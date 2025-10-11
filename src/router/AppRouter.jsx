@@ -9,6 +9,11 @@ import Traceabilityreports from "../pages/TraceabilityReport/TraceabilityReport"
 import ReverseTraceabilityReport from "../pages/TraceabilityReport/ReverseTraceabilityReport";
 import Kittingprocessscreen from "../pages/Traceability/Kitting";
 import LineDashboard from "../pages/Traceability/Dashboard";
+import ToolChange from "../pages/ToolMonitoring/Reports/ToolChange";
+import ToolHistoryLog from "../pages/ToolMonitoring/Reports/ToolHistoryLog";
+import CriticalSparePartsList from "../pages/ToolMonitoring/Reports/CriticalSparePartsList";
+import PreventiveMaintenanceCheckList from "../pages/ToolMonitoring/Reports/PMchecklist";
+import ToolMonitoringMaster from "../pages/ToolMonitoring/Master/MainMaster";
 
 export default function AppRouter() {
   return (
@@ -38,6 +43,11 @@ export default function AppRouter() {
             element={<Kittingprocessscreen />}
           />
           <Route path="/lineDashboard" element={<LineDashboard />} />
+          <Route path="/toolChange" element={<ToolChange/>} />
+          <Route path="/ToolHistoryLog" element={<ToolHistoryLog/>} />
+          <Route path="/CriticalSparePartsList" element={<CriticalSparePartsList/>} />
+          <Route path="/PreventiveMaintenanceCheckList" element={<PreventiveMaintenanceCheckList/>} />
+          <Route path="/toolmonitoringmaster" element={<ToolMonitoringMaster />} />
         </Route>
       </Routes>
     </BrowserRouter>

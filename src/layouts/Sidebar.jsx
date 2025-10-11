@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { Layout, Menu } from "antd";
-import {
-  DashboardOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { DashboardOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
 const { Sider } = Layout;
@@ -77,8 +74,10 @@ export default function SidebarMenu({ collapsed }) {
                 { key: "datamissreport", label: "Data Miss Reports" },
                 { key: "oversteyreport", label: "Overstay Reports" },
                 { key: "overalldashboard", label: "Overall Dashboard" },
-                { key: "Line side overall dashboard(Traceability)", label: "Line side overall dashboard(Traceability)" },
-
+                {
+                  key: "Line side overall dashboard(Traceability)",
+                  label: "Line side overall dashboard(Traceability)",
+                },
               ],
             },
             { key: "profile", icon: <UserOutlined />, label: "Profile" },
@@ -103,17 +102,52 @@ export default function SidebarMenu({ collapsed }) {
               label: "Traceability",
               children: [
                 { key: "Picklist screen", label: "Picklist screen" },
-                { key: "picklist verification screen", label: "picklist verification screen" },
+                {
+                  key: "picklist verification screen",
+                  label: "picklist verification screen",
+                },
                 { key: "Store returnable", label: "Store returnable" },
-                { key: "line side child part verification screen", label: "line side child part verification screen" },
-                { key: "Kittingprocessscreen", label: "Kitting process screen" },
-                { key: "A2 and B2 type label print screen", label: "A2 and B2 type label print screen" },
+                {
+                  key: "line side child part verification screen",
+                  label: "line side child part verification screen",
+                },
+                {
+                  key: "Kittingprocessscreen",
+                  label: "Kitting process screen",
+                },
+                {
+                  key: "A2 and B2 type label print screen",
+                  label: "A2 and B2 type label print screen",
+                },
                 { key: "lineDashboard", label: "Line Dashboard" },
                 { key: "traceabilityReports", label: "Reports" },
                 { key: "linefeeder", label: "Line Feeder" },
                 { key: "storeReturnable", label: "Store Returnable" },
                 { key: "Traceabilityreports1", label: "TraceabilityReports" },
-                { key: "reversetraceabilityReports", label: "ReverseTreaceabilityReports" },
+                {
+                  key: "reversetraceabilityReports",
+                  label: "ReverseTreaceabilityReports",
+                },
+                {
+                  key: "toolmonitoring  ",
+                  label: "Tool Monitoring",
+                  children: [
+                    { key: "toolChange", label: "Tool Change" },
+                    { key: "ToolHistoryLog", label: "Tool History Log" },
+                    {
+                      key: "CriticalSparePartsList",
+                      label: "Critical Spare Parts List",
+                    },
+                    {
+                      key: "PreventiveMaintenanceCheckList",
+                      label: "PM Checklist Log",
+                    },
+                    {
+                      key: "toolmonitoringmaster",
+                      label: "Tool Monitoring Master",
+                    },
+                  ],
+                },
               ],
             },
           ]}
