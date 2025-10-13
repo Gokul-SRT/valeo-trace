@@ -6,9 +6,12 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from 'ag-grid-community'; 
 import { SetFilterModule } from 'ag-grid-enterprise'; 
 import { DateFilterModule } from 'ag-grid-enterprise'; 
-
+import { ExcelExportModule } from "ag-grid-enterprise";
+import { Input, Button, Form, message } from "antd";
+import store from "store";
+import serverApi from '../../../serverAPI';
 ModuleRegistry.registerModules([ SetFilterModule,
-    DateFilterModule]); 
+    DateFilterModule,ExcelExportModule]); 
 
 const ProductMaster = ({modulesprop,screensprop}) => {
     const [selectedModule, setSelectedModule] = useState("");
@@ -27,7 +30,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
     const allColumnIds = params.columnApi.getAllColumns().map(col => col.getId());
     params.api.autoSizeColumns(allColumnIds);
   };
-  
+  /*
   useEffect(() => {
       setSelectedModule(modulesprop);
       setSelectedScreen(screensprop);
@@ -55,13 +58,64 @@ const ProductMaster = ({modulesprop,screensprop}) => {
             isActive: false,
           },
         ];
-        setMasterList(sampleData);
-        setOriginalList(sampleData);
+
+        const updatedResponseData = sampleData.map((item)=>{
+          return {
+            ...item,
+            isUpdate: 1
+          }
+        })
+        console.log(updatedResponseData);
+        setMasterList(updatedResponseData);
+        setOriginalList(updatedResponseData);
       }
     }, [selectedModule, selectedScreen]); 
   
+  */
   
-  
+    useEffect(()=>{
+      setSelectedModule(modulesprop);
+      setSelectedScreen(screensprop);
+    },[modulesprop, screensprop])
+    
+    useEffect(() => {
+      if (selectedModule && selectedScreen) {
+        fetchData();
+      }
+    }, [selectedModule, selectedScreen])
+    
+    const fetchData = async () => {
+      try {
+        const response = await serverApi.post("getproductmasterdtl", {
+          isActive: "1",
+         /* tenantId: store.get('tenantId'),
+          branchCode: store.get('branchCode')
+          */
+          tenantId: ('val'),
+          branchCode: ('VAL')
+        });
+    
+        // ✅ Handle if backend sends null, undefined, or empty array
+        if (!response.data || response.data.length === 0) {
+          setMasterList([]);
+          setOriginalList([]);
+         
+        } else {
+          const updatedResponseData = response.data.map((item) => ({
+            ...item,
+            isUpdate: 1,
+          }));
+          setMasterList(updatedResponseData);
+          setOriginalList(updatedResponseData);
+          console.log(updatedResponseData);
+        }
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+        alert("Error fetching data. Please try again later.");
+      }
+    };
+
+
     const defaultColDef = {
       sortable: true,
       filter: true,
@@ -76,11 +130,11 @@ const ProductMaster = ({modulesprop,screensprop}) => {
           headerName: "Product Code",
           field: "productCode",
           filter: "agTextColumnFilter",
-          editable: (params) => !params.data || !params.data.productCode, // only editable if code is empty
+          editable: (params) => params.data.isUpdate === 0 ? true : false
         },
       { headerName: "Product Description", field: "productDesc",filter: "agTextColumnFilter" },
-      { headerName: "UOM", field: "uom",filter: "agTextColumnFilter" },
-      { headerName: "Product Category Description", field: "productCategoryDesc",filter: "agTextColumnFilter" },
+      { headerName: "UOM", field: "productUomCode",filter: "agTextColumnFilter" },
+    //  { headerName: "Product Category Description", field: "productCategoryDesc",filter: "agTextColumnFilter" },
      
       {
           headerName: "IsActive",
@@ -89,11 +143,18 @@ const ProductMaster = ({modulesprop,screensprop}) => {
           editable: true,
           cellRenderer: "agCheckboxCellRenderer",
           cellEditor: "agCheckboxCellEditor",
-          valueGetter: (params) => params.data.isActive === true,
-          valueSetter: (params) => {
-            params.data.isActive = params.newValue ? true : false;
-            return true;
-          },
+          // valueGetter: (params) => params.data.isActive === true,
+          // valueSetter: (params) => {
+          //   params.data.isActive = params.newValue ? true : false;
+          //   return true;
+          // },
+
+          valueGetter: (params) => params.data.isActive === "1" || params.data.isActive === 1,
+  valueSetter: (params) => {
+    // when checkbox is clicked, set 1 for true, 0 for false
+    params.data.isActive = params.newValue ? "1" : "0";
+    return true;
+  },
           cellStyle: { textAlign: "center" }
         }
       
@@ -102,15 +163,72 @@ const ProductMaster = ({modulesprop,screensprop}) => {
   
   // Add new empty row
   const handleAddRow = () => {
-      const emptyRow = {};
-      columnDefs.forEach((col) => {
-        emptyRow[col.field] = "";
-      });
-      const updated = [...masterList, emptyRow];
-      setMasterList(updated);
-      setOriginalList(updated);
+      const emptyRow = {
+        isUpdate:0
+      };
+      // columnDefs.forEach((col) => {
+      //   emptyRow[col.field] = "";
+      // });
+      const productcodeempty = masterList.filter((item)=> !item.productCode);
+      console.log(productcodeempty);
+      if(productcodeempty && productcodeempty?.length === 0){
+        const updated = [...masterList, emptyRow];
+        setMasterList(updated);
+        setOriginalList(updated);
+      }else{
+        message.error("Please enter the Product code for all the rows.");
+        alert("Please enter the Product code for all the rows.");
+      }
     };
   
+  /*const createorUpdate =() =>{
+
+
+
+
+    console.log(originalList);
+  }*/
+
+  const createorUpdate = async () => {
+    try {
+
+      const updatedList = masterList.map(item => ({
+       /* ...item,
+        tenantId: "valeo",
+        branchCode: "0001" 
+        */
+       isUpdate:item.isUpdate,
+       productCode:item.productCode,
+       productCategoryCode:"FG",
+       productUomCode:item.productUomCode,
+       productDesc:item.productDesc,
+       tenantId:"val",
+       isActive:item.isActive,
+       updatedBy:"E0001",
+       branchCode:"VAL" ,
+       isInventory:"0"
+
+      }));
+
+      const response = await serverApi.post("insertupdateproductmaster",updatedList);
+  
+      if (response.data && response.data === "SUCCESS") {
+       // message.success("Data saved successfully!");
+        alert("Data saved successfully!");
+        fetchData();
+      } else {
+       // message.error("SaveOrUpdate failed.");
+        alert("SaveOrUpdate failed.");
+      }
+    } catch (error) {
+      console.error("Error saving product data:", error);
+     // message.error("Error while saving data!");
+     alert("Error while saving data!");
+    }
+  };
+
+
+
   
     // ✅ Cancel
     const handleCancel = () => {
@@ -118,6 +236,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
       setSelectedScreen("");
       setMasterList([]);
       setOriginalList([]);
+      fetchData();
      
     };
   
@@ -126,10 +245,10 @@ const ProductMaster = ({modulesprop,screensprop}) => {
     const handleFilterChange = (value) => {
       if (!value || value === "GetAll") {
         setMasterList(originalList);
-      } else if (value === "Active") {
-        setMasterList(originalList.filter((item) => item.isActive === true));
-      } else if (value === "Inactive") {
-        setMasterList(originalList.filter((item) => item.isActive === false));
+      } else if (value === "1") {
+        setMasterList(originalList.filter((item) => item.isActive === "1"));
+      } else if (value === "0") {
+        setMasterList(originalList.filter((item) => item.isActive === "0"));
       }
     };
     
@@ -143,13 +262,15 @@ const ProductMaster = ({modulesprop,screensprop}) => {
       }
     };
   
+
+
     return (
-      <div className="container mt-1">
+      <div className="container mt-1 p-0">
         
   
         {/* Second Card - Table */}
-        {masterList.length > 0 && (
-          <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
+        {/* {masterList.length > 0 && ( */}
+          <div className="card shadow" style={{ borderRadius: "6px" }}>
             <div
              className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
              style={{ backgroundColor: "#00264d" }}
@@ -172,8 +293,8 @@ const ProductMaster = ({modulesprop,screensprop}) => {
                     onChange={(e) => handleFilterChange(e.target.value)}
                   >
                     <option value="GetAll">Get All</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">InActive</option>
+                    <option value="1">Active</option>
+                    <option value="0">InActive</option>
                   </select>
                 </div>
               </div>
@@ -209,6 +330,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
                   type="submit"
                   className="btn text-white me-2"
                   style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+                  onClick={createorUpdate}
                 >
                   Update
                 </button>
@@ -224,7 +346,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
             </div>
             
           </div>
-        )}
+        {/* )} */}
   
         
       </div>
