@@ -4,8 +4,8 @@ import ToolMaster from "../ToolMaster";
 import SparepartsMaster from "../SparepartsMaster";
 import PMChecklistMaster from "../PMchecklistMaster";
 import CustomerMaster from "../CustomerMaster";
-import SupplierMaster from "../SupplierMaster";
-import LocationMaster from "../LocationMaster";
+//import SupplierMaster from "../SupplierMaster";
+//import LocationMaster from "../LocationMaster";
 
 const ToolMonitoring = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
@@ -17,8 +17,8 @@ const ToolMonitoring = () => {
       { id: 2, name: "Spare Master", value: SparepartsMaster },
       { id: 3, name: "PM Checklist Master", value: PMChecklistMaster },
       { id: 4, name: "Customer Master", value: CustomerMaster },
-      { id: 5, name: "Supplier Master", value: SupplierMaster },
-      { id: 6, name: "Location Master", value: LocationMaster },
+      // { id: 5, name: "Supplier Master", value: SupplierMaster },
+      // { id: 6, name: "Location Master", value: LocationMaster },
     ],
   };
 

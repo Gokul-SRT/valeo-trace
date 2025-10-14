@@ -1,0 +1,91 @@
+.traceability-container {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", sans-serif;
+  background-color: #f5f5f5;
+}
+
+.traceability-card {
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+}
+
+.required {
+  color: red;
+  margin-left: 3px;
+}
+
+.error-text {
+  color: red;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.table-wrapper {
+  position: relative;
+}
+
+.table-header {
+  border: 1px solid #ddd;
+  border-bottom: none;
+}
+
+.table-content {
+  border: 1px solid #ddd;
+  border-top: none;
+  position: relative;
+}
+
+.table-row {
+  border-top: 1px solid #ddd;
+  padding: 12px 0;
+}
+
+.cell-center {
+  text-align: center;
+}
+
+.green-box,
+.grey-box {
+  min-width: 120px;
+  padding: 6px 12px;
+  text-align: center;
+  font-weight: 600;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.green-box {
+  background-color: #5cb85c;
+  color: white;
+}
+
+.grey-box {
+  background-color: #d9d9d9;
+  color: #333;
+}
+
+.shifted-box {
+  margin-left: 20px;
+}
+
+.vertical-grey-line {
+  position: absolute;
+  left: 41.66%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: rgb(217, 206, 206);
+  z-index: 0;
+}
+
+/* Progress bar alignment */
+.ant-progress {
+  margin-top: 4px;
+  width: 80%;
+  margin-left: 20px;
+}

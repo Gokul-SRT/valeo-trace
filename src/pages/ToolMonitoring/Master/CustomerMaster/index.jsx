@@ -24,21 +24,12 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
   useEffect(() => {
     if (selectedModule && selectedScreen) {
-      // Sample data for Customer Master
       const sampleData = [
-        { customer_id: "CUST001", customer_name: "Toyota", status: "Active" },
-        { customer_id: "CUST002", customer_name: "Honda", status: "Inactive" },
-        { customer_id: "CUST003", customer_name: "Ford", status: "Active" },
-        { customer_id: "CUST004", customer_name: "Hyundai", status: "Active" },
-        { customer_id: "CUST005", customer_name: "Nissan", status: "Inactive" },
-        { customer_id: "CUST006", customer_name: "Suzuki", status: "Active" },
-        { customer_id: "CUST007", customer_name: "Volkswagen", status: "Inactive" },
-        { customer_id: "CUST008", customer_name: "Tata Motors", status: "Active" },
-        { customer_id: "CUST009", customer_name: "Kia", status: "Active" },
-        { customer_id: "CUST010", customer_name: "Renault", status: "Inactive" },
+        { customer_id: "CUST001", customer_name: "Maruti", status: "Active" },
       ].map((item) => ({
         ...item,
         isActive: item.status === "Active",
+        isDisabled: false,
       }));
 
       setMasterList(sampleData);
@@ -53,9 +44,37 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+  // Custom renderer for handling disabled checkbox
+  const CustomCheckboxRenderer = (props) => {
+    const handleChange = (e) => {
+      if (props.data.isDisabled) return;
+      props.setValue(e.target.checked);
+    };
+
+    return (
+      <input
+        type="checkbox"
+        checked={props.value}
+        onChange={handleChange}
+        disabled={props.data.isDisabled}
+        style={{
+          cursor: props.data.isDisabled ? "not-allowed" : "pointer",
+        }}
+      />
+    );
+  };
+
   const columnDefs = [
-    { headerName: "Customer ID", field: "customer_id", filter: "agTextColumnFilter" },
-    { headerName: "Customer Name", field: "customer_name", filter: "agTextColumnFilter" },
+    {
+      headerName: "Customer ID",
+      field: "customer_id",
+      filter: "agTextColumnFilter",
+    },
+    {
+      headerName: "Customer Name",
+      field: "customer_name",
+      filter: "agTextColumnFilter",
+    },
     {
       headerName: "Status",
       field: "status",
@@ -67,8 +86,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       field: "isActive",
       filter: true,
       editable: true,
-      cellRenderer: "agCheckboxCellRenderer",
-      cellEditor: "agCheckboxCellEditor",
+      cellRenderer: CustomCheckboxRenderer,
       valueGetter: (params) => params.data.isActive === true,
       valueSetter: (params) => {
         params.data.isActive = params.newValue ? true : false;
@@ -79,17 +97,16 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     },
   ];
 
+  // + Button Click
   const handleAddRow = () => {
-    const emptyRow = {};
-    columnDefs.forEach((col) => {
-      emptyRow[col.field] =
-        col.field === "isActive"
-          ? false
-          : col.field === "status"
-          ? "Inactive"
-          : "";
-    });
-    const updated = [...masterList, emptyRow];
+    const newRow = {
+      customer_id: "",
+      customer_name: "",
+      status: "Active",
+      isActive: true,
+      isDisabled: true, // Disable checkbox
+    };
+    const updated = [...masterList, newRow];
     setMasterList(updated);
     setOriginalList(updated);
   };
@@ -122,81 +139,106 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1">
-      <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
-        <div
-          className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
-          style={{ backgroundColor: "#00264d" }}
-        >
-          Customer Master
-          <PlusOutlined
-            style={{ fontSize: "20px", cursor: "pointer", color: "white" }}
-            onClick={handleAddRow}
-            title="Add Row"
-          />
-        </div>
-
-        {/* Filter Dropdown */}
-        <div className="p-3">
-          <div className="row">
-            <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
-              <select
-                className="form-select"
-                onChange={(e) => handleFilterChange(e.target.value)}
-              >
-                <option value="GetAll">Get All</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="card-body p-3">
-          {masterList.length > 0 && (
-            <AgGridReact
-              ref={gridRef}
-              rowData={masterList}
-              columnDefs={columnDefs}
-              defaultColDef={defaultColDef}
-              paginationPageSize={100}
-              pagination={true}
-              domLayout="autoHeight"
-              singleClickEdit={true}
-              onFirstDataRendered={autoSizeAllColumns}
-              onCellValueChanged={(params) => {
-                const updatedList = [...masterList];
-                updatedList[params.rowIndex] = params.data;
-                setMasterList(updatedList);
-                setOriginalList(updatedList);
+    <div className="container mt-1 p-0">
+      {/* Match size and alignment with Tool Monitoring Master */}
+      <div className="row justify-content-center">
+        <div className="col-md-12">
+          <div className="card shadow mt-4">
+            {/* Card Header */}
+            <div
+              className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
+              style={{
+                backgroundColor: "#00264d",
+                borderTopLeftRadius: "8px",
+                borderTopRightRadius: "8px",
+                padding: "10px 15px",
               }}
-            />
-          )}
+            >
+              Customer Master
+              <PlusOutlined
+                style={{
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  color: "white",
+                }}
+                onClick={handleAddRow}
+                title="Add Row"
+              />
+            </div>
 
-          <div className="text-center mt-4">
-            <button
-              onClick={() => onExportExcel(gridRef)}
-              className="btn text-white me-2"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-            >
-              Excel
-            </button>
-            <button
-              type="submit"
-              className="btn text-white me-2"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-            >
-              Update
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="btn text-white"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-            >
-              Cancel
-            </button>
+            {/* Card Body */}
+            <div className="card-body p-3">
+              {/* Filter Dropdown */}
+              <div className="row mb-3">
+                <div className="col-md-3">
+                  <label className="form-label fw-bold">Status</label>
+                  <select
+                    className="form-select"
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                  >
+                    <option value="GetAll">Get All</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Grid */}
+              {masterList.length > 0 && (
+                <AgGridReact
+                  ref={gridRef}
+                  rowData={masterList}
+                  columnDefs={columnDefs}
+                  defaultColDef={defaultColDef}
+                  paginationPageSize={100}
+                  pagination={true}
+                  domLayout="autoHeight"
+                  singleClickEdit={true}
+                  onFirstDataRendered={autoSizeAllColumns}
+                  onCellValueChanged={(params) => {
+                    const updatedList = [...masterList];
+                    updatedList[params.rowIndex] = params.data;
+                    setMasterList(updatedList);
+                    setOriginalList(updatedList);
+                  }}
+                />
+              )}
+
+              {/* Buttons */}
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => onExportExcel(gridRef)}
+                  className="btn text-white me-2"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                >
+                  Excel
+                </button>
+                <button
+                  type="submit"
+                  className="btn text-white me-2"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="btn text-white"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
