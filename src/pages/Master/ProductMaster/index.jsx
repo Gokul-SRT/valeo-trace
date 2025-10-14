@@ -7,7 +7,8 @@ import { ModuleRegistry } from 'ag-grid-community';
 import { SetFilterModule } from 'ag-grid-enterprise'; 
 import { DateFilterModule } from 'ag-grid-enterprise'; 
 import { ExcelExportModule } from "ag-grid-enterprise";
-import { Input, Button, Form, message } from "antd";
+import { Input, Button, Form, message,notification  } from "antd";
+import { toast } from "react-toastify";
 import store from "store";
 import serverApi from '../../../serverAPI';
 ModuleRegistry.registerModules([ SetFilterModule,
@@ -111,7 +112,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
         }
       } catch (error) {
         console.error("Error fetching master data:", error);
-        alert("Error fetching data. Please try again later.");
+        toast.error("Error fetching data. Please try again later.");
       }
     };
 
@@ -177,7 +178,7 @@ const ProductMaster = ({modulesprop,screensprop}) => {
         setOriginalList(updated);
       }else{
         message.error("Please enter the Product code for all the rows.");
-        alert("Please enter the Product code for all the rows.");
+        toast.error("Please enter the Product code for all the rows.");
       }
     };
   
@@ -213,17 +214,20 @@ const ProductMaster = ({modulesprop,screensprop}) => {
       const response = await serverApi.post("insertupdateproductmaster",updatedList);
   
       if (response.data && response.data === "SUCCESS") {
-       // message.success("Data saved successfully!");
-        alert("Data saved successfully!");
+        toast.success("Data saved successfully!");
+      
         fetchData();
-      } else {
-       // message.error("SaveOrUpdate failed.");
-        alert("SaveOrUpdate failed.");
+      } else if (response.data && response.data === "DUBLICATE") {
+        toast.success("Do Not Allow Dublicate ProductCode!");
+
+      }  else {
+        toast.error("SaveOrUpdate failed.");
+        
       }
     } catch (error) {
       console.error("Error saving product data:", error);
-     // message.error("Error while saving data!");
-     alert("Error while saving data!");
+     toast.error("Error while saving data!");
+     
     }
   };
 
