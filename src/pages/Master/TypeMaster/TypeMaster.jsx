@@ -3,19 +3,31 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
 import "ag-grid-enterprise";
+import { ModuleRegistry } from "ag-grid-community";
+import { SetFilterModule } from "ag-grid-enterprise";
+import { DateFilterModule } from "ag-grid-enterprise";
+import { ExcelExportModule } from "ag-grid-enterprise";
+import { Input, Button, Form, message } from "antd";
+import { toast } from "react-toastify";
+import store from "store";
+import serverApi from "../../../serverAPI";
+ModuleRegistry.registerModules([
+  SetFilterModule,
+  DateFilterModule,
+  ExcelExportModule,
+]);
+
 
 const TypeMaster = ({ modulesprop, screensprop }) => {
-  console.log("Modules Props:", modulesprop);
-  console.log("Screens Props:", screensprop);
-
-  const [selectedModule, setSelectedModule] = useState(modulesprop);
-  const [selectedScreen, setSelectedScreen] = useState(screensprop);
+  const [selectedModule, setSelectedModule] = useState("");
+  const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
-  const [originalList, setOriginalList] = useState([]);
+  const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
   const gridRef = useRef(null);
 
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
+
     const allColumnIds = params.columnApi
       .getAllColumns()
       .map((col) => col.getId());
@@ -23,89 +35,148 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
   };
 
   useEffect(() => {
-
-  if (selectedModule && selectedScreen) {
-
-    // Sample data for Type Master
-    const sampleData = [
-      {
-        type_id: "TYP001",
-        type_code: "CODE1",
-        type_description: "Description 1",
-        tenant_id: "TEN001",
-        created_at: "2025-09-29",
-        updated_at: "2025-09-29",
-        isActive: true,
-      },
-      {
-        type_id: "TYP002",
-        type_code: "CODE2",
-        type_description: "Description 2",
-        tenant_id: "TEN002",
-        created_at: "2025-09-20",
-        updated_at: "2025-09-25",
-        isActive: false,
-      },
-    ];
-    setMasterList(sampleData);
-    setOriginalList(sampleData);
-}
+    setSelectedModule(modulesprop);
+    setSelectedScreen(screensprop);
   }, [modulesprop, screensprop]);
+
+  useEffect(() => {
+    if (selectedModule && selectedScreen) {
+      fetchData();
+    }
+  }, [selectedModule, selectedScreen]);
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  const employeeId = JSON.parse(localStorage.getItem("empID"));
+
+  console.log("tenantId",tenantId);
+
+  const fetchData = async () => {
+    try {
+      //  console.log(store.get('tenantId'),"tenantId");
+      //  console.log(store.get('branchCode'),"branchCode");
+      const response = await serverApi.post("gettypeMasterdtl", {
+       
+        tenantId:tenantId,
+        branchCode:branchCode
+        
+        // tenantId: "val",
+        // branchCode: "VAL",
+      });
+
+      // ✅ Handle if backend sends null, undefined, or empty array
+      if (!response.data || response.data.length === 0) {
+        setMasterList([]);
+        setOriginalList([]);
+      } else {
+        const updatedResponseData = response.data.map((item) => ({
+          ...item,
+          isUpdate: 1,
+        }));
+        setMasterList(updatedResponseData);
+        setOriginalList(updatedResponseData);
+        console.log(updatedResponseData);
+      }
+    } catch (error) {
+      console.error("Error fetching master data:", error);
+      toast.error("Error fetching data. Please try again later.");
+    }
+  };
 
   const defaultColDef = {
     sortable: true,
     filter: true,
     editable: true,
+    //resizable: true, // allow manual resize too
     flex: 1,
   };
 
-  const columnDefs = [
-    { headerName: "Type ID", field: "type_id", filter: "agTextColumnFilter" },
-    { headerName: "Type Code", field: "type_code", filter: "agTextColumnFilter" },
-    { headerName: "Type Description", field: "type_description", filter: "agTextColumnFilter" },
-    { headerName: "Tenant ID", field: "tenant_id", filter: "agTextColumnFilter" },
-    { headerName: "Created At", field: "created_at", filter: "agDateColumnFilter" },
-    { headerName: "Updated At", field: "updated_at", filter: "agDateColumnFilter" },
-    {
-      headerName: "Is Active",
-      field: "isActive",
-      filter: true,
-      editable: true,
-      cellRenderer: "agCheckboxCellRenderer",
-      cellEditor: "agCheckboxCellEditor",
-      valueGetter: (params) => params.data.isActive === true,
-      valueSetter: (params) => {
-        params.data.isActive = params.newValue ? true : false;
-        return true;
-      },
-      cellStyle: { textAlign: "center" },
-    },
-  ];
+ 
 
+// const columnDefs = [
+//   { headerName: "Packet ID", field: "packetId", filter: "agTextColumnFilter",  editable: (params) => (params.data.isUpdate === 0 ? true : false), },
+//   { headerName: "Child Part ID", field: "childPartId", filter: "agTextColumnFilter" },
+//   { headerName: "Packet Qty", field: "packetsQtys", filter: "agNumberColumnFilter" },
+// ];
+
+
+const columnDefs = [
+ // { headerName: "Type ID", field: "type_id", filter: "agTextColumnFilter",editable: (params) => (params.data.isUpdate === 0 ? true : false), },
+  { headerName: "Type Code", field: "typeCode", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === 0 ? true : false), },
+  { headerName: "Type Description", field: "typeDesc", filter: "agTextColumnFilter" },
+ // { headerName: "Tenant ID", field: "tenant_id", filter: "agTextColumnFilter" },
+  // { headerName: "Created At", field: "created_at", filter: "agDateColumnFilter" },
+  // { headerName: "Updated At", field: "updated_at", filter: "agDateColumnFilter" },
+];
+
+
+  // Add new empty row
   const handleAddRow = () => {
-    const emptyRow = {};
-    columnDefs.forEach((col) => {
-      emptyRow[col.field] = col.field === "isActive" ? false : "";
-    });
-    const updated = [...masterList, emptyRow];
-    setMasterList(updated);
-    setOriginalList(updated);
+    const emptyRow = {
+      isUpdate: 0,
+    };
+
+    const TypeMasterempty = masterList.filter((item) => !item.typeCode);
+    console.log(TypeMasterempty);
+    if (TypeMasterempty && TypeMasterempty?.length === 0) {
+      const updated = [...masterList, emptyRow];
+      setMasterList(updated);
+      setOriginalList(updated);
+    } else {
+      toast.error("Please enter the Type Code for all the rows.");
+    }
   };
 
+  const createorUpdate = async () => {
+    try {
+      console.log('masterList',masterList)
+      const updatedList = masterList.map((item) => ({
+        isUpdate: item.isUpdate,
+        typeCode: item.typeCode,
+        typeDesc: item.typeDesc,
+        tenantId: tenantId,
+        updatedBy: employeeId,
+        branchCode: branchCode,
+      }));
+
+      const response = await serverApi.post(
+        "insertupdatetypemaster",
+        updatedList
+      );
+
+      if (response.data && response.data === "SUCCESS") {
+        toast.success("Data saved successfully!");
+        fetchData();
+      } else if (response.data && response.data === "DUBLICATE") {
+        toast.success("Do Not Allow Dublicate TypeCode!");
+
+      }  else {
+        toast.error("SaveOrUpdate failed.");
+        
+      }
+    } catch (error) {
+      console.error("Error saving TypeMaster data:", error);
+       toast.error("Error while saving data!");
+     
+    }
+  };
+
+  // ✅ Cancel
   const handleCancel = () => {
     setSelectedModule("");
     setSelectedScreen("");
     setMasterList([]);
     setOriginalList([]);
+    fetchData();
   };
 
+  // ✅ Filter change
   const handleFilterChange = (value) => {
     if (!value || value === "GetAll") {
       setMasterList(originalList);
-    } else if (value === "Active") {
-      setMasterList(originalList.filter((item) => item.isActive === true));
-    } else if (value === "Inactive") {
-      setMasterList(originalList.filter((item) => item.isActive === false));
+    } else if (value === "1") {
+      setMasterList(originalList.filter((item) => item.isActive === "1"));
+    } else if (value === "0") {
+      setMasterList(originalList.filter((item) => item.isActive === "0"));
     }
   };
 
@@ -120,13 +191,15 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1">
-      <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
+    <div className="container mt-1 p-0">
+      {/* Second Card - Table */}
+      {/* {masterList.length > 0 && ( */}
+      <div className="card shadow" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
           style={{ backgroundColor: "#00264d" }}
         >
-          Type Master Details
+          {selectedScreen} Details
           <PlusOutlined
             style={{ fontSize: "20px", cursor: "pointer", color: "white" }}
             onClick={handleAddRow}
@@ -134,8 +207,8 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
           />
         </div>
 
-        {/* Filter Dropdown */}
-        <div className="p-3">
+        {/* 🔹 Filter Dropdown */}
+        {/* <div className="p-3">
           <div className="row">
             <div className="col-md-3">
               <label className="form-label fw-bold">Search Filter</label>
@@ -144,21 +217,20 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
                 onChange={(e) => handleFilterChange(e.target.value)}
               >
                 <option value="GetAll">Get All</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">InActive</option>
+                <option value="1">Active</option>
+                <option value="0">InActive</option>
               </select>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="card-body p-3">
-        {masterList.length > 0 && (
           <AgGridReact
             ref={gridRef}
             rowData={masterList}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={100}
+            paginationPageSize={10}
             pagination={true}
             domLayout="autoHeight"
             singleClickEdit={true}
@@ -170,8 +242,6 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
               setOriginalList(updatedList);
             }}
           />
-          )}
-          
           <div className="text-center mt-4">
             <button
               onClick={() => onExportExcel(gridRef)}
@@ -184,6 +254,7 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
               type="submit"
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+              onClick={createorUpdate}
             >
               Update
             </button>
@@ -198,6 +269,7 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
           </div>
         </div>
       </div>
+      {/* )} */}
     </div>
   );
 };

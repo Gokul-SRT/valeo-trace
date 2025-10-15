@@ -43,7 +43,9 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       fetchData();
     }
   }, [selectedModule, selectedScreen]);
-
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  const employeeId = JSON.parse(localStorage.getItem("empID"));
   const fetchData = async () => {
     try {
       const response = await serverApi.post("getlineMasterdtl", {
@@ -51,8 +53,8 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         /* tenantId: store.get('tenantId'),
         branchCode: store.get('branchCode')
         */
-        tenantId: "val",
-        branchCode: "VAL",
+        tenantId: tenantId,
+        branchCode: branchCode,
       });
 
       // ✅ Handle if backend sends null, undefined, or empty array
@@ -141,10 +143,10 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         lineMasterCode: item.lineMstCode,
         sequence: item.sequence || "0",
         lineMasterDesc: item.lineMstDesc,
-        tenantId: "val",
+        tenantId: tenantId,
         isActive: item.isActive,
-        updatedBy: "E0001",
-        branchCode: "VAL",
+        updatedBy: employeeId,
+        branchCode: branchCode,
       }));
 
       const response = await serverApi.post(
@@ -239,7 +241,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
             rowData={masterList}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={100}
+            paginationPageSize={10}
             pagination={true}
             domLayout="autoHeight"
             singleClickEdit={true}
