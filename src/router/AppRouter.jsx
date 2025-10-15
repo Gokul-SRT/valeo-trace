@@ -15,6 +15,7 @@ import CriticalSparePartsList from "../pages/ToolMonitoring/Reports/CriticalSpar
 import PreventiveMaintenanceCheckList from "../pages/ToolMonitoring/Reports/PMchecklist";
 import ToolMonitoringMaster from "../pages/ToolMonitoring/Master/MainMaster";
 import TraceabilityLog from "../pages/Traceability/TraceabilityLog/TraceabilityLog";
+import CycleTimeAnalysis from "../pages/Traceability/CycleTimeAnalysis/CycleTimeAnalysis";
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -49,6 +50,7 @@ export default function AppRouter() {
           <Route path="/PreventiveMaintenanceCheckList" element={<PreventiveMaintenanceCheckList/>} />
           <Route path="/toolmonitoringmaster" element={<ToolMonitoringMaster />} />
           <Route path="/traceabilitylog" element={<TraceabilityLog />} />
+          <Route path="/cycletimeanalysis" element={<CycleTimeAnalysis />} />
         </Route>
       </Routes>
     </BrowserRouter>
