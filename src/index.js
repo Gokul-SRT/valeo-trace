@@ -14,11 +14,6 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <Provider store={store}>
     <App />
-    return (
-    <>
-      {/* Your App content */}
-      <ToastContainer style={{marginTop:'65px'}} position="top-right" autoClose={3000} />
-    </>
-  );
+    <ToastContainer style={{marginTop:'65px'}} position="top-right" autoClose={3000} />
   </Provider>
 );
