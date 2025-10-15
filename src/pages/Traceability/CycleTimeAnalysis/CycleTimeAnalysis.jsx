@@ -5,7 +5,7 @@ import * as am4charts from "@amcharts/amcharts4/charts";
 import * as am4plugins_timeline from "@amcharts/amcharts4/plugins/timeline";
 import am4themes_animated from "@amcharts/amcharts4/themes/animated";
 import "antd/dist/reset.css";
-import "./style.css";
+
 
 am4core.useTheme(am4themes_animated);
 
