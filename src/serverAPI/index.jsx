@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { notification } from 'antd';
-
+import store from 'store';
 // Helper: read cookie
 function getCookie(name) {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -20,9 +20,16 @@ const serverApi = axios.create({
 serverApi.interceptors.request.use(
   (request) => {
     const accessToken = getCookie('accessToken');
+    const tenantId = getCookie('tenantId')
+    const employeeId = getCookie('empID')
+    const branchCode = getCookie('branchCode')
     if (accessToken) {
       request.headers.Authorization = `Bearer ${accessToken}`;
       request.headers.AccessToken = accessToken;
+      store.set("accessToken", accessToken)
+      store.set("employeeId", employeeId)
+      store.set("branchCode", branchCode)
+      store.set("tenantId", tenantId)
     }
     return request;
   },

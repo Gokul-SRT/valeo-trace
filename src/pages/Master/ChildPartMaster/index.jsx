@@ -6,6 +6,8 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
+import { toast } from "react-toastify";
+import serverApi from '../../../serverAPI';
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
@@ -15,6 +17,9 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
   const gridRef = useRef(null);
+
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem('branchCode'));
 
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
@@ -26,92 +31,35 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     setSelectedModule(modulesprop);
     setSelectedScreen(screensprop);
     if (selectedModule && selectedScreen) {
-      const sampleData = [
-        {
-          id: 1,
-          childPartCode: "CF72760",
-          childPartDesc: "Cushion Disc - MSIL  Z12E 200 UX OE",
-          product: "MSIL Z12E 200 OE",
-          line: "Disc Assy",
-          status: true,
-        },
-        {
-          id: 2,
-          childPartCode: "CF72760HF",
-          childPartDesc: "Cushion Disc HF - MSIL  Z12E 200 UX OE",
-          product: "MSIL Z12E 200 OE",
-          line: "Disc Assy",
-          status: true,
-        },
-        {
-          id: 3,
-          childPartCode: "CF72760TE",
-          childPartDesc: "Cushion Disc Temp - MSIL  Z12E 200 UX OE",
-          product: "MSIL Z12E 200 OE",
-          line: "Disc Assy",
-          status: false,
-        },
-        {
-          id: 4,
-          childPartCode: "612050700H",
-          childPartDesc: "Steel Coil-MSIL Z12E Cushion Disc205X0.7",
-          product: "MSIL Z12E 200 OE",
-          line: "Disc Assy",
-          status: false,
-        },
-        {
-          id: 5,
-          childPartCode: "1069282",
-          childPartDesc: "Rivet - Cushion Disc DW",
-          product: "MSIL Z12E 200 OE",
-          line: "Disc Assy",
-          status: false,
-        },
-        {
-          id: 6,
-          childPartCode: "CF89045",
-          childPartDesc: "Cover Plate - MSIL Z12E 200 OE",
-          product: "MSIL YTA 200 OE",
-          line: "Cover Assy",
-          status: false,
-        },
-        {
-          id: 7,
-          childPartCode: "CF89045HP",
-          childPartDesc: "Spring WasherCover Plate Forming - MSIL Z12E 200CPoV",
-          product: "MSIL YTA 200 OE",
-          line: "Cover Assy",
-          status: false,
-        },
-        {
-          id: 8,
-          childPartCode: "CF89045BL",
-          childPartDesc: "Cover Blank - MSIL Z12E 200CPoV",
-          product: "MSIL YTA 200 OE",
-          line: "Cover Assy",
-          status: false,
-        },
-        {
-          id: 9,
-          childPartCode: "614853000",
-          childPartDesc: "Steel Coil-MSIL Z12E Cover plate485X3.15",
-          product: "MSIL YTA 200 OE",
-          line: "Cover Assy",
-          status: false,
-        },
-        {
-          id: 10,
-          childPartCode: "SCRAPMS",
-          childPartDesc: "Scrap - MS Blank Scrap",
-          product: "MSIL YTA 200 OE",
-          line: "Cover Assy",
-          status: false,
-        },
-      ];
-      setMasterList(sampleData);
-      setOriginalList(sampleData);
+     fetchData()
     }
   }, [selectedModule, selectedScreen]);
+
+   const fetchData = async () => {
+      try {
+        const response = await serverApi.post("getchildpartMasterdtl", {
+          isActive: "1",
+          tenantId,
+          branchCode,
+        });
+        if (!response.data || response.data.length === 0) {
+          setMasterList([]);
+          setOriginalList([]);
+         
+        } else {
+          const updatedResponseData = response.data.map((item) => ({
+            ...item,
+            isUpdate: 1,
+          }));
+          setMasterList(updatedResponseData);
+          setOriginalList(updatedResponseData);
+          console.log(updatedResponseData);
+        }
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+        toast.error("Error fetching data. Please try again later.");
+      }
+    };
 
   const defaultColDef = {
     sortable: true,
