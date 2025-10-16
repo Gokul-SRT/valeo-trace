@@ -40,18 +40,14 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     }
   }, [selectedModule, selectedScreen])
 
-  const fetchData = async () => {
+  const fetchData = async (e) => {
     try {
       const response = await serverApi.post("getchildpartMasterdtl", {
-        isActive: "1",
+        isActive: e || "getall",
         tenantId,
         branchCode,
       });
-      if (!response?.data?.responseCode === '200') {
-        setMasterList([]);
-        setOriginalList([]);
-        toast.error(response.data.responseMessage)
-      } else {
+      if (response?.data?.responseCode === '200') {
         console.log(response)
         const updatedResponseData = response?.data?.responseData.map((item) => ({
           ...item,
@@ -59,6 +55,10 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
+      }else{
+        setMasterList([]);
+        setOriginalList([]);
+        toast.error(response.data.responseMessage)
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
@@ -128,7 +128,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     const emptyRow = {
         isUpdate:0
       };
-      const childPartCodeEmpty = masterList.filter((item)=> !item.childPartCode);
+      const childPartCodeEmpty = masterList.filter((item)=> !item.childPartCode && !item.product);
   
         if(childPartCodeEmpty && childPartCodeEmpty?.length === 0){
           const updated = [...masterList, emptyRow];
@@ -137,14 +137,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         }else{
         // ("Please enter the empty rows.");
         toast.error("Please enter the empty rows.");
-        }
-    // const emptyRow = { id: nextId };
-    // columnDefs.forEach((col) => {
-    //   if (col.field !== "id") {
-    //     emptyRow[col.field] = "";
-    //   }
-    // });
-    
+        }   
   };
 
   // Cancel
@@ -159,11 +152,11 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   // Filter change
   const handleFilterChange = (value) => {
     if (!value || value === "GetAll") {
-      setMasterList(originalList);
+      fetchData(value);
     } else if (value === "Active") {
-      setMasterList(originalList.filter((item) => item.status === true));
+      fetchData(1);
     } else if (value === "Inactive") {
-      setMasterList(originalList.filter((item) => item.status === false));
+      fetchData("0");
     }
   };
 
