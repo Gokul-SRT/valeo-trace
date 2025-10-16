@@ -167,13 +167,11 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   // Filter change
   const handleFilterChange = (value) => {
     if (!value || value === "GetAll") {
-      fetchData(value)
+      setMasterList(originalList);
     } else if (value === "Active") {
-      fetchData(1)
-      // setMasterList(originalList.filter((item) => item.status === true));
+      setMasterList(originalList.filter((item) => item.isActive === "1"));
     } else if (value === "Inactive") {
-      fetchData("0")
-      // setMasterList(originalList.filter((item) => item.status === false));
+      setMasterList(originalList.filter((item) => item.isActive === "0"));
     }
   };
 
