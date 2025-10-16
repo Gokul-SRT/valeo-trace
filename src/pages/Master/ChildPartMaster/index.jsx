@@ -82,7 +82,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
 
       const response = await serverApi.post("insertupdatechildpartmaster", updatedList);
 
-      if (response?.responseCode === '200') {
+      if (response?.data?.responseCode === '200') {
         toast.success(response.data.responseMessage)
         fetchData();
       } else {
