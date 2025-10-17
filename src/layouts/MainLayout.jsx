@@ -17,7 +17,7 @@ export default function MainLayout() {
      
        <Layout
         style={{ 
-          marginTop: 64,
+          marginTop:0,
           transition: "all 0.3s ease",
         }}
       >
