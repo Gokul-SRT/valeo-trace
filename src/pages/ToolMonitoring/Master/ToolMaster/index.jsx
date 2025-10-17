@@ -5,9 +5,6 @@ import { PlusOutlined } from "@ant-design/icons";
 import "ag-grid-enterprise";
 
 const ToolMaster = ({ modulesprop, screensprop }) => {
-  console.log("Modules Props:", modulesprop);
-  console.log("Screens Props:", screensprop);
-
   const [selectedModule, setSelectedModule] = useState(modulesprop);
   const [selectedScreen, setSelectedScreen] = useState(screensprop);
   const [masterList, setMasterList] = useState([]);
@@ -24,33 +21,229 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   useEffect(() => {
     if (selectedModule && selectedScreen) {
-      // Sample data for Tool Master
       const sampleData = [
         {
           tool_id: "T001",
-          tool_desc: "Press Die for Panel A",
-          tool_type: "Press Die",
+          tool_desc: "Greasing Fixture",
           max_shot_count: 50000,
-          line: "Line-1",
+          line: "Cover Assembly",
           machine: "Machine-A",
-          customer: "Toyota",
-          location: "Plant 1",
+          customer: "Maruthi",
           status: "Active",
           isActive: true,
+          isLocked: false,
         },
         {
           tool_id: "T002",
-          tool_desc: "Injection Mold for Handle",
-          tool_type: "Mold",
+          tool_desc: "1st Top Tool",
           max_shot_count: 80000,
-          line: "Line-2",
+          line: "Cover Assembly",
           machine: "Machine-B",
-          customer: "Honda",
-          location: "Plant 2",
+          customer: "Maruthi",
           status: "Inactive",
           isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T003",
+          tool_desc: "1st Bottom Tool",
+          max_shot_count: 80000,
+          line: "Cover Assembly",
+          machine: "Machine-B",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T004",
+          tool_desc: "2nd Top Tool",
+          max_shot_count: 80000,
+          line: "Cover Assembly",
+          machine: "Machine-C",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T005",
+          tool_desc: "2nd Bottom Tool",
+          max_shot_count: 80000,
+          line: "Cover Assembly",
+          machine: "Machine-C",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T006",
+          tool_desc: "3rd Top Tool",
+          max_shot_count: 80000,
+          line: "Cover Assembly",
+          machine: "Machine-D",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T007",
+          tool_desc: "3rd Bottom Tool",
+          max_shot_count: 80000,
+          line: "Cover Assembly",
+          machine: "Machine-D",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T008",
+          tool_desc: "Balancing Fixture",
+          max_shot_count: 60000,
+          line: "Cover Assembly",
+          machine: "Machine-E",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T009",
+          tool_desc: "Balancing Riveting Fixture",
+          max_shot_count: 60000,
+          line: "Cover Assembly",
+          machine: "Machine-E",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T010",
+          tool_desc: "Rebalancing Fixture",
+          max_shot_count: 60000,
+          line: "Cover Assembly",
+          machine: "Machine-E",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T011",
+          tool_desc: "R/o Depositor",
+          max_shot_count: 70000,
+          line: "Cover Assembly",
+          machine: "Machine-F",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T012",
+          tool_desc: "R/o Lever",
+          max_shot_count: 70000,
+          line: "Cover Assembly",
+          machine: "Machine-F",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T013",
+          tool_desc: "R/o Bunk",
+          max_shot_count: 70000,
+          line: "Cover Assembly",
+          machine: "Machine-F",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T014",
+          tool_desc: "R/o Probe",
+          max_shot_count: 70000,
+          line: "Cover Assembly",
+          machine: "Machine-F",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T015",
+          tool_desc: "R/o Po Plate",
+          max_shot_count: 70000,
+          line: "Cover Assembly",
+          machine: "Machine-F",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T016",
+          tool_desc: "EOL Bunk",
+          max_shot_count: 90000,
+          line: "Cover Assembly",
+          machine: "Machine-G",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T017",
+          tool_desc: "EOL Top Plate",
+          max_shot_count: 90000,
+          line: "Cover Assembly",
+          machine: "Machine-G",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T018",
+          tool_desc: "EOL Bottom Plate",
+          max_shot_count: 90000,
+          line: "Cover Assembly",
+          machine: "Machine-G",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
+        },
+        {
+          tool_id: "T019",
+          tool_desc: "EOL Po Plate",
+          max_shot_count: 90000,
+          line: "Cover Assembly",
+          machine: "Machine-G",
+          customer: "Maruthi",
+          status: "Inactive",
+          isActive: false,
+          isLocked: false,
+        },
+        {
+          tool_id: "T020",
+          tool_desc: "EOL Marking Fixture",
+          max_shot_count: 90000,
+          line: "Cover Assembly",
+          machine: "Machine-G",
+          customer: "Maruthi",
+          status: "Active",
+          isActive: true,
+          isLocked: false,
         },
       ];
+
       setMasterList(sampleData);
       setOriginalList(sampleData);
     }
@@ -63,19 +256,42 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+  const lineOptions = ["Cover Assembly", "Disc Assembly - 1", "Disc Assembly - 2"];
+  const machineOptions = ["Machine-A", "Machine-B", "Machine-C"];
+  const customerOptions = ["Maruthi"];
+
   const columnDefs = [
     { headerName: "Tool ID", field: "tool_id", filter: "agTextColumnFilter" },
     { headerName: "Tool Desc", field: "tool_desc", filter: "agTextColumnFilter" },
-    { headerName: "Tool Type", field: "tool_type", filter: "agTextColumnFilter" },
     {
-      headerName: "Maximum Shot Count",
+      headerName: "Maximum Shot Count (Nos.)",
       field: "max_shot_count",
       filter: "agNumberColumnFilter",
     },
-    { headerName: "Line", field: "line", filter: "agTextColumnFilter" },
-    { headerName: "Machine", field: "machine", filter: "agTextColumnFilter" },
-    { headerName: "Customer", field: "customer", filter: "agTextColumnFilter" },
-    { headerName: "Location", field: "location", filter: "agTextColumnFilter" },
+    {
+      headerName: "Line",
+      field: "line",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+      cellEditorParams: { values: lineOptions },
+      filter: "agSetColumnFilter",
+    },
+    {
+      headerName: "Machine",
+      field: "machine",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+      cellEditorParams: { values: machineOptions },
+      filter: "agSetColumnFilter",
+    },
+    {
+      headerName: "Customer",
+      field: "customer",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+      cellEditorParams: { values: customerOptions },
+      filter: "agSetColumnFilter",
+    },
     {
       headerName: "Status",
       field: "status",
@@ -86,7 +302,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       headerName: "Is Active",
       field: "isActive",
       filter: true,
-      editable: true,
+      editable: (params) => !params.data?.isLocked, // disable edit when locked
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
       valueGetter: (params) => params.data.isActive === true,
@@ -100,15 +316,17 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   ];
 
   const handleAddRow = () => {
-    const emptyRow = {};
-    columnDefs.forEach((col) => {
-      emptyRow[col.field] =
-        col.field === "isActive"
-          ? false
-          : col.field === "status"
-          ? "Inactive"
-          : "";
-    });
+    const emptyRow = {
+      tool_id: "",
+      tool_desc: "",
+      max_shot_count: "",
+      line: "",
+      machine: "",
+      customer: "",
+      status: "Active",
+      isActive: true,
+      isLocked: true, // prevent unchecking
+    };
     const updated = [...masterList, emptyRow];
     setMasterList(updated);
     setOriginalList(updated);
@@ -129,6 +347,10 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     } else if (value === "Inactive") {
       setMasterList(originalList.filter((item) => item.isActive === false));
     }
+
+    if (value === "Cover Assembly" || value === "Disc Assembly - 1" || value === "Disc Assembly - 2") {
+      setMasterList(originalList.filter((item) => item.line === value));
+    }
   };
 
   const onExportExcel = (ref) => {
@@ -142,7 +364,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1">
+    <div className="container mt-1" style={{ padding: "0px" }}>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -160,7 +382,19 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold">Line</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                <option value="Cover Assembly">Cover Assembly</option>
+                <option value="Disc Assembly - 1">Disc Assembly - 1</option>
+                <option value="Disc Assembly - 2">Disc Assembly - 2</option>
+              </select>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange(e.target.value)}
@@ -180,17 +414,11 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
               rowData={masterList}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              paginationPageSize={100}
+              paginationPageSize={10}
               pagination={true}
               domLayout="autoHeight"
               singleClickEdit={true}
               onFirstDataRendered={autoSizeAllColumns}
-              onCellValueChanged={(params) => {
-                const updatedList = [...masterList];
-                updatedList[params.rowIndex] = params.data;
-                setMasterList(updatedList);
-                setOriginalList(updatedList);
-              }}
             />
           )}
 

@@ -43,7 +43,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
           isActive: false,
         },
         {
-          sno: 2,
+          sno: 3,
           characteristic: "CHECK THE TOP TOOL CAM SPRING LENGTH",
           spec_unit: "40.0+0.20MM",
           measurement_tools: "VERNIER",
@@ -51,7 +51,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
           isActive: true,
         },
         {
-          sno: 2,
+          sno: 4,
           characteristic: "CHECK THE TOP TOOL SUPPORTING STOPPER LENGTH",
           spec_unit: "38+0.50MM",
           measurement_tools: "VERNIER",
@@ -116,9 +116,9 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
     columnDefs.forEach((col) => {
       emptyRow[col.field] =
         col.field === "isActive"
-          ? false
+          ? true
           : col.field === "status"
-          ? "Inactive"
+          ? "Active"
           : col.field === "sno"
           ? masterList.length + 1
           : "";
@@ -156,7 +156,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1">
+    <div className="container mt-1 p-0">
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -174,7 +174,39 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold">Line</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="Z12E">Cover Assembly</option>
+                <option value="YTE">Disc Assembly - 1</option>
+                <option value="YTE">Disc Assembly - 2</option>
+              </select>
+            </div>
+
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Tool Desc</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="Greasing Fixture">Greasing Fixture</option>
+              </select>
+            </div>
+
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Operation</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="Greasing & Finger Folding Tool Stage">Greasing & Finger Folding Tool Stage</option>
+              </select>
+            </div>
+
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange(e.target.value)}

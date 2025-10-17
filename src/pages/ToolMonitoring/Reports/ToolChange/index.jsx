@@ -1,5 +1,16 @@
 import React, { useState } from "react";
 import { Card, Form, Input, Select, Row, Col, Button } from "antd";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+  Label
+} from "recharts";
 
 const { Option } = Select;
 
@@ -15,147 +26,202 @@ const ToolChange = () => {
     }
   };
 
+  // 🔹 Dummy data for 20 tools
+const chartData = [
+  { toolName: "Greasing Fixture", maxUsage: 100000, usedUsage: 60000 },
+  { toolName: "1st Top Tool", maxUsage: 90000, usedUsage: 70000 },
+  { toolName: "1st Bottom Tool", maxUsage: 120000, usedUsage: 80000 },
+  { toolName: "2nd Top Tool", maxUsage: 80000, usedUsage: 50000 },
+  { toolName: "2nd Bottom Tool", maxUsage: 110000, usedUsage: 85000 },
+  { toolName: "3rd Top Tool", maxUsage: 95000, usedUsage: 75000 },
+  { toolName: "3rd Bottom Tool", maxUsage: 105000, usedUsage: 65000 },
+  { toolName: "Balancing Fixture", maxUsage: 115000, usedUsage: 95000 },
+  { toolName: "Balancing Riveting Fixture", maxUsage: 100000, usedUsage: 80000 },
+  { toolName: "Rebalancing Fixture", maxUsage: 90000, usedUsage: 60000 },
+  { toolName: "R/o Depositor", maxUsage: 95000, usedUsage: 70000 },
+  { toolName: "R/o Lever", maxUsage: 100000, usedUsage: 85000 },
+  { toolName: "R/o Bunk", maxUsage: 120000, usedUsage: 95000 },
+  { toolName: "R/o Probe", maxUsage: 110000, usedUsage: 70000 },
+  { toolName: "R/o Po Plate", maxUsage: 95000, usedUsage: 80000 },
+  { toolName: "EOL Bunk", maxUsage: 100000, usedUsage: 90000 },
+  { toolName: "EOL Top Plate", maxUsage: 95000, usedUsage: 85000 },
+  { toolName: "EOL Bottom Plate", maxUsage: 105000, usedUsage: 95000 },
+  { toolName: "EOL Po Plate", maxUsage: 115000, usedUsage: 100000 },
+  { toolName: "EOL Marking Fixture", maxUsage: 100000, usedUsage: 85000 },
+];
+
+
   return (
-    <Card
-      headStyle={{ backgroundColor: "#00264d", color: "white" }}
-      title="Tool Life Log"
-      style={{ marginTop: "20px", borderRadius: "8px" }}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onValuesChange={handleUsageChange}
-        style={{ marginTop: "10px" }}
+    <div style={{ padding: "20px" }}>
+      {/* Tool Life Log Card */}
+      <Card
+        headStyle={{ backgroundColor: "#00264d", color: "white" }}
+        title="Tool Life Log"
+        style={{ marginTop: "20px", borderRadius: "8px" }}
       >
-        <Row gutter={16}>
-          {/* Tool ID Scan - Static Value */}
-          <Col span={4}>
-            <Form.Item
-              label="Tool ID Scan"
-              name="toolId"
-              initialValue="D001"
-              rules={[{ required: true, message: "Tool ID is required" }]}
+        <Form
+          form={form}
+          layout="vertical"
+          onValuesChange={handleUsageChange}
+          style={{ marginTop: "10px" }}
+        >
+          <Row gutter={16}>
+            {/* Tool ID Scan */}
+            <Col span={4}>
+              <Form.Item
+                label="Scan Tool No."
+                name="toolId"
+                initialValue="T001"
+                rules={[{ required: true, message: "Tool ID is required" }]}
+              >
+                <Input readOnly style={{ backgroundColor: "#ffffff", fontWeight: "bold" }} />
+              </Form.Item>
+            </Col>
+
+            {/* Tool Name */}
+            <Col span={4}>
+              <Form.Item label="Tool Desc">
+                <Input
+                  value="1st Top Tool"
+                  readOnly
+                  style={{ backgroundColor: "#ffffff", fontWeight: "bold" }}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Machine */}
+            <Col span={4}>
+              <Form.Item
+                label="Machine"
+                name="machine"
+                rules={[{ required: true, message: "Select Machine" }]}
+              >
+                <Select placeholder="<select>">
+                  <Option value="machine1">Machine 1</Option>
+                  <Option value="machine2">Machine 2</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+
+            {/* Usage Till Date */}
+            <Col span={4}>
+              <Form.Item
+                label="Usage Till Date (Nos.)"
+                name="usageTillDate"
+                initialValue="45000"
+                rules={[{ required: true, message: "Enter usage till date" }]}
+              >
+                <Input
+                  type="number"
+                  readOnly
+                  style={{ backgroundColor: "#ffffff", fontWeight: "bold" }}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Maximum Usage */}
+            <Col span={4}>
+              <Form.Item
+                label="Maximum Usage (Nos.)"
+                name="maxUsage"
+                initialValue="100000"
+                rules={[{ required: true, message: "Enter maximum usage" }]}
+              >
+                <Input
+                  type="number"
+                  readOnly
+                  style={{ backgroundColor: "#ffffff", fontWeight: "bold" }}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Remaining Usage */}
+            <Col span={4}>
+              <Form.Item
+                label="Remaining Usage (Nos.)"
+                name="remainingUsage"
+                initialValue={remainingUsage}
+                rules={[{ required: true, message: "Required field" }]}
+              >
+                <Input
+                  readOnly
+                  value={remainingUsage}
+                  style={{ backgroundColor: "#90EE90", fontWeight: "bold" }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Buttons */}
+          <div style={{ textAlign: "center", marginTop: "10px" }}>
+            <Button type="primary" style={{ marginRight: "10px" }}>
+              Submit
+            </Button>
+            <Button>Cancel</Button>
+          </div>
+        </Form>
+      </Card>
+
+      {/* Bar Chart Section */}
+      <Card
+        headStyle={{ backgroundColor: "#00264d", color: "white" }}
+        style={{ marginTop: "30px", borderRadius: "8px", height: "450px" }}
+        title={
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Tool Usage vs Max Usage</span>
+            <Select
+              defaultValue="Cover Assembly"
+              style={{ width: 150 }}
+              onChange={(value) => console.log("Selected line:", value)}
             >
-              <Input
-                readOnly
-                style={{
-                  backgroundColor: "#ffffffff",
-                  fontWeight: "bold",
-                }}
+              <Option value="Cover Assembly">Cover Assembly</Option>
+              <Option value="Disc Assembly 1">Disc Assembly 1</Option>
+              <Option value="Disc Assembly 2">Disc Assembly 2</Option>
+            </Select>
+          </div>
+        }
+      >
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 80 }}>
+            <XAxis
+              dataKey="toolName"
+              angle={-45}
+              textAnchor="end"
+              interval={0}
+              height={80}
+            >
+              <Label
+                value="Tools"
+                offset={-5}
+                position="insideBottom"
+                style={{ fontSize: 12, fontWeight: "bold" }}
               />
-            </Form.Item>
-          </Col>
+            </XAxis>
 
-          <Col span={4}>
-            <Form.Item
-              label="Tool Name / Description"
-              // no `name` since it's static
-            >
-              <Input
-                value="3rd Top & Bottom Tool"
-                readOnly
-                style={{
-                  backgroundColor: "#ffffff",
-                  fontWeight: "bold",
-                }}
+            <YAxis>
+              <Label
+                value="Nos."
+                angle={-90}
+                position="insideLeft"
+                style={{ textAnchor: "middle", fontSize: 12, fontWeight: "bold" }}
               />
-            </Form.Item>
-          </Col>
+            </YAxis>
+            <Tooltip />
+            <Legend />
 
-          {/* Tool Location / Rack */}
-          <Col span={4}>
-            <Form.Item
-              label="Tool Location / Rack"
-              name="toolLocation"
-              rules={[{ required: true, message: "Select Tool Location" }]}
-            >
-              <Select placeholder="<select>">
-                <Option value="rack1">Rack 1</Option>
-                <Option value="rack2">Rack 2</Option>
-              </Select>
-            </Form.Item>
-          </Col>
+            {/* Max Usage Bars */}
+            <Bar dataKey="maxUsage" fill="#82ca9d" name="Max Usage">
+              <LabelList dataKey="maxUsage" position="top" fontSize={10} fill="#000" />
+            </Bar>
 
-          {/* Machine */}
-          <Col span={4}>
-            <Form.Item
-              label="Machine"
-              name="machine"
-              rules={[{ required: true, message: "Select Machine" }]}
-            >
-              <Select placeholder="<select>">
-                <Option value="machine1">Machine 1</Option>
-                <Option value="machine2">Machine 2</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-
-          {/* Usage Till Date - Static Value */}
-          <Col span={4}>
-            <Form.Item
-              label="Usage Till Date"
-              name="usageTillDate"
-              initialValue="45000"
-              rules={[{ required: true, message: "Enter usage till date" }]}
-            >
-              <Input
-                type="number"
-                readOnly
-                style={{
-                  backgroundColor: "#ffffffff",
-                  fontWeight: "bold",
-                }}
-              />
-            </Form.Item>
-          </Col>
-
-          {/* Maximum Usage - Static Value */}
-          <Col span={4}>
-            <Form.Item
-              label="Maximum Usage"
-              name="maxUsage"
-              initialValue="100000"
-              rules={[{ required: true, message: "Enter maximum usage" }]}
-            >
-              <Input
-                type="number"
-                readOnly
-                style={{
-                  backgroundColor: "#ffffffff",
-                  fontWeight: "bold",
-                }}
-              />
-            </Form.Item>
-          </Col>
-
-          {/* Remaining Usage - Static Value */}
-          <Col span={4}>
-            <Form.Item
-              label="Remaining Usage"
-              name="remainingUsage"
-              initialValue="55000"
-              rules={[{ required: true, message: "Required field" }]}
-            >
-              <Input
-                readOnly
-                style={{
-                  backgroundColor: "#90EE90",
-                  fontWeight: "bold",
-                }}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Buttons */}
-        <div style={{ textAlign: "center", marginTop: "10px" }}>
-          <Button type="primary" style={{ marginRight: "10px" }}>
-            Submit
-          </Button>
-          <Button>Cancel</Button>
-        </div>
-      </Form>
-    </Card>
+            {/* Used Usage Bars */}
+            <Bar dataKey="usedUsage" fill="#8884d8" name="Used Usage">
+              <LabelList dataKey="usedUsage" position="top" fontSize={10} fill="#000" />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+    </div>
   );
 };
 

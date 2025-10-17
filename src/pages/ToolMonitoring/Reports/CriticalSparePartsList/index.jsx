@@ -1,10 +1,65 @@
 import React, { useState } from "react";
-import { Card, Form, Select, Row, Col, Button, DatePicker, Table, Input } from "antd";
-import "antd/dist/reset.css";
-import dayjs from "dayjs";
+import {
+  Card,
+  Form,
+  Select,
+  Row,
+  Col,
+  Button,
+  DatePicker,
+  Input,
+} from "antd";
+import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 const { Option } = Select;
+
+const chartData = [
+  { toolName: "Greasing Fixture", maxUsage: 100000, usedUsage: 60000 },
+  { toolName: "1st Top Tool", maxUsage: 90000, usedUsage: 70000 },
+  { toolName: "1st Bottom Tool", maxUsage: 120000, usedUsage: 80000 },
+  { toolName: "2nd Top Tool", maxUsage: 80000, usedUsage: 50000 },
+  { toolName: "2nd Bottom Tool", maxUsage: 110000, usedUsage: 85000 },
+];
+
+const criticalSparesList = [
+  { critical: "Locating pin" },
+  { critical: "Cover Locating Pin" },
+  { critical: "POKA-YOKE BUSH" },
+  { critical: "Hook Rivet Guide pin" },
+  { critical: "Hook Rivet Guide pin spring" },
+  { critical: "Hook Rivet Punch with MAGNET" },
+  { critical: "Delta Rivet Holder" },
+  { critical: "DSP Loader" },
+  { critical: "Bottom stopper" },
+  { critical: "Top Punch 80.0 mm" },
+  { critical: "Top Punch 80.30 mm" },
+  { critical: "Top Load Spring" },
+  { critical: "TOP Punch Base Plate" },
+  { critical: "Top Tool Holder Spring" },
+  { critical: "Cover Plate Holder Bush" },
+  { critical: "Hook Rivet Plate" },
+  { critical: "DSP Locator Pin" },
+  { critical: "DSP Holder pin spring" },
+  { critical: "Drive Strap Pin" },
+  { critical: "Bottom Punch Spacer" },
+];
+
+const dataSource = [
+  {
+    key: 1,
+    line: "Cover Assembly",
+    toolDescription: "Greasing Fixture",
+    monthYear: "09-Oct-2025",
+  },
+  {
+    key: 2,
+    line: "Cover Assembly",
+    toolDescription: "Greasing Fixture",
+    monthYear: "12-Oct-2025",
+  },
+];
 
 const CriticalSparePartsList = () => {
   const [form] = Form.useForm();
@@ -12,86 +67,7 @@ const CriticalSparePartsList = () => {
   const [showAddCard, setShowAddCard] = useState(false);
   const [addCardData, setAddCardData] = useState([]);
 
-  // 🔹 Sample data for Critical Spare Parts List
-  const dataSource = [
-    { key: 1, toolId: "D001", toolDescription: "Spindle Assembly - L1", monthYear: "Oct-2025" },
-    { key: 2, toolId: "D002", toolDescription: "Motor Coupling - L2", monthYear: "Oct-2025" },
-    { key: 3, toolId: "D003", toolDescription: "Clutch Plate - L3", monthYear: "Sep-2025" },
-    { key: 4, toolId: "D004", toolDescription: "Pressure Plate - L4", monthYear: "Sep-2025" },
-  ];
-
-  // 🔹 Columns for Critical Spare Parts List Table
-  const columns = [
-    { title: "S.No", dataIndex: "key", key: "key" },
-    { title: "Tool ID", dataIndex: "toolId", key: "toolId" },
-    { title: "Tool Description", dataIndex: "toolDescription", key: "toolDescription" },
-    { title: "Month Year", dataIndex: "monthYear", key: "monthYear" },
-  ];
-
-  // 🔹 Columns for Add Critical Spare Parts Details Table
-  const addCardColumns = [
-    { title: "S.No", dataIndex: "key", key: "key" },
-    { title: "Tool Description", dataIndex: "toolDescription", key: "toolDescription" },
-    { title: "Critical Spares", dataIndex: "criticalSpares", key: "criticalSpares" },
-    {
-      title: "Spares Min Qty in tool",
-      dataIndex: "minQty",
-      key: "minQty",
-      render: () => <Input placeholder="Enter Min Qty" />,
-    },
-    {
-      title: "Spares Available Qty",
-      dataIndex: "availableQty",
-      key: "availableQty",
-      render: () => <Input placeholder="Enter Available Qty" />,
-    },
-    {
-      title: "Storage Rack",
-      dataIndex: "storageRack",
-      key: "storageRack",
-      render: () => <Input placeholder="Enter Storage Rack" />,
-    },
-    {
-      title: "Need to Order",
-      dataIndex: "needToOrder",
-      key: "needToOrder",
-      render: () => <Input placeholder="Enter Need to Order" />,
-    },
-    {
-      title: "Drawing is Available",
-      dataIndex: "drawingAvailable",
-      key: "drawingAvailable",
-      render: () => <Input placeholder="Enter Drawing Availability" />,
-    },
-    {
-      title: "Reorder Data Suppliers",
-      dataIndex: "reorderSuppliers",
-      key: "reorderSuppliers",
-      render: () => <Input placeholder="Enter Supplier Info" />,
-    },
-    {
-      title: "PO No/GRN No/Remarks",
-      dataIndex: "poGrnRemarks",
-      key: "poGrnRemarks",
-      render: () => <Input placeholder="Enter PO/GRN/Remarks" />,
-    },
-    {
-      title: "Received Date & Qty",
-      dataIndex: "receivedDateQty",
-      key: "receivedDateQty",
-      render: () => <Input placeholder="Enter Received Date & Qty" />,
-    },
-    {
-      title: "TOTAL Available",
-      dataIndex: "totalAvailable",
-      key: "totalAvailable",
-      render: () => <Input placeholder="Enter Total Available" />,
-    },
-  ];
-
-  // 🔹 Handlers
-  const handleSubmit = (values) => {
-    console.log("Form values:", values);
+  const handleSubmit = () => {
     setShowDetails(true);
     setShowAddCard(false);
   };
@@ -111,40 +87,123 @@ const CriticalSparePartsList = () => {
 
   const handleAddFormChange = (changedValues, allValues) => {
     if (allValues.line && allValues.toolId && allValues.monthYear) {
-      // Combine Greasing + Station 1 in same table
-      const combinedData = [
-        { desc: "Greasing", critical: "Location pin" },
-        { critical: "Cover Locating Pin" },
-        { critical: "POKA-YOKE BUSH" },
-        { desc: "Station 1", critical: "Top Load Spring" },
-        { critical: "Top Punch Base Plate" },
-      ];
-
-      const tableData = combinedData.map((item, index) => ({
+      const tableData = criticalSparesList.map((item, index) => ({
         key: index + 1,
-        toolDescription: item.desc,
+        toolDescription: allValues.toolId,
         criticalSpares: item.critical,
+        minQty: Math.floor(Math.random() * 8) + 3,
+        availableQty: "",
+        storageRack: "",
+        needToOrder: "",
+        totalAvailable: "",
       }));
-
       setAddCardData(tableData);
     } else {
       setAddCardData([]);
     }
   };
 
+  const handleAddCardEdit = (params) => {
+    const updated = [...addCardData];
+    const index = updated.findIndex((row) => row.key === params.data.key);
+    if (index > -1) {
+      updated[index] = { ...params.data };
+      setAddCardData(updated);
+    }
+  };
+
+  const addCardColumns = [
+    { headerName: "S.No", field: "key", width: 80 },
+    { headerName: "Tool Description", field: "toolDescription", width: 180 },
+    { headerName: "Critical Spares", field: "criticalSpares", width: 200 },
+    {
+      headerName: "Min Qty",
+      field: "minQty",
+      width: 120,
+      editable: false,
+      cellStyle: { textAlign: "center", fontWeight: "bold" },
+    },
+    {
+      headerName: "Available Qty",
+      field: "availableQty",
+      width: 150,
+      cellRenderer: (params) => (
+        <Input
+          type="number"
+          value={params.value || ""}
+          onChange={(e) => {
+            params.data.availableQty = e.target.value;
+            handleAddCardEdit(params);
+          }}
+        />
+      ),
+    },
+    {
+      headerName: "Storage Rack",
+      field: "storageRack",
+      width: 150,
+      cellRenderer: (params) => (
+        <Input
+          value={params.value || ""}
+          onChange={(e) => {
+            params.data.storageRack = e.target.value;
+            handleAddCardEdit(params);
+          }}
+        />
+      ),
+    },
+    {
+      headerName: "Need to Order",
+      field: "needToOrder",
+      width: 150,
+      cellRenderer: (params) => (
+        <Input
+          type="number"
+          value={params.value || ""}
+          onChange={(e) => {
+            params.data.needToOrder = e.target.value;
+            handleAddCardEdit(params);
+          }}
+        />
+      ),
+    },
+    {
+      headerName: "Total Available",
+      field: "totalAvailable",
+      width: 150,
+      cellRenderer: (params) => (
+        <Input
+          type="number"
+          value={params.value || ""}
+          onChange={(e) => {
+            params.data.totalAvailable = e.target.value;
+            handleAddCardEdit(params);
+          }}
+        />
+      ),
+    },
+  ];
+
+  // ✅ FIXED: Use flex instead of fixed width
+  const detailsColumns = [
+    { headerName: "S.No", field: "key", flex: 1 },
+    { headerName: "Line", field: "line", flex: 2 },
+    { headerName: "Tool Description", field: "toolDescription", flex: 3 },
+    { headerName: "Month Year", field: "monthYear", flex: 2 },
+  ];
+
   return (
     <>
-      {/* Critical Spare Parts List Card */}
       <Card
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
         title="Critical Spare Parts List"
         extra={
           <PlusOutlined
-            style={{ fontSize: "18px", color: "white", cursor: "pointer" }}
+            style={{ fontSize: 18, color: "white", cursor: "pointer" }}
             onClick={handleAddClick}
           />
         }
-        style={{ marginTop: "20px", borderRadius: "8px" }}
+        style={{ marginTop: 20, borderRadius: 8 }}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={16}>
@@ -155,58 +214,49 @@ const CriticalSparePartsList = () => {
                 rules={[{ required: true, message: "Please select Line" }]}
               >
                 <Select placeholder="Select Line">
-                  <Option value="Line1">Line 1</Option>
-                  <Option value="Line2">Line 2</Option>
-                  <Option value="Line3">Line 3</Option>
+                  <Option value="Cover Assembly">Cover Assembly</Option>
+                  <Option value="Disc Assembly - 1">Disc Assembly - 1</Option>
+                  <Option value="Disc Assembly - 2">Disc Assembly - 2</Option>
                 </Select>
               </Form.Item>
             </Col>
-
             <Col span={4}>
               <Form.Item
-                label="Tool ID"
+                label="Tool Desc"
                 name="toolId"
-                rules={[{ required: true, message: "Please select Tool ID" }]}
+                rules={[{ required: true, message: "Please select Tool" }]}
               >
-                <Select placeholder="Select Tool ID">
-                  <Option value="D001">D001</Option>
-                  <Option value="D002">D002</Option>
-                  <Option value="D003">D003</Option>
+                <Select placeholder="Select Tool Desc">
+                  {chartData.map((tool, index) => (
+                    <Option key={index} value={tool.toolName}>
+                      {tool.toolName}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>
-
             <Col span={4}>
               <Form.Item
                 label="Month/Year"
                 name="monthYear"
                 initialValue={dayjs()}
-                rules={[{ required: true, message: "Please select Month/Year" }]}
+                rules={[{ required: true, message: "Select Month/Year" }]}
               >
                 <DatePicker
                   picker="month"
                   format="MMM-YYYY"
                   placeholder="Select Month/Year"
-                  allowClear
-                  style={{
-                    width: "100%",
-                    height: "34px",
-                    borderRadius: "4px",
-                    border: "1px solid #ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }}
                 />
               </Form.Item>
             </Col>
           </Row>
 
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <div style={{ textAlign: "center", marginTop: 20 }}>
             <Button
               type="primary"
               htmlType="submit"
               style={{
-                marginRight: "10px",
+                marginRight: 10,
                 backgroundColor: "#00264d",
                 borderColor: "#00264d",
               }}
@@ -218,92 +268,92 @@ const CriticalSparePartsList = () => {
         </Form>
       </Card>
 
-      {/* Critical Spare Parts Details Table */}
+      {/* ✅ FIXED TABLE WIDTH ISSUE HERE */}
       {showDetails && (
         <Card
           title="Critical Spare Parts Details"
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
-          style={{ marginTop: "20px", borderRadius: "8px" }}
+          style={{ marginTop: 20, borderRadius: 8 }}
         >
-          <Table
-            dataSource={dataSource}
-            columns={columns}
-            pagination={{ pageSize: 5 }}
-            bordered
-          />
+          <div className="ag-theme-alpine" style={{ height: 300, width: "100%" }}>
+            <AgGridReact
+              rowData={dataSource}
+              columnDefs={detailsColumns}
+              domLayout="autoHeight"
+              defaultColDef={{
+                sortable: true,
+                filter: true,
+                resizable: true,
+              }}
+            />
+          </div>
         </Card>
       )}
 
-      {/* Add Critical Spare Parts Details */}
       {showAddCard && (
         <Card
           title="Add Critical Spare Parts Details"
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
-          style={{ marginTop: "20px", borderRadius: "8px" }}
+          style={{ marginTop: 20, borderRadius: 8 }}
         >
           <Form layout="vertical" onValuesChange={handleAddFormChange}>
             <Row gutter={16}>
               <Col span={4}>
                 <Form.Item label="Line" name="line">
                   <Select placeholder="Select Line">
-                    <Option value="Line1">Line 1</Option>
-                    <Option value="Line2">Line 2</Option>
-                    <Option value="Line3">Line 3</Option>
+                    <Option value="Cover Assembly">Cover Assembly</Option>
+                    <Option value="Disc Assembly - 1">Disc Assembly - 1</Option>
+                    <Option value="Disc Assembly - 2">Disc Assembly - 2</Option>
                   </Select>
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Tool ID" name="toolId">
-                  <Select placeholder="Select Tool ID">
-                    <Option value="D001">D001</Option>
-                    <Option value="D002">D002</Option>
-                    <Option value="D003">D003</Option>
+                <Form.Item label="Tool Desc" name="toolId">
+                  <Select placeholder="Select Tool Desc">
+                    {chartData.map((tool, index) => (
+                      <Option key={index} value={tool.toolName}>
+                        {tool.toolName}
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Month/Year" name="monthYear">
+                <Form.Item label="Date" name="monthYear">
                   <DatePicker
-                    picker="month"
-                    format="MMM-YYYY"
-                    placeholder="Select Month/Year"
-                    allowClear
-                    style={{
-                      width: "100%",
-                      height: "34px",
-                      borderRadius: "4px",
-                      border: "1px solid #ced4da",
-                    }}
+                    format="YYYY-MM-DD"
+                    placeholder="Select Date"
+                    style={{ width: "100%" }}
                   />
                 </Form.Item>
               </Col>
             </Row>
-          </Form>
 
-          <Table
-            dataSource={addCardData}
-            columns={addCardColumns}
-            pagination={{ pageSize: 5 }}
-            bordered
-            style={{ marginTop: "20px" }}
-            locale={{
-              emptyText: "Please select Line, Tool ID, and Month/Year",
-            }}
-          />
-
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
-            <Button
-              type="primary"
-              style={{
-                marginRight: "10px",
-                backgroundColor: "#00264d",
-                borderColor: "#00264d",
-              }}
+            <div
+              className="ag-theme-alpine"
+              style={{ height: 400, width: "100%", marginTop: 20 }}
             >
-              Submit
-            </Button>
-            <Button onClick={handleCancel}>Cancel</Button>
-          </div>
+              <AgGridReact
+                rowData={addCardData}
+                columnDefs={addCardColumns}
+                defaultColDef={{ resizable: true }}
+              />
+            </div>
+
+            <div style={{ textAlign: "center", marginTop: 20 }}>
+              <Button
+                type="primary"
+                style={{
+                  marginRight: 10,
+                  backgroundColor: "#00264d",
+                  borderColor: "#00264d",
+                }}
+              >
+                Submit
+              </Button>
+              <Button onClick={handleCancel}>Cancel</Button>
+            </div>
+          </Form>
         </Card>
       )}
     </>

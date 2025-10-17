@@ -4,16 +4,34 @@ import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
 import "ag-grid-enterprise";
 
-const SparepartsMaster = ({ modulesprop, screensprop }) => {
-  console.log("Modules Props:", modulesprop);
-  console.log("Screens Props:", screensprop);
+const criticalSparesList = [
+  { description: "Locating pin" },
+  { description: "Cover Locating Pin" },
+  { description: "POKA-YOKE BUSH" },
+  { description: "Hook Rivet Guide pin" },
+  { description: "Hook Rivet Guide pin spring" },
+  { description: "Hook Rivet Punch with MAGNET" },
+  { description: "Delta Rivet Holder" },
+  { description: "DSP Loader" },
+  { description: "Bottom stopper" },
+  { description: "Top Punch 80.0 mm" },
+  { description: "Top Punch 80.30 mm" },
+  { description: "Top Load Spring" },
+  { description: "TOP Punch Base Plate" },
+  { description: "Top Tool Holder Spring" },
+  { description: "Cover Plate Holder Bush" },
+  { description: "Hook Rivet Plate" },
+  { description: "DSP Locator Pin" },
+  { description: "DSP Holder pin spring" },
+  { description: "Drive Strap Pin" },
+  { description: "Bottom Punch Spacer" },
+];
 
-  const [selectedModule, setSelectedModule] = useState(modulesprop);
-  const [selectedScreen, setSelectedScreen] = useState(screensprop);
+const SparepartsMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
-  const [originalList, setOriginalList] = useState([]);
   const gridRef = useRef(null);
 
+  // Auto-size all columns
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
     const allColumnIds = params.columnApi
@@ -22,48 +40,17 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
     params.api.autoSizeColumns(allColumnIds);
   };
 
+  // Load default spares list
   useEffect(() => {
-    if (selectedModule && selectedScreen) {
-      // Sample data for Spareparts Master
-      const sampleData = [
-        {
-          spare_part_no: "S0001",
-          description: "Die Finger",
-          min_qty: "2",
-          line: "Cover Assembly",
-          tool_assoc: "Die-A",
-          supplier: "ABC Ltd",
-          location: "Bin-01",
-          status: "Active",
-          isActive: true,
-        },
-        {
-          spare_part_no: "S0002",
-          description: "Bearing",
-          min_qty: "5",
-          line: "Disc Assembly 1",
-          tool_assoc: "Die-B",
-          supplier: "XYZ Ltd",
-          location: "Bin-02",
-          status: "Inactive",
-          isActive: false,
-        },
-        {
-          spare_part_no: "S0003",
-          description: "Bolt Set",
-          min_qty: "10",
-          line: "Disc Assembly 2",
-          tool_assoc: "Die-C",
-          supplier: "LMN Ltd",
-          location: "Bin-03",
-          status: "Active",
-          isActive: true,
-        },
-      ];
-      setMasterList(sampleData);
-      setOriginalList(sampleData);
-    }
-  }, [modulesprop, screensprop]);
+    const generatedData = criticalSparesList.map((item, index) => ({
+      spare_part_no: `S${(index + 1).toString().padStart(4, "0")}`,
+      description: item.description,
+      min_qty: Math.floor(Math.random() * 8) + 3, // random 3–10
+      status: "Active",
+      isActive: true,
+    }));
+    setMasterList(generatedData);
+  }, []);
 
   const defaultColDef = {
     sortable: true,
@@ -75,11 +62,13 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
   const columnDefs = [
     { headerName: "Spare Part No", field: "spare_part_no", filter: "agTextColumnFilter" },
     { headerName: "Description", field: "description", filter: "agTextColumnFilter" },
-    { headerName: "Min Qty", field: "min_qty", filter: "agTextColumnFilter" },
-    { headerName: "Line", field: "line", filter: "agTextColumnFilter" },
-    { headerName: "Tool Assoc", field: "tool_assoc", filter: "agTextColumnFilter" },
-    { headerName: "Supplier", field: "supplier", filter: "agTextColumnFilter" },
-    { headerName: "Location", field: "location", filter: "agTextColumnFilter" },
+    {
+      headerName: "Min Qty",
+      field: "min_qty",
+      filter: "agTextColumnFilter",
+      editable: true,
+      cellStyle: { textAlign: "center" },
+    },
     {
       headerName: "Status",
       field: "status",
@@ -103,40 +92,22 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
     },
   ];
 
+  // Add new empty row
   const handleAddRow = () => {
-    const emptyRow = {};
-    columnDefs.forEach((col) => {
-      emptyRow[col.field] =
-        col.field === "isActive"
-          ? false
-          : col.field === "status"
-          ? "Inactive"
-          : "";
-    });
-    const updated = [...masterList, emptyRow];
+    const newRow = {
+      spare_part_no: `S${(masterList.length + 1)
+        .toString()
+        .padStart(4, "0")}`,
+      description: "",
+      min_qty: 3,
+      status: "Active",
+      isActive: true,
+    };
+    const updated = [...masterList, newRow];
     setMasterList(updated);
-    setOriginalList(updated);
   };
 
-  const handleCancel = () => {
-    setSelectedModule("");
-    setSelectedScreen("");
-    setMasterList([]);
-    setOriginalList([]);
-  };
-
-  const handleFilterChange = (value) => {
-    if (!value) {
-      setMasterList(originalList);
-    } else {
-      setMasterList(
-        originalList.filter(
-          (item) => item.line.toLowerCase() === value.toLowerCase()
-        )
-      );
-    }
-  };
-
+  // Export to Excel
   const onExportExcel = (ref) => {
     if (ref.current?.api) {
       ref.current.api.exportDataAsExcel({
@@ -147,8 +118,19 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
+  const handleCancel = () => {
+    const regenerated = criticalSparesList.map((item, index) => ({
+      spare_part_no: `S${(index + 1).toString().padStart(4, "0")}`,
+      description: item.description,
+      min_qty: Math.floor(Math.random() * 8) + 3,
+      status: "Active",
+      isActive: true,
+    }));
+    setMasterList(regenerated);
+  };
+
   return (
-    <div className="container mt-1">
+    <div className="container mt-1 p-0">
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -162,25 +144,6 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
           />
         </div>
 
-        {/* Filter Dropdown */}
-        <div className="p-3">
-          <div className="row">
-            <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
-              <select
-                className="form-select"
-                onChange={(e) => handleFilterChange(e.target.value)}
-                defaultValue=""
-              >
-                <option value="">Select Line</option>
-                <option value="Cover Assembly">Cover Assembly</option>
-                <option value="Disc Assembly 1">Disc Assembly 1</option>
-                <option value="Disc Assembly 2">Disc Assembly 2</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <div className="card-body p-3">
           {masterList.length > 0 && (
             <AgGridReact
@@ -188,7 +151,7 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
               rowData={masterList}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              paginationPageSize={100}
+              paginationPageSize={10}
               pagination={true}
               domLayout="autoHeight"
               singleClickEdit={true}
@@ -197,7 +160,6 @@ const SparepartsMaster = ({ modulesprop, screensprop }) => {
                 const updatedList = [...masterList];
                 updatedList[params.rowIndex] = params.data;
                 setMasterList(updatedList);
-                setOriginalList(updatedList);
               }}
             />
           )}
