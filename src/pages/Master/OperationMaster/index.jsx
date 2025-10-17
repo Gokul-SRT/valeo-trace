@@ -6,6 +6,9 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
+import store from "store";
+import { toast } from "react-toastify";
+import serverApi from "../../../serverAPI";
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
@@ -15,6 +18,11 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
   const gridRef = useRef(null);
+
+
+  const tenantId = store.get("tenantId")
+  const branchCode = store.get('branchCode');
+  const employeeId = store.get("employeeId")
 
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
@@ -28,63 +36,64 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     setSelectedModule(modulesprop);
     setSelectedScreen(screensprop);
     if (selectedModule && selectedScreen) {
-      const sampleData = [
-  {
-    operationId: 1,  
-    operationCode: "CF72760",
-    operationDesc: "Cushion Disc - MSIL Z12E 200 UX OE",
-    productId: "MSIL Z12E 200 OE",
-    lineId: "Disc Assy",
-    createdAt: "26-09-2025 10:00",
-    updatedAt: "29-09-2025 13:00",
-    status: true,
-  },
-  {
-    operationId: 2,
-    operationCode: "CF72760HF",
-    operationDesc: "Cushion Disc HF - MSIL  Z12E 200 UX OE",
-    productId: "MSIL Z12E 200 OE",
-    lineId: "Disc Assy",
-    createdAt: "26-09-2025 10:00",
-    updatedAt: "29-09-2025 00:00",
-    status: true,
-  },
-  {
-    operationId: 3,
-    operationCode: "CF72760TE",
-    operationDesc: "Cushion Disc Temp - MSIL  Z12E 200 UX OE",
-    productId: "MSIL Z12E 200 OE",
-    lineId: "Disc Assy",
-    createdAt: "26-09-2025 08:00",
-    updatedAt: "29-09-2025 19:00",
-    status: false,
-  },
-  {
-    operationId: 4,
-    operationCode: "CF89045HP",
-    operationDesc: "Cover Plate Forming - MSIL Z12E 200CPoV",
-    productId: "MSIL YTZ 300 OE",
-    lineId: "Cover Assy",
-    createdAt: "26-09-2025 07:00",
-    updatedAt: "29-09-2025 14:30",
-    status: true,
-  },
-  {
-    operationId: 5,
-    operationCode: "CF89045BL",
-    operationDesc: "Cover Blank - MSIL Z12E 200CPoV",
-    productId: "MSIL YTZ 300 OE",
-    lineId: "Cover Assy",
-    createdAt: "26-09-2025 06:00",
-    updatedAt: "26-09-2025 20:00",
-    status: true,
-  }
-];
-      setMasterList(sampleData);
-      setOriginalList(sampleData);
+      fetchData()
     }
   }, [selectedModule, selectedScreen]);
 
+  const fetchData = async (e) => {
+      try {
+        const response = await serverApi.post("getoperationMasterdtl", {
+          isActive: e || "getAll",
+          tenantId,
+          branchCode,
+        });
+        if (response?.data?.responseCode === '200') {
+          console.log(response)
+          const updatedResponseData = response?.data?.responseData.map((item) => ({
+            ...item,
+            isUpdate: 1,
+          }));
+          setMasterList(updatedResponseData);
+          setOriginalList(updatedResponseData);
+        }else{
+          setMasterList([]);
+          setOriginalList([]);
+          toast.error(response.data.responseMessage)
+        }
+      } catch (error) {
+        console.error("Error fetching master data:", error);
+        toast.error("Error fetching data. Please try again later.");
+      }
+    };
+
+
+    const createorUpdate = async () => {
+    try {
+      const updatedList = masterList.map(item => ({
+        isUpdate: item.isUpdate,
+        isActive: item.isActive,
+        opId: item.operationId,
+        opCode: item.operationUniquecode,
+        opDesc: item.operationDesc,
+        prodCnt: item.productionParameterCount,
+        tenantId,
+        updatedBy: employeeId,
+        branchCode,
+      }));
+
+      const response = await serverApi.post("insertupdateoperationmaster", updatedList);
+
+      if (response?.data?.responseCode === '200') {
+        toast.success(response.data.responseMessage)
+        fetchData();
+      } else {
+        toast.error(response.data.responseMessage)
+      }
+    } catch (error) {
+      console.error("Error saving data:", error);
+      toast.error("Error while saving data!");
+    }
+  }
   const defaultColDef = {
     sortable: true,
     filter: true,
@@ -94,13 +103,13 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
      {
-      headerName: "OperationId",
+      headerName: "Operation Id",
       field: "operationId",
       filter: "agTextColumnFilter",
     },
     {
       headerName: "Operation Code",
-      field: "operationCode",
+      field: "operationUniquecode",
       filter: "agTextColumnFilter",
       editable: (params) => !params.data || !params.data.operationCode, 
     },
@@ -110,35 +119,20 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       filter: "agTextColumnFilter",
     },
      {
-      headerName: "Product Id",
-      field: "productId",
-      filter: "agTextColumnFilter",
-    },
-     {
-      headerName: "Line Id",
-      field: "lineId",
-      filter: "agTextColumnFilter",
-    },
-     {
-      headerName: "Created At",
-      field: "createdAt",
-      filter: "agTextColumnFilter",
-    },
-     {
-      headerName: "Updated At",
-      field: "updatedAt",
+      headerName: "Production Parameter Count",
+      field: "productionParameterCount",
       filter: "agTextColumnFilter",
     },
     {
       headerName: "Status",
-      field: "status",
+      field: "isActive",
       filter: true,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
-      valueGetter: (params) => params.data.status === true,
+      valueGetter: (params) => params.data.isActive === "1" || params.data.isActive === 1,
       valueSetter: (params) => {
-        params.data.status = params.newValue ? true : false;
+        params.data.isActive = params.newValue ? "1" : "0";
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -147,22 +141,19 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
 
   // Add new empty row
   const handleAddRow = () => {
-    const nextId =
-    masterList.length > 0
-      ? Math.max(...masterList.map((item) => Number(item.id) || 0)) + 1
-      : 1;
-
-  // Create an empty row with that ID
-  const emptyRow = { id: nextId };
-  columnDefs.forEach((col) => {
-    if (col.field !== "id") {
-      emptyRow[col.field] = "";
-    }
-  });
-    emptyRow.status = false; // default inactive
-    const updated = [...masterList, emptyRow];
-    setMasterList(updated);
-    setOriginalList(updated);
+     const emptyRow = {
+            isUpdate:0
+          };
+          const emptyRowss = masterList.filter((item)=> !item.operationId && !item.operationUniquecode);
+      
+            if(emptyRowss && emptyRowss?.length === 0){
+              const updated = [...masterList, emptyRow];
+              setMasterList(updated);
+              setOriginalList(updated);
+            }else{
+            // ("Please enter the empty rows.");
+            toast.error("Please enter the empty rows.");
+            } 
   };
 
   // Cancel
@@ -178,9 +169,9 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     if (!value || value === "GetAll") {
       setMasterList(originalList);
     } else if (value === "Active") {
-      setMasterList(originalList.filter((item) => item.status === true));
+      setMasterList(originalList.filter((item) => item.isActive === "1"));
     } else if (value === "Inactive") {
-      setMasterList(originalList.filter((item) => item.status === false));
+      setMasterList(originalList.filter((item) => item.isActive === "0"));
     }
   };
 
@@ -195,8 +186,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1">
-      {masterList.length > 0 && (
+    <div className="container mt-1container mt-1 p-0">
+      {/* {masterList.length > 0 && ( */}
         <div
           className="card shadow mt-4"
           style={{ borderRadius: "6px" }}
@@ -260,6 +251,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
                 type="submit"
                 className="btn text-white me-2"
                 style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+                onClick={createorUpdate}
               >
                 Update
               </button>
@@ -274,7 +266,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
             </div>
           </div>
         </div>
-      )}
+      {/* )} */}
     </div>
   );
 };

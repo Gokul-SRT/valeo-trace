@@ -230,7 +230,7 @@ const Picklist = () => {
 
           {/* Show Line Feeder below Pending Picklist */}
           {showLineFeeder && (
-            <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Line Feeder Details">
+            <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Picklist Verification">
               <Table
                 columns={lineFeederColumns}
                 dataSource={lineFeederData}
