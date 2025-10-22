@@ -23,7 +23,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
   const [childPartData, setChildPartData] = useState([])
-  // const [ChildPartCode, setChildPartCode] = useState('')
+  const [typeIdData, setTypeIdData] = useState([])
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
   const gridRef = useRef(null);
 
@@ -44,7 +44,8 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
-      getChildPartDropDownData()
+      getChildPartDropDownData();
+      getTypeMasterDropDownData();
     }
   }, [selectedModule, selectedScreen]);
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
@@ -85,6 +86,37 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
     //resizable: true, // allow manual resize too
     flex: 1,
   };
+
+  const getTypeMasterDropDownData = async () => {
+    try {
+      const payload = {
+        tenantId,
+        branchCode,
+        // isActive: "1",
+      }
+      const response = await serverApi.post("gettypeMasterdtl", payload);
+
+      let returnData = []; // Use 'let' for reassignment and initialize
+
+      if (response?.data?.responseCode === '200' && response.data.responseData) {
+        // toast.success(response.data.responseMessage);
+        returnData = response.data.responseData;
+      } else {
+        toast.error(response.data.responseMessage || "Failed to load Type Id.");
+      }
+      const options = returnData.map(item => ({
+        key: item.typeId || "",
+        value: item.typeCode || ""
+      }));
+      setTypeIdData(options);
+      return returnData;
+
+    } catch (error) {
+      console.error('Error fetching Type Id dropdown data:', error);
+      toast.error('Error fetching data. Please try again later.');
+      return [];
+    }
+  }
 
   const getChildPartDropDownData = async () => {
     try {
@@ -134,7 +166,21 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       return option ? option.value : params.value; // Display the value or the original code if not found
     },
     },
-    { headerName: "Type Id", field: "typeId", filter: "agTextColumnFilter" },
+    {
+      headerName: "Type Code", 
+      field: "typeCode", 
+      filter: "agTextColumnFilter",
+      editable: true, 
+      cellEditor: "agSelectCellEditor", 
+      cellEditorParams: {
+      values: typeIdData.map(item => item.key), // Ag-Grid typically expects an array of keys for 'values'
+    },
+    valueFormatter: (params) => {
+      // Find the corresponding display value (item.value) based on the stored key (params.value)
+      const option = typeIdData.find(item => item.key === params.value);
+      return option ? option.value : params.value; // Display the value or the original code if not found
+    },
+    },
   ];
 
   // Add new empty row
@@ -157,15 +203,26 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   const createorUpdate = async () => {
     try {
       console.log('masterList', masterList)
-      const updatedList = masterList.map((item) => ({
-        isUpdate: item.isUpdate,
-        childPacMapId: item.childPacMapId,
-        childPartId: item.childPartCode,
-        typeId: item.typeId,
-        tenantId: tenantId,
-        updatedBy: employeeId,
-        branchCode: branchCode,
-      }));
+      const updatedList = masterList.map((item) => {
+            const code = item.typeCode;
+            const isNumericString = 
+                (typeof code === 'string') && 
+                (!isNaN(parseFloat(code)) && isFinite(code)); // Checks if it's a valid number string
+                
+            return ({
+                isUpdate: item.isUpdate,
+                childPacMapId: item.childPacMapId,
+                childPartId: item.childPartCode,
+                typeId: 
+                    isNumericString
+                    ? item.typeCode 
+                    : item.typeId,
+                    
+                tenantId: tenantId,
+                updatedBy: employeeId,
+                branchCode: branchCode,
+            });
+        });
 
       const response = await serverApi.post(
         "insertupdatechildparttypemapping",
