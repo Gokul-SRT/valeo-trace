@@ -21,6 +21,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
+  const [productData, setProductData] = useState([])
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
   const gridRef = useRef(null);
 
@@ -41,18 +42,16 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
+      getProductDropDownData()
     }
   }, [selectedModule, selectedScreen]);
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("empID"));
+  const employeeId = JSON.parse(localStorage.getItem("employeeId"));
   const fetchData = async () => {
     try {
       const response = await serverApi.post("getlineMasterdtl", {
         isActive: "1",
-        /* tenantId: store.get('tenantId'),
-        branchCode: store.get('branchCode')
-        */
         tenantId: tenantId,
         branchCode: branchCode,
       });
@@ -85,6 +84,37 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+  const getProductDropDownData = async () => {
+    try {
+      const payload = {
+        tenantId,
+        // branchCode,
+        isActive: "1",
+      }
+      const response = await serverApi.post("getProductDropdown", payload);
+
+      let returnData = []; 
+
+      if (response?.data?.responseCode === '200' && response.data.responseData) {
+        // toast.success(response.data.responseMessage);
+        returnData = response.data.responseData;
+      } else {
+        toast.error(response.data.responseMessage || "Failed to load Child Parts.");
+      }
+      const options = returnData.map(item => ({
+        key: item.productCode || "",
+        value: item.productCode || ""
+      }));
+      setProductData(options);
+      return returnData;
+
+    } catch (error) {
+      console.error('Error fetching child part dropdown data:', error);
+      toast.error('Error fetching data. Please try again later.');
+      return [];
+    }
+  }
+
   const columnDefs = [
     {
       headerName: "Line Code",
@@ -97,8 +127,21 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
     },
-    // { headerName: "UOM", field: "productUomCode",filter: "agTextColumnFilter" },
-
+    {
+      headerName: "Product Code",
+      field: "productCode",
+      filter: "agTextColumnFilter",
+      editable: true, 
+      cellEditor: "agSelectCellEditor", 
+      cellEditorParams: {
+      values: productData.map(item => item.key), // Ag-Grid typically expects an array of keys for 'values'
+    },
+    valueFormatter: (params) => {
+      // Find the corresponding display value (item.value) based on the stored key (params.value)
+      const option = productData.find(item => item.key === params.value);
+      return option ? option.value : params.value; // Display the value or the original code if not found
+    },
+    },
     {
       headerName: "IsActive",
       field: "isActive",
@@ -143,16 +186,14 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         lineMasterCode: item.lineMstCode,
         sequence: item.sequence || "0",
         lineMasterDesc: item.lineMstDesc,
+        productCode: item.productCode,
         tenantId: tenantId,
         isActive: item.isActive,
         updatedBy: employeeId,
         branchCode: branchCode,
       }));
 
-      const response = await serverApi.post(
-        "insertupdatelinemaster",
-        updatedList
-      );
+      const response = await serverApi.post("insertupdatelinemaster", updatedList);
 
       if (response.data && response.data === "SUCCESS") {
         toast.success("Data saved successfully!");

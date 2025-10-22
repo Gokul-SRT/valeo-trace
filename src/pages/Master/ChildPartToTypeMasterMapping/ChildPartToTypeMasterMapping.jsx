@@ -1,4 +1,4 @@
- 
+
 import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
@@ -22,6 +22,8 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
+  const [childPartData, setChildPartData] = useState([])
+  // const [ChildPartCode, setChildPartCode] = useState('')
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
   const gridRef = useRef(null);
 
@@ -42,38 +44,33 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
+      getChildPartDropDownData()
     }
   }, [selectedModule, selectedScreen]);
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("empID"));
-  console.log("tenantId",tenantId);
+  const employeeId = JSON.parse(localStorage.getItem("employeeId"));
 
   const fetchData = async () => {
     try {
-      //  console.log(store.get('tenantId'),"tenantId");
-      //  console.log(store.get('branchCode'),"branchCode");
-      const response = await serverApi.post("getchildpartTypeMappingdtl", {
-       
-        tenantId:tenantId,
-        branchCode:branchCode
-        
-        // tenantId: "val",
-        // branchCode: "VAL",
-      });
-
+      const payload = {
+        tenantId,
+        branchCode,
+      }
+      const response = await serverApi.post("getchildpartTypeMappingdtl", payload);
       // ✅ Handle if backend sends null, undefined, or empty array
-      if (!response.data || response.data.length === 0) {
-        setMasterList([]);
-        setOriginalList([]);
-      } else {
-        const updatedResponseData = response.data.map((item) => ({
+      if (response?.data?.responseCode === '200') {
+        console.log(response)
+        const updatedResponseData = response?.data?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
-        console.log(updatedResponseData);
+      } else {
+        setMasterList([]);
+        setOriginalList([]);
+        toast.error(response.data.responseMessage)
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
@@ -89,38 +86,56 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
- 
+  const getChildPartDropDownData = async () => {
+    try {
+      const payload = {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      }
+      const response = await serverApi.post("getChildPartDropDown", payload);
 
-// const columnDefs = [
-//   { headerName: "Packet ID", field: "packetId", filter: "agTextColumnFilter",  editable: (params) => (params.data.isUpdate === 0 ? true : false), },
-//   { headerName: "Child Part ID", field: "childPartId", filter: "agTextColumnFilter" },
-//   { headerName: "Packet Qty", field: "packetsQtys", filter: "agNumberColumnFilter" },
-// ];
+      let returnData = []; // Use 'let' for reassignment and initialize
 
+      if (response?.data?.responseCode === '200' && response.data.responseData) {
+        // toast.success(response.data.responseMessage);
+        returnData = response.data.responseData;
+      } else {
+        toast.error(response.data.responseMessage || "Failed to load Child Parts.");
+      }
+      const options = returnData.map(item => ({
+        key: item.childPartCode || "",
+        value: item.childPartCode || ""
+      }));
+      setChildPartData(options);
+      return returnData;
 
+    } catch (error) {
+      console.error('Error fetching child part dropdown data:', error);
+      toast.error('Error fetching data. Please try again later.');
+      return [];
+    }
+  }
 
-const columnDefs = [
-  { headerName: "Child Map Id", field: "childPacMapId", filter: "agTextColumnFilter" ,editable: (params) => (params.data.isUpdate === 0 ? true : false), },
-  { headerName: "Child Part Id", field: "childPartId", filter: "agTextColumnFilter" },
-  { headerName: "Type Id", field: "typeId", filter: "agTextColumnFilter" },
-  // { headerName: "Tenant ID", field: "tenant_id", filter: "agTextColumnFilter" },
-  // { headerName: "Created At", field: "created_at", filter: "agDateColumnFilter" },
-  // { headerName: "Updated At", field: "updated_at", filter: "agDateColumnFilter" },
-  // {
-  //   headerName: "Is Active",
-  //   field: "isActive",
-  //   filter: true,
-  //   editable: true,
-  //   cellRenderer: "agCheckboxCellRenderer",
-  //   cellEditor: "agCheckboxCellEditor",
-  //   valueGetter: (params) => params.data.isActive === true,
-  //   valueSetter: (params) => {
-  //     params.data.isActive = params.newValue ? true : false;
-  //     return true;
-  //   },
-  //   cellStyle: { textAlign: "center" },
-  // },
-];
+  const columnDefs = [
+    { headerName: "Child Map Id", field: "childPacMapId", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === 0 ? true : false), },
+    {
+      headerName: "Child Part Id",
+      field: "childPartCode",
+      filter: "agTextColumnFilter",
+      editable: true, 
+      cellEditor: "agSelectCellEditor", 
+      cellEditorParams: {
+      values: childPartData.map(item => item.key), // Ag-Grid typically expects an array of keys for 'values'
+    },
+    valueFormatter: (params) => {
+      // Find the corresponding display value (item.value) based on the stored key (params.value)
+      const option = childPartData.find(item => item.key === params.value);
+      return option ? option.value : params.value; // Display the value or the original code if not found
+    },
+    },
+    { headerName: "Type Id", field: "typeId", filter: "agTextColumnFilter" },
+  ];
 
   // Add new empty row
   const handleAddRow = () => {
@@ -141,14 +156,14 @@ const columnDefs = [
 
   const createorUpdate = async () => {
     try {
-      console.log('masterList',masterList)
+      console.log('masterList', masterList)
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
         childPacMapId: item.childPacMapId,
-        childPartId: item.childPartId,
+        childPartId: item.childPartCode,
         typeId: item.typeId,
         tenantId: tenantId,
-        udatedBy: employeeId,
+        updatedBy: employeeId,
         branchCode: branchCode,
       }));
 
@@ -163,14 +178,14 @@ const columnDefs = [
       } else if (response.data && response.data === "DUBLICATE") {
         toast.success("Do Not Allow Dublicate ChildMapId!");
 
-      }  else {
+      } else {
         toast.error("SaveOrUpdate failed.");
-        
+
       }
     } catch (error) {
       console.error("Error saving Child Part To Type Master data:", error);
-       toast.error("Error while saving data!");
-     
+      toast.error("Error while saving data!");
+
     }
   };
 
@@ -183,16 +198,16 @@ const columnDefs = [
     fetchData();
   };
 
-  // ✅ Filter change
-  const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-    } else if (value === "1") {
-      setMasterList(originalList.filter((item) => item.isActive === "1"));
-    } else if (value === "0") {
-      setMasterList(originalList.filter((item) => item.isActive === "0"));
-    }
-  };
+  // // ✅ Filter change
+  // const handleFilterChange = (value) => {
+  //   if (!value || value === "GetAll") {
+  //     setMasterList(originalList);
+  //   } else if (value === "1") {
+  //     setMasterList(originalList.filter((item) => item.isActive === "1"));
+  //   } else if (value === "0") {
+  //     setMasterList(originalList.filter((item) => item.isActive === "0"));
+  //   }
+  // };
 
   const onExportExcel = (ref) => {
     if (ref.current?.api) {
