@@ -51,7 +51,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const fetchData = async () => {
     try {
       const response = await serverApi.post("getlineMasterdtl", {
-        isActive: "1",
+        isActive: "getAll",
         tenantId: tenantId,
         branchCode: branchCode,
       });
