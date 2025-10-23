@@ -17,6 +17,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
+  const [productMastOptions, setProductMastOptions] = useState([]);
+  const [lineMastOptions, setLineMastOptions] = useState([]);
   const gridRef = useRef(null);
 
 
@@ -36,14 +38,16 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     setSelectedModule(modulesprop);
     setSelectedScreen(screensprop);
     if (selectedModule && selectedScreen) {
-      fetchData()
+      fetchData();
+      productMastData();
+      lineMastData();
     }
   }, [selectedModule, selectedScreen]);
 
   const fetchData = async (e) => {
       try {
         const response = await serverApi.post("getoperationMasterdtl", {
-          isActive: e || "getAll",
+          isActive:"1",
           tenantId,
           branchCode,
         });
@@ -61,10 +65,52 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
           toast.error(response.data.responseMessage)
         }
       } catch (error) {
-        console.error("Error fetching master data:", error);
+        
         toast.error("Error fetching data. Please try again later.");
       }
     };
+
+
+    const productMastData = async () => {
+      try {
+        const response = await serverApi.post("getProductDropdown", {
+          tenantId,
+          branchCode,
+          isActive: "1",
+        });
+    
+        const res = response.data;
+        if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+          setProductMastOptions(res.responseData);
+        } else {
+          setProductMastOptions([]);
+        }
+      } catch (error) {
+        
+        toast.error("Error fetching productMastData. Please try again later.");
+      }
+    };
+
+    const lineMastData = async () => {
+      try {
+        const response = await serverApi.post("getLineDropdown", {
+          tenantId,
+          branchCode,
+          isActive: "1",
+        });
+    
+        const res = response.data;
+       if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+          setLineMastOptions(res.responseData);
+        } else {
+          setLineMastOptions([]);
+        }
+      } catch (error) {
+        
+        toast.error("Error fetching lineMastData. Please try again later.");
+      }
+    };
+
 
 
     const createorUpdate = async () => {
@@ -79,6 +125,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         updatedBy: employeeId,
         branchCode,
+        productCode:item.productCode,
+        lineCode:item.lineMstCode,
       }));
 
       const response = await serverApi.post("insertupdateoperationmaster", updatedList);
@@ -106,12 +154,14 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       headerName: "Operation Id",
       field: "operationId",
       filter: "agTextColumnFilter",
+      editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Operation Code",
       field: "operationUniquecode",
       filter: "agTextColumnFilter",
-      editable: (params) => !params.data || !params.data.operationCode, 
+      //editable: (params) => !params.data || !params.data.operationCode, 
+     // editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Operation Description",
@@ -123,6 +173,46 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       field: "productionParameterCount",
       filter: "agTextColumnFilter",
     },
+
+    {
+      headerName: "Product Code",
+      field: "productCode",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+      cellEditorParams: (params) => ({
+        values: productMastOptions.map((p) => p.productCode), // show part IDs in dropdown
+      }),
+      valueFormatter: (params) => {
+        const found = productMastOptions.find((p) => p.productCode === params.value);
+        return found ? `${found.productDesc}` : params.value; // display description in grid
+      },
+      filter: "agTextColumnFilter",
+      filterValueGetter: (params) => {
+        const found = productMastOptions.find((p) => p.productCode === params.data.productCode);
+        return found ? found.productDesc : ""; // search/filter by description
+      },
+    },
+
+    {
+      headerName: "Line Code",
+      field: "lineMstCode",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+      cellEditorParams: (params) => ({
+        values: lineMastOptions.map((p) => p.lineMstCode), // show part IDs in dropdown
+      }),
+      valueFormatter: (params) => {
+        const found = lineMastOptions.find((p) => p.lineMstCode === params.value);
+        return found ? `${found.lineMstDesc}` : params.value; // display description in grid
+      },
+      filter: "agTextColumnFilter",
+      filterValueGetter: (params) => {
+        const found = lineMastOptions.find((p) => p.lineMstCode === params.data.lineMstCode);
+        return found ? found.lineMstDesc : ""; // search/filter by description
+      },
+    },
+
+
     {
       headerName: "Status",
       field: "isActive",

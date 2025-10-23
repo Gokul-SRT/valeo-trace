@@ -23,6 +23,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
+  const [childPartOptions, setChildPartOptions] = useState([]);
   const gridRef = useRef(null);
 
   const autoSizeAllColumns = (params) => {
@@ -42,11 +43,12 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
+      fetchChildParts();
     }
   }, [selectedModule, selectedScreen]);
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("empID"));
+  const employeeId = store.get("employeeId")
   const fetchData = async () => {
     try {
       const response = await serverApi.post("getpocketqtyMasterdtl", {
@@ -77,6 +79,29 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
+
+
+  const fetchChildParts = async () => {
+    try {
+      const response = await serverApi.post("getChildPartDropDown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+  
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setChildPartOptions(res.responseData);
+      } else {
+        setChildPartOptions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching child parts:", error);
+      toast.error("Error fetching child parts. Please try again later.");
+    }
+  };
+  
+
   const defaultColDef = {
     sortable: true,
     filter: true,
@@ -89,9 +114,28 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
  
 
 const columnDefs = [
-  { headerName: "Packet ID", field: "packetId", filter: "agTextColumnFilter",  editable: (params) => (params.data.isUpdate === 0 ? true : false), },
-  { headerName: "Child Part ID", field: "childPartId", filter: "agTextColumnFilter" },
-  { headerName: "Packet Qty", field: "packetsQtys", filter: "agNumberColumnFilter" },
+ // { headerName: "Packet ID", field: "packetId", filter: "agTextColumnFilter",  editable: (params) => (params.data.isUpdate === 0 ? true : false), },
+ // { headerName: "Child Part Code", field: "childPartId", filter: "agTextColumnFilter" },
+ {
+  headerName: "Child Part Code",
+  field: "childPartId",
+  editable: true,
+  cellEditor: "agSelectCellEditor",
+  cellEditorParams: (params) => ({
+    values: childPartOptions.map((p) => p.childPartCode), // show part IDs in dropdown
+  }),
+  valueFormatter: (params) => {
+    const found = childPartOptions.find((p) => p.childPartCode === params.value);
+    return found ? `${found.childPartDesc}` : params.value; // display description in grid
+  },
+  filter: "agTextColumnFilter",
+  filterValueGetter: (params) => {
+    const found = childPartOptions.find((p) => p.childPartCode === params.data.childPartId);
+    return found ? found.childPartDesc : ""; // search/filter by description
+  },
+},
+  // { headerName: "Packet Qty", field: "packetsQtys", filter: "agNumberColumnFilter" },
+  { headerName: "Packet Qty", field: "packetsQtys", filter: "agTextColumnFilter" },
 ];
 
 
@@ -196,7 +240,7 @@ const columnDefs = [
         </div>
 
         {/* 🔹 Filter Dropdown */}
-        <div className="p-3">
+        {/* <div className="p-3">
           <div className="row">
             <div className="col-md-3">
               <label className="form-label fw-bold">Search Filter</label>
@@ -210,7 +254,7 @@ const columnDefs = [
               </select>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="card-body p-3">
           <AgGridReact
