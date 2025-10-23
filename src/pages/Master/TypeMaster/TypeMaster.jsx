@@ -51,36 +51,33 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
   console.log("tenantId",tenantId);
 
   const fetchData = async () => {
-    try {
-      //  console.log(store.get('tenantId'),"tenantId");
-      //  console.log(store.get('branchCode'),"branchCode");
-      const response = await serverApi.post("gettypeMasterdtl", {
-       
-        tenantId:tenantId,
-        branchCode:branchCode
-        
-        // tenantId: "val",
-        // branchCode: "VAL",
-      });
+  try {
+    const response = await serverApi.post("gettypeMasterdtl", {
+      tenantId,
+      branchCode,
+    });
 
-      // ✅ Handle if backend sends null, undefined, or empty array
-      if (!response.data || response.data.length === 0) {
-        setMasterList([]);
-        setOriginalList([]);
-      } else {
-        const updatedResponseData = response.data.map((item) => ({
-          ...item,
-          isUpdate: 1,
-        }));
-        setMasterList(updatedResponseData);
-        setOriginalList(updatedResponseData);
-        console.log(updatedResponseData);
-      }
-    } catch (error) {
-      console.error("Error fetching master data:", error);
-      toast.error("Error fetching data. Please try again later.");
+    // Fix: Handle backend response wrapper
+    if (response?.data?.responseCode === "200" && Array.isArray(response.data.responseData)) {
+      const updatedResponseData = response.data.responseData.map((item) => ({
+        ...item,
+        // keep your original payload fields as-is
+        isUpdate: 1,
+      }));
+      setMasterList(updatedResponseData);
+      setOriginalList(updatedResponseData);
+      console.log("Fetched TypeMaster:", updatedResponseData);
+    } else {
+      setMasterList([]);
+      setOriginalList([]);
+      toast.error(response?.data?.responseMessage || "No data found");
     }
-  };
+  } catch (error) {
+    console.error("Error fetching TypeMaster data:", error);
+    toast.error("Error fetching data. Please try again later.");
+  }
+};
+
 
   const defaultColDef = {
     sortable: true,
@@ -102,7 +99,7 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
 const columnDefs = [
  // { headerName: "Type ID", field: "type_id", filter: "agTextColumnFilter",editable: (params) => (params.data.isUpdate === 0 ? true : false), },
   { headerName: "Type Code", field: "typeCode", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === 0 ? true : false), },
-  { headerName: "Type Description", field: "typeDesc", filter: "agTextColumnFilter" },
+  { headerName: "Type Description", field: "typeDescription", filter: "agTextColumnFilter" },
  // { headerName: "Tenant ID", field: "tenant_id", filter: "agTextColumnFilter" },
   // { headerName: "Created At", field: "created_at", filter: "agDateColumnFilter" },
   // { headerName: "Updated At", field: "updated_at", filter: "agDateColumnFilter" },
@@ -132,7 +129,7 @@ const columnDefs = [
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
         typeCode: item.typeCode,
-        typeDesc: item.typeDesc,
+        typeDesc: item.typeDescription,
         tenantId: tenantId,
         updatedBy: employeeId,
         branchCode: branchCode,
