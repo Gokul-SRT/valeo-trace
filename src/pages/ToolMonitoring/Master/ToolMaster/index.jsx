@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -9,7 +9,8 @@ import { toast } from "react-toastify";
 import serverApi from "../../../../service/ToolServerApi";
 import api from "../../../../serverAPI"
 import commonApi from "../../../../CommonserverApi";
-
+import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
+import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/OperationMasterService";
 const ToolMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState(modulesprop);
   const [selectedScreen, setSelectedScreen] = useState(screensprop);
@@ -17,11 +18,15 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   const [originalList, setOriginalList] = useState([]);
   const [productData, setProductData] = useState([]);
   const [customerData, setCustomerData] = useState([]);
+  const [lineData, setLineData] = useState([]);
+  const [operationData, setOpeartionData] = useState([]);
   const [isModelIdModalOpen, setIsModelIdModalOpen] = useState(false);
   const [editingToolData, setEditingToolData] = useState(null);
   const [selectedModelIds, setSelectedModelIds] = useState([]);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState([]); // State for customer multi-select
   const [editingField, setEditingField] = useState(null);
+  const [selectedLineCode, setSelectedLineCode] = useState("getAll");
+  const [selectedStatus, setSelectedStatus] = useState("GetAll");
   const gridRef = useRef(null);
 
   const tenantId = store.get("tenantId")
@@ -36,13 +41,59 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     params.api.autoSizeColumns(allColumnIds);
   };
 
+  const getLineDropDownData = useCallback(async () => {
+    try {
+      const response = await LineMstdropdown();
+      console.log(response)
+      let returnData = [];
+      if (response) {
+        returnData = response;
+        const options = returnData.map(item => ({
+          key: item.lineMstCode || "",
+          value: item.lineMstDesc || "",
+          // label: item.productCode || ""
+        }));
+        setLineData(options);
+        return returnData;
+      } else {
+        console.warn("LineMstdropdown returned no data.");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching line dropdown data:", error);
+      setLineData([]);
+    }
+  }, []);
+
+  const getOperationDropDownData = useCallback(async () => {
+    try {
+      const response = await OperationMasterDropdown();
+      console.log(response)
+      let returnData = [];
+      if (response) {
+        returnData = response;
+        const options = returnData.map(item => ({
+          key: item.operationUniqueCode || "",
+          value: item.operationDescription || "",
+          // label: item.productCode || ""
+        }));
+        setOpeartionData(options);
+        return returnData;
+      } else {
+        console.warn("OperationMstdropdown returned no data.");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching operation dropdown data:", error);
+      setOpeartionData([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData()
-      getProductDropDownData()
-      getCustomerDropDownData()
     }
-  }, [modulesprop, screensprop]);
+  }, [modulesprop, screensprop, getLineDropDownData]);
 
   const fetchData = async (e) => {
     try {
@@ -53,21 +104,21 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         status: "getAll"
       });
       if (response?.data?.responseCode === '200') {
-        console.log(response)
         const updatedResponseData = response?.data?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
+        getLineDropDownData()
+        getOperationDropDownData()
+        getProductDropDownData()
+        getCustomerDropDownData()
       } else {
         setMasterList([]);
         setOriginalList([]);
         toast.error(response.data.responseMessage)
       }
-      // console.log(response,"response--")
-      // setMasterList(response.data);
-      // setOriginalList(response.data);
     } catch (error) {
       console.error("Error fetching master data:", error);
       toast.error("Error fetching data. Please try again later.");
@@ -95,7 +146,6 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         value: item.productCode || "",
         label: item.productCode || ""
       }));
-      console.log(options, 'options------')
       setProductData(options);
       return returnData;
 
@@ -127,7 +177,6 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         value: item.customerId || "",
         label: item.customerName || ""
       }));
-      console.log(options, 'options------')
       setCustomerData(options);
       return returnData;
 
@@ -140,35 +189,40 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   const createorUpdate = async () => {
     try {
-      const updatedList = masterList.map(item => {
-        const formatIds = (ids) => {
-          return Array.isArray(ids)
-            ? ids.join(',')
-            : ids || '';
-        };
-        return {
-          isUpdate: item.isUpdate,
-          toolNo: item.toolNo,
-          toolDesc: item.toolDesc,
-          maxShots: item.maxShots,
-          line: item.line,
-          operation: item.operation,
-          customerId: formatIds(item.customerId),
-          modelId: formatIds(item.modelId),
-          status: item.status,
-          tenantId,
-          updatedBy: employeeId,
-          branchCode,
-        };
-      });
+      const ToolNoEmpty = masterList.filter((item) => !item.toolNo);
+      if (ToolNoEmpty && ToolNoEmpty?.length === 0) {
+        const updatedList = masterList.map(item => {
+          const formatIds = (ids) => {
+            return Array.isArray(ids)
+              ? ids.join(',')
+              : ids || '';
+          };
+          return {
+            isUpdate: item.isUpdate,
+            toolNo: item.toolNo,
+            toolDesc: item.toolDesc,
+            maxShots: item.maxShots,
+            line: item.line,
+            operation: item.operation,
+            customerId: formatIds(item.customerId),
+            modelId: formatIds(item.modelId),
+            status: item.status,
+            tenantId,
+            updatedBy: employeeId,
+            branchCode,
+          };
+        });
 
-      const response = await serverApi.post("saveOrUpdate", updatedList);
+        const response = await serverApi.post("saveOrUpdate", updatedList);
 
-      if (response?.data?.responseCode === '200') {
-        toast.success(response.data.responseMessage);
-        fetchData();
-      } else {
-        toast.error(response.data.responseMessage);
+        if (response?.data?.responseCode === '200') {
+          toast.success(response.data.responseMessage);
+          fetchData();
+        } else {
+          toast.error(response.data.responseMessage);
+        }
+      }else {
+        toast.error("Please enter the Tool No for all the rows.");
       }
     } catch (error) {
       console.error("Error saving data:", error);
@@ -183,41 +237,20 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
-  const lineOptions = ["Cover Assembly", "Disc Assembly - 1", "Disc Assembly - 2"];
-  const machineOptions = ["Machine-A", "Machine-B", "Machine-C"];
-  // const customerOptions = ["Maruthi"];
-
-  // const handleModelIdCellClick = (params) => {
-  //   const toolData = params.data;
-  //   setEditingToolData(toolData);
-
-  //   let currentModelIds = [];
-  //   if (toolData.modelId) {
-  //     if (Array.isArray(toolData.modelId)) {
-  //       currentModelIds = toolData.modelId;
-  //     } else {
-  //       currentModelIds = toolData.modelId.split(',').filter(id => id.trim() !== '');
-  //     }
-  //   }
-  //   console.log("Model ID Clicked for Tool:", toolData.toolNo || `New Row (${toolData.localId})`);
-  //   setSelectedModelIds(currentModelIds);
-  //   setIsModelIdModalOpen(true);
-  // };
-
   const handleCellClick = (params) => {
     const { colDef, data } = params;
     setEditingToolData(data);
-    setEditingField(colDef.field); // Set which field is being edited
+    setEditingField(colDef.field);
 
     let currentIds = [];
     if (colDef.field === 'modelId') {
       currentIds = Array.isArray(data.modelId) ? data.modelId : (data.modelId ? data.modelId.split(',').filter(id => id.trim() !== '') : []);
       setSelectedModelIds(currentIds);
-      setSelectedCustomerIds([]); // Clear customer selection
+      setSelectedCustomerIds([]);
     } else if (colDef.field === 'customerId') {
       currentIds = Array.isArray(data.customerId) ? data.customerId : (data.customerId ? data.customerId.split(',').filter(id => id.trim() !== '') : []);
       setSelectedCustomerIds(currentIds);
-      setSelectedModelIds([]); // Clear model selection
+      setSelectedModelIds([]);
     }
 
     setIsModelIdModalOpen(true);
@@ -228,13 +261,9 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     const { value, colDef, context } = props;
 
     if (colDef.field === 'modelId') {
-      // For modelId, value is an array of product codes
       displayValue = Array.isArray(value) ? value.join(', ') : value || '';
     } else if (colDef.field === 'customerId') {
-      // Handle customerId logic (string or array)
       currentIds = Array.isArray(value) ? value : (value ? String(value).split(',').filter(id => id.trim() !== '') : []);
-
-      // Now map the IDs to names
       const names = currentIds.map(id => {
         const customer = customerData.find(item => item.value === id);
         return customer ? customer.label : id;
@@ -278,16 +307,28 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       field: "line",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      cellEditorParams: { values: lineOptions },
       filter: "agSetColumnFilter",
+      cellEditorParams: {
+        values: lineData.map(item => item.key), // These are the Line Codes
+      },
+      valueFormatter: (params) => { // This displays the Line Description
+        const option = lineData.find(item => item.key === params.value);
+        return option ? option.value : params.value;
+      },
     },
     {
       headerName: "Operation",
       field: "operation",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      cellEditorParams: { values: machineOptions },
       filter: "agSetColumnFilter",
+      cellEditorParams: {
+        values: operationData.map(item => item.key),
+      },
+      valueFormatter: (params) => {
+        const option = operationData.find(item => item.key === params.value);
+        return option ? option.value : params.value;
+      },
     },
     {
       headerName: "Customer",
@@ -348,9 +389,15 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       isUpdate: "0",
       localId: Date.now().toString(),
     };
-    const updated = [...masterList, emptyRow];
-    setMasterList(updated);
-    setOriginalList(updated);
+
+    const ToolNoEmpty = masterList.filter((item) => !item.toolNo);
+    if (ToolNoEmpty && ToolNoEmpty?.length === 0) {
+      const updated = [...masterList, emptyRow];
+      setMasterList(updated);
+      setOriginalList(updated);
+    } else {
+      toast.error("Please enter the Tool No for all the rows.");
+    }
   };
 
   const handleCancel = () => {
@@ -361,22 +408,36 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     fetchData();
   };
 
-  const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-    } else if (value === "Active") {
-      setMasterList(originalList.filter((item) => item.status === "1"));
-    } else if (value === "Inactive") {
-      setMasterList(originalList.filter((item) => item.status === "0"));
+  const handleFilterChange = (type, value) => {
+    let newSelectedLineCode = selectedLineCode;
+    let newSelectedStatus = selectedStatus;
+
+    if (type === 'line') {
+      newSelectedLineCode = value;
+      setSelectedLineCode(newSelectedLineCode);
+    } else if (type === 'status') {
+      newSelectedStatus = value;
+      setSelectedStatus(newSelectedStatus);
     }
 
-    if (value === "Cover Assembly" || value === "Disc Assembly - 1" || value === "Disc Assembly - 2") {
-      setMasterList(originalList.filter((item) => item.line === value));
+    let filteredList = originalList;
+
+    // 1. Apply Line Filter
+    if (newSelectedLineCode !== "getAll") {
+      filteredList = filteredList.filter((item) => item.line === newSelectedLineCode);
     }
+
+    // 2. Apply Status Filter (on the line-filtered list or the full list)
+    if (newSelectedStatus === "Active") {
+      filteredList = filteredList.filter((item) => item.status === "1");
+    } else if (newSelectedStatus === "Inactive") {
+      filteredList = filteredList.filter((item) => item.status === "0");
+    }
+
+    setMasterList(filteredList);
   };
 
   const handleModelModalSave = () => {
-    console.log(editingToolData, "editingToolData--------")
     if (editingToolData) {
       const updatedMasterList = masterList.map(item => {
         const isTargetRow = (item.toolNo && item.toolNo === editingToolData.toolNo) ||
@@ -464,19 +525,23 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
               <label className="form-label fw-bold">Line</label>
               <select
                 className="form-select"
-                onChange={(e) => handleFilterChange(e.target.value)}
+                // value={selectedStatus}
+                onChange={(e) => handleFilterChange('line', e.target.value)}
               >
-                <option value="GetAll">Get All</option>
-                <option value="Cover Assembly">Cover Assembly</option>
-                <option value="Disc Assembly - 1">Disc Assembly - 1</option>
-                <option value="Disc Assembly - 2">Disc Assembly - 2</option>
+                <option value="getAll">Get All</option>
+                {lineData.map((line) => (
+                  <option key={line.key} value={line.key}>
+                    {line.value} {/* Display the line description */}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="col-md-3">
               <label className="form-label fw-bold">Status</label>
               <select
                 className="form-select"
-                onChange={(e) => handleFilterChange(e.target.value)}
+                // value={selectedLineCode}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
               >
                 <option value="GetAll">Get All</option>
                 <option value="Active">Active</option>
