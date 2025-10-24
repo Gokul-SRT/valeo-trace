@@ -10,7 +10,7 @@ function getCookie(name) {
 
 // Create axios instance
 const serverApi = axios.create({
-  baseURL: 'http://localhost:8093/commonservices/',
+  baseURL: 'http://localhost:8091/tool/',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,7 +23,6 @@ serverApi.interceptors.request.use(
     const tenantId = getCookie('tenantId')
     const employeeId = getCookie('empID')
     const branchCode = getCookie('branchCode')
-    const orgCode = getCookie('orgCode')
     if (accessToken) {
       request.headers.Authorization = `Bearer ${accessToken}`;
       request.headers.AccessToken = accessToken;
@@ -31,7 +30,6 @@ serverApi.interceptors.request.use(
       store.set("employeeId", employeeId)
       store.set("branchCode", branchCode)
       store.set("tenantId", tenantId)
-      store.set("orgCode", orgCode)
     }
     return request;
   },
