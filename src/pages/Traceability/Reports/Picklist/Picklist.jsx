@@ -1,31 +1,300 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Card, Select, Input, Form, Row, Col } from "antd";
+import React, { useState,useEffect } from "react";
+import { Table, Button, Modal, Card, Select, Input, Form, Row, Col, Progress, Space,DatePicker } from "antd";
 import { PlusCircleOutlined, PrinterOutlined, DownloadOutlined } from "@ant-design/icons";
 import { FaQrcode } from "react-icons/fa";
 import QRCode from "antd/lib/qr-code";
 import html2canvas from "html2canvas";
 import "./style.css";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
+import { toast } from "react-toastify";
+import store from "store";
+import serverApi from "../../../../serverAPI";
 
- 
+
 
 const { Option } = Select;
 
 const Picklist = () => {
   const navigate = useNavigate();
-  // Pending Picklist sample data
-  const [pendingData] = useState([
-    { key: 1, sno: 1, picklistCode: "PENDING-001",product:"MSIL Z12E 200 OE",line:"Disc Assy", createdDate: "20-Sep-2025",shift:"A", status: "Pending", issueStatus: "Open" },
-    { key: 2, sno: 2, picklistCode: "PENDING-002",product:"MSIL YTA 200 OE",line:"Cover Assy",  createdDate: "21-Sep-2025",shift:"B", status: "Pending", issueStatus: "Open" },
-  ]);
+  const [form] = Form.useForm();
+  const todays = dayjs(); // Default to current date
 
-  // Completed Picklist sample data
-  const [completedData] = useState([
-    { key: 1, sno: 1, picklistCode: "VACPUMP-L1/JUN-2025/463/6543",product:"MSIL Z12E 200 OE",line:"Disc Assy",  createdDate: "03-Jun-2025",shift:"A", status: "Completed", issueStatus: "Completed" },
-    { key: 2, sno: 2, picklistCode: "VACPUMP-L1/MAY-2025/463/6528",product:"MSIL YTA 200 OE",line:"Cover Assy",  createdDate: "27-May-2025",shift:"B", status: "Completed", issueStatus: "Completed" },
-    { key: 3, sno: 3, picklistCode: "VACPUMP-L1/MAY-2025/463/6521",product:"MSIL Z12E 200 OE",line:"Disc Assy",  createdDate: "24-May-2025",shift:"C", status: "Completed", issueStatus: "Completed" },
-  ]);
+  const [productList, setProductList] = useState([]);
+  const [lineList,setLineList]= useState([]);
+  const[statusList,setStatusList]= useState([]);
 
+  const [tableData, setTableData] = useState([]);
+  const [completedDatas, setCompletedDatas] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState("completed");
+  const [isFilterApplied, setIsFilterApplied] = useState(false);
+  const [lineFeederDatas, setLineFeederDatas] = useState([]);
+// 🟢 State for title
+const [tableTitle, setTableTitle] = useState("Completed Picklist");
+
+
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  const employeeId = store.get("employeeId")
+
+
+  
+
+
+  useEffect(() => {
+    setShowLineFeeder(false);
+    fetchProductDetails();
+    fetchLineDetails();
+    fetchStatusDetails();
+    fetchDefaultCompletedTable();
+  }, []);
+
+  const fetchProductDetails = async () => {
+    try {
+      const response = await serverApi.post("getProductDropdown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+  
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setProductList(res.responseData);
+      } else {
+        setProductList([]);
+      }
+    } catch (error) {
+     
+      toast.error("Error fetching productCode. Please try again later.");
+    }
+  };
+
+
+  const fetchLineDetails = async () => {
+    try {
+      const response = await serverApi.post("getLineDropdown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+  
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setLineList(res.responseData);
+      } else {
+        setLineList([]);
+      }
+    } catch (error) {
+     
+      toast.error("Error fetching lineCode. Please try again later.");
+    }
+  };
+  
+
+  const fetchStatusDetails = async () => {
+    try {
+      const response = await serverApi.post("getStatusDropdown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+  
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setStatusList(res.responseData);
+
+      const completedStatus=res.responseData.find((item)=>item.statusDesc?.toLowerCase()==="completed");
+       if(completedStatus){
+         form.setFieldsValue({status:completedStatus.statusDesc})
+         setSelectedStatus(completedStatus.statusDesc);
+       }
+
+      } else {
+        setStatusList([]);
+      }
+    } catch (error) {
+     
+      toast.error("Error fetching ststusCode. Please try again later.");
+    }
+  };
+
+
+
+  const fetchDefaultCompletedTable = async () => {
+    try {
+      const response = await serverApi.post("getCompletedPicklist", {
+        tenantId:tenantId,
+        branCode:branchCode,
+        prodCode: "",
+        lineCode: "",
+        pickDate: dayjs().format("YYYY-MM-DD"),
+        status: "3",
+      });
+     // const res = response.data;
+      // if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+      //   setCompletedDatas(res.responseData);
+      // }
+      const resData = response.data;
+      if (resData != null && Array.isArray(resData.completedScanHdrList) && resData.completedScanHdrList.length > 0) {
+        setCompletedDatas(resData.completedScanHdrList);
+      }else {
+        setCompletedDatas([]); // fallback to empty array
+      }
+    } catch (error) {
+      toast.error("Error fetching default Completed table");
+      console.error(error);
+    }
+  };
+
+  const fetchPicklistData = async ({ product, line, date, status }) => {
+    try {
+      const response = await serverApi.post("getPicklist", {
+        tenantId:tenantId,
+        branCode:branchCode,
+        prodCode:product,
+        lineCode:line,
+        pickDate: date.format("YYYY-MM-DD"),
+        status:status,
+      });
+    //  const res = response.data;
+      /*if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setTableData(res.responseData);
+      } else {
+        setTableData([]);
+      }*/
+      const resData = response.data;
+      if (resData != null && Array.isArray(resData.pendingScanHdrList) && resData.pendingScanHdrList.length > 0) {
+        setTableData(resData.pendingScanHdrList);
+      }else {
+        setTableData([]); // fallback to empty array
+      }
+    } catch (error) {
+      toast.error("Error fetching picklist data");
+      console.error(error);
+    }
+  };
+
+  // const getColumns = () => {
+  //   if (selectedStatus.toLowerCase() === "completed") return completedColumns;
+  //   if (selectedStatus === "Partially Completed") return partiallyCompletedColumns;
+  //   return pendingColumns;
+  // };
+
+
+  const getColumns = () => {
+    if (!selectedStatus) return completedColumns; // default
+    const statusLower = selectedStatus.toLowerCase();
+    if (statusLower === "3") return completedColumns;
+    if (statusLower === "2") return partiallyCompletedColumns;
+    if (statusLower === "1") return pendingColumns;
+    return completedColumns; // fallback
+  };
+  
+  // Function to get table title based on status
+  const getTableTitle = (status) => {
+    console.log("getTableTitle",status)
+    if (!status) return "Completed Picklist"; // default
+    const statusLower = status.toLowerCase();
+    if (statusLower === "3") return "Completed Picklist";
+    if (statusLower === "2") return "Partially Completed Picklist";
+    if (statusLower === "1") return "Pending Picklist";
+    return "Completed Picklist"; // fallback
+  };
+
+
+
+// Single API call on Submit
+const onFinish = (values) => {
+  setSelectedStatus(values.status);
+  setShowLineFeeder(false);
+  setIsFilterApplied(true);
+  fetchPicklistData(values);
+  const dynamicTitle = getTableTitle(values.status);
+    setTableTitle(dynamicTitle);
+};
+
+
+// ✅ Optional cancel function
+const onCancel = () => {
+  form.resetFields(); // resets form fields
+  setSelectedStatus("3");
+    setTableTitle("Completed Picklist");
+    setShowLineFeeder(false);
+    setIsFilterApplied(false);
+    setTableData([]);
+    fetchDefaultCompletedTable();
+};
+
+
+
+const handlePicklistClick = async (picklistCode) => {
+  try {
+    const response = await serverApi.post("getRetrievePickdetails", {
+      tenantId:tenantId,
+      branchCode:branchCode,
+      plscode:picklistCode,
+    });
+
+    const res = response.data;
+    console .log("responseCode",response);
+    console .log("responseCode",res);
+    console.log("responseData",res);
+    if (res.responseCode === "200") {
+      setLineFeederDatas(res.responseData);
+      setShowLineFeeder(true); // show the Line Feeder table
+      console .log("showLineFeeder",showLineFeeder);
+      setCurrentPage("main");   // if you need to track current page
+    } else {
+      setLineFeederDatas([]);
+      setShowLineFeeder(false);
+    }
+  } catch (error) {
+    toast.error("Error fetching line feeder data", error);
+    setLineFeederDatas([]);
+    setShowLineFeeder(false);
+  }
+};
+
+
+
+const partiallyCompletedColumns = [
+  { title: "S.No", key: "sno",render:(text,reord,index)=>index+1},
+  { title: "Picklist Code", dataIndex: "plsCode", key: "plsCode", 
+     render: (text, record) => (
+    // <Button
+    //   type="link"
+    //   onClick={() => {
+    //     setShowLineFeeder(true);
+    //     setCurrentPage("main");
+    //   }}
+    //   style={{ padding: 0 }}
+    // >
+    //   {text}
+    // </Button>
+
+    <Button
+    type="link"
+    onClick={() => handlePicklistClick(record.plsId)}
+    style={{ padding: 0 }}
+  >
+    {text}
+  </Button>
+
+  ), },
+  { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
+  { title: "Line", dataIndex: "lineCode", key: "lineCode" },
+  { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+  { title: "Shift", dataIndex: "shift", key: "shift" },
+  { title: "Status", dataIndex: "status", key: "status" },
+  { title: "Partially Issued Qty", dataIndex: "partialQty", key: "partialQty" },
+  //{ title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
+];
+
+
+
+
+
+  
   // States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showLineFeeder, setShowLineFeeder] = useState(false);
@@ -33,7 +302,7 @@ const Picklist = () => {
   const [selectedPrintPart, setSelectedPrintPart] = useState(null);
   const [selectType, setSelectedType] = useState(null);
   const [showPrintDetails, setShowPrintDetails] = useState(false);
-   
+
 
   // QR modal states
   const [qrModalVisible, setQrModalVisible] = useState(false);
@@ -45,8 +314,8 @@ const Picklist = () => {
     setQrModalVisible(true);
 
     setTimeout(() => {
-   handleDownloadQR();
-  }, 500); // 0.5s delay to ensure QR is rendered
+      handleDownloadQR();
+    }, 500); // 0.5s delay to ensure QR is rendered
   };
 
   const handleDownloadQR = () => {
@@ -59,111 +328,131 @@ const Picklist = () => {
       link.click();
     });
   };
-
+  
   // Line Feeder Details Table
   const today = new Date().toLocaleDateString("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-}).replace(/ /g, "-").toLowerCase();
-  const lineFeederData = [
-    { key: 1, sno: 1, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF72760", childPartDesc: "Cushion Disc - MSIL  Z12E 200 UX OE", type: "A1", fromSub: "STORES", locator: "LOC-001", lotNumber: "LOT-001", picklistQty: 1000 },
-    { key: 2, sno: 2, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF72760HF", childPartDesc: "Cushion Disc HF - MSIL  Z12E 200 UX OE", type: "A1", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 1000 },
-    { key: 3, sno: 3, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF72760TE", childPartDesc: "Cushion Disc Temp - MSIL  Z12E 200 UX OE", type: "A1", fromSub: "STORES", locator: "LOC-001", lotNumber: "LOT-001", picklistQty: 1000 },
-    { key: 4, sno: 4, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "612050700H", childPartDesc: "Steel Coil-MSIL Z12E Cushion Disc205X0.7", type: "A1", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 226 },
-    { key: 5, sno: 5, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "1069282", childPartDesc: "Rivet - Cushion Disc DW", type: "A2", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 4000 },
-    { key: 6, sno: 6, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "KRPA00024", childPartDesc: "Kitting RP Assy - MARUTI F8D 180KX", type: "A2", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 1000 },
-    { key: 7, sno: 7, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF86479", childPartDesc: "Retainer Plate - MSIL Z12E FW Side", type: "A2", fromSub: "STORES", locator: "LOC-001", lotNumber: "LOT-001", picklistQty: 1000 },
-    { key: 8, sno: 8, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF86479HT", childPartDesc: "Retainer Plate HT - MSIL Z12E FW Side", type: "A2", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 1000 },
-    { key: 9, sno: 9, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF86479BL", childPartDesc: "Retainer Plate BL - MSIL Z12E FW Side", type: "B2", fromSub: "STORES", locator: "LOC-001", lotNumber: "LOT-001", picklistQty: 1000 },
-    { key: 10, sno: 10, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "612801700", childPartDesc: "Steel Coil - MSIL Z12E R/P 280 X 1.7", type: "B2", fromSub: "STORES", locator: "LOC-001", lotNumber: "LOT-001", picklistQty: 263 },
-    { key: 11, sno: 11, date: today, operation: "Disc Assy - MSIL Z12E 200 OE", childPartCode: "CF86495", childPartDesc: "Friction Bush - MSIL Z12E FW Side", type: "C", fromSub: "STORES", locator: "LOC-002", lotNumber: "LOT-002", picklistQty: 1000 },
-  ];
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).replace(/ /g, "-").toLowerCase();
+ 
 
   const lineFeederColumns = [
-    { title: "S.No", dataIndex: "sno", key: "sno" },
-    { title: "Date", dataIndex: "date", key: "date" },
-    { title: "Product & Line ", dataIndex: "operation", key: "operation" },
+    { title: "S.No", key: "sno",render:(text,record,index)=>index+1 },
+
     { title: "Child Part Code", dataIndex: "childPartCode", key: "childPartCode" },
     { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
-    { title: "Type", dataIndex: "type", key: "type" },
-    { title: "FromSub", dataIndex: "fromSub", key: "fromSub" },
-    { title: "Locator", dataIndex: "locator", key: "locator" },
-    { title: "Lot Number", dataIndex: "lotNumber", key: "lotNumber" },
     { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
-    { title: "Status", dataIndex: "status", key: "status", render: () => <FaQrcode size={18} color="#002147" /> },
-    {
-  title: "Action",
-  dataIndex: "action",
-  key: "action",
-  render: (_, record) =>
-    record.type === "A2" || record.type === "B2" ? (
-      <Button
-        type="link"
-        icon={<PrinterOutlined />}
-        onClick={() => {
-          setSelectedType(record.type);
-          setSelectedPrintPart(record.childPartCode);
-          setCurrentPage("printPage");
-          setShowPrintDetails(false);
-        }}
-      >
-        Print
-      </Button>
-    ) : record.type === "C" ? (
-      <Button
-        type="link"
-        icon={<PrinterOutlined />}
-        onClick={() => {
-           setSelectedType(record.type);
-           navigate("/Kittingprocessscreen");
+    
 
-        }}
-      >
-        Print
-      </Button>
-    ) : null,
-}
+  {
+      title: "Status",
+      dataIndex: "pickedQty",
+      key: "pickedQty",
+      render: (value, record) => {
+       
+        if (value === 0 || value === null || value === undefined) {
+          return <FaQrcode size={18} color="#002147" />;
+        } else {
+          const percent=(value / record.picklistQty) * 100; 
+          return (
+            <Progress
+              percent={percent}
+              percentPosition={{ align: "start", type: "inner" }}
+              size={[100, 20]}
+              strokeColor="#B7EB8F"
+            />
+          );
+        }
+      },
+    },
+  
+    {
+      title: "Action",
+      dataIndex: "itemType",
+      key: "itemType",
+      render: (_, record) =>
+        record.itemType === "A2" || record.itemType === "B2" || record.itemType === "A1"? (
+          <Button
+            type="link"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              setSelectedType(record.itemType);
+              setSelectedPrintPart(record.childPartCode);
+              setCurrentPage("printPage");
+              setShowPrintDetails(false);
+            }}
+          >
+            Print
+          </Button>
+        ) : record.itemType === "C" ? (
+          <Button
+            type="link"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              setSelectedType(record.itemType);
+              navigate("/Kittingprocessscreen");
+
+            }}
+          >
+            Print
+          </Button>
+        ) : null,
+    }
 
   ];
 
   // Columns for Pending Picklist
   const pendingColumns = [
-    { title: "S.No", dataIndex: "sno", key: "sno" },
+    { title: "S.No", key: "sno",render:(text,reord,index)=>index+1},
     {
       title: "Picklist Code",
-      dataIndex: "picklistCode",
-      key: "picklistCode",
-      render: (text) => (
+      dataIndex: "plsCode",
+      key: "plsCode",
+      render: (text, record) => (
+        // <Button
+        //   type="link"
+        //   onClick={() => {
+        //     setShowLineFeeder(true);
+        //     setCurrentPage("main");
+        //   }}
+        //   style={{ padding: 0 }}
+        // >
+        //   {text}
+        // </Button>
+
         <Button
-          type="link"
-          onClick={() => {
-            setShowLineFeeder(true);
-            setCurrentPage("main");
-          }}
-          style={{ padding: 0 }}
-        >
-          {text}
-        </Button>
+        type="link"
+        onClick={() => handlePicklistClick(record.plsId)}
+        style={{ padding: 0 }}
+      >
+        {text}
+      </Button>
+
       ),
     },
-    { title: "Product", dataIndex: "product", key: "product" },
-    { title: "Line", dataIndex: "line", key: "line" },
-    { title: "Created Date", dataIndex: "createdDate", key: "createdDate" },
+    { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
+    { title: "Line", dataIndex: "lineCode", key: "lineCode" },
+    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
     { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
-    { title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
+   // { title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
   ];
 
   const completedColumns = [
-    { title: "S.No", dataIndex: "sno", key: "sno" },
-    { title: "Picklist Code", dataIndex: "picklistCode", key: "picklistCode" },
-    { title: "Product", dataIndex: "product", key: "product" },
-    { title: "Line", dataIndex: "line", key: "line" },
-    { title: "Created Date", dataIndex: "createdDate", key: "createdDate" },
-     { title: "Shift", dataIndex: "shift", key: "shift" },
+    //{ title: "S.No", dataIndex: "sno", key: "sno" },
+    {
+      title: "S.No",
+      key: "sno",
+      render: (text, record, index) => index + 1, // 👈 Auto increments
+    },
+    { title: "Picklist Code", dataIndex: "plsCode", key: "plsCode" },
+    { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
+    { title: "Line", dataIndex: "lineCode", key: "lineCode" },
+    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
-    { title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
+    //{ title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
   ];
 
   // Print Page - B2 details sample table
@@ -200,20 +489,11 @@ const Picklist = () => {
       <Card
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
         title={title}
-        extra={
-          showAddButton && (
-            <Button
-              type="link"
-              onClick={() => setIsModalOpen(true)}
-              icon={<PlusCircleOutlined style={{ fontSize: "20px", color: "#fff" }} />}
-            />
-          )
-        }
       >
         <Table
           columns={columns}
           dataSource={data}
-          pagination={{ pageSize: 5 }}
+          pagination={{ pageSize: 10 }}
           bordered
           locale={{ emptyText: "No data available in table" }}
         />
@@ -221,35 +501,138 @@ const Picklist = () => {
     </div>
   );
 
+  
+
   return (
     <>
       {/* MAIN PAGE */}
+      <Card
+        title="Pick List"
+        headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
+        style={{marginBottom:"10px"}}
+      >
+         <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish} // ✅ Handles submit
+        initialValues={{
+          date: dayjs(), // ✅ default to today
+        }}
+      >
+          <Row gutter={16}>
+            <Col span={6}>
+            <Form.Item label="Product" name="product" rules={[{ required: true }]}>
+                <Select placeholder="Select a Product">
+                {productList.map((productLis) => (
+                <Option key={productLis.productCode} value={productLis.productCode || productLis.productDesc}>
+                  {productLis.productDesc}
+                </Option>
+              ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+            <Form.Item label="Line" name="line" rules={[{ required: true }]}>
+                <Select placeholder="Select a line">
+                 {lineList.map((linelis)=>(
+                  <Option key={linelis.lineMstCode} value={linelis.lineMstCode || linelis.lineMstDesc} >
+                    {linelis.lineMstDesc}
+                  </Option>
+                 ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+            <Form.Item label="Date" name="date" rules={[{ required: true }]}>
+              <DatePicker
+                style={{ width: "100%" }}
+                defaultValue={todays}
+                format="YYYY-MM-DD"
+              />
+
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+            <Form.Item label="Status" name="status" rules={[{ required: true }]}>
+                <Select placeholder="Select a Status">
+                {statusList.map((statuslis)=>(
+                  <Option key={statuslis.statusId} value={statuslis.statusId || statuslis.statusDesc} >
+                    {statuslis.statusDesc}
+                  </Option>
+                 ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row>
+            <Col span={24} style={{ textAlign: 'center' }}>
+              <Button style={{ backgroundColor: "#001F3E", color: "white" }} htmlType="submit">
+                Submit
+              </Button>
+              <Button style={{ marginLeft: 8 ,backgroundColor: "#001F3E", color: "white"}} onClick={onCancel}>
+                Cancel
+              </Button>
+            </Col>
+          </Row>
+        </Form>
+      </Card>
       {currentPage === "main" && (
         <>
-          {renderPicklist("Pending Picklist", pendingData, pendingColumns, true)}
+
+          {/* {renderPicklist("Pending Picklist", pendingData, pendingColumns, true)} */}
+
+
+           {/* Render table: Default Completed or Filtered */}
+          {/* {isFilterApplied ? (
+         renderPicklist(
+          selectedStatus.toLowerCase() === "completed" ? "Completed Picklist" : "Pending Picklist",
+          tableData,
+          getColumns()
+        )
+      ) : (
+        renderPicklist("Completed Picklist", completedDatas, completedColumns)
+      )} */}
+
+
+        {isFilterApplied ? (
+         renderPicklist(
+         // getTableTitle(), // table title based on selected status
+         tableTitle,
+         tableData,       // filtered data based on submit
+         getColumns()     // columns based on selected status
+        )
+        ) : (
+      renderPicklist(
+        "Completed Picklist", 
+        completedDatas, 
+       completedColumns
+     )
+     )}
+
 
           {/* Show Line Feeder below Pending Picklist */}
           {showLineFeeder && (
             <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Picklist Verification">
               <Table
                 columns={lineFeederColumns}
-                dataSource={lineFeederData}
+                dataSource={lineFeederDatas}
                 bordered
-                pagination={{ pageSize: 5 }}
+                pagination={{ pageSize: 10 }}
+                //rowKey="plsdId"
               />
               <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
-                <Button type="primary" style={{ marginRight: "5px" }}>Partially Approved</Button>
+                <Button type="primary" style={{ marginRight: "5px" }}>Allow to Partially Transfer</Button>
                 <Button type="primary">Submit</Button>
               </div>
             </Card>
           )}
 
           {/* Hide Completed Picklist when Line Feeder is open */}
-          {!showLineFeeder && (
+          {/* {!showLineFeeder && (
             <div style={{ marginTop: "30px" }}>
               {renderPicklist("Completed Picklist", completedData, completedColumns)}
             </div>
-          )}
+          )} */}
         </>
       )}
 
@@ -352,18 +735,18 @@ const Picklist = () => {
         open={qrModalVisible}
         onCancel={() => setQrModalVisible(false)}
         footer={[
-    <div
-      key="footer"
-      style={{
-        width: "100%",
-        textAlign: "center", // centers buttons
-      }}
-    >
-      <Button key="close" onClick={() => setQrModalVisible(false)}>
-        Close
-      </Button>
-    </div>,
-  ]}
+          <div
+            key="footer"
+            style={{
+              width: "100%",
+              textAlign: "center", // centers buttons
+            }}
+          >
+            <Button key="close" onClick={() => setQrModalVisible(false)}>
+              Close
+            </Button>
+          </div>,
+        ]}
         centered
         width={400}
       >
