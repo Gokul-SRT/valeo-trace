@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState,forwardRef  } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -7,7 +7,7 @@ import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
 import { ExcelExportModule } from "ag-grid-enterprise";
-import { Input, Button, Form, message } from "antd";
+import { Input, Button, Form, message,Select } from "antd";
 import { toast } from "react-toastify";
 import store from "store";
 import serverApi from "../../../serverAPI";
@@ -16,6 +16,48 @@ ModuleRegistry.registerModules([
   DateFilterModule,
   ExcelExportModule,
 ]);
+
+const { Option } = Select;
+// 🔹 Custom MultiSelect Cell Editor
+const MultiSelectEditor = forwardRef((props, ref) => {
+  const [selectedValues, setSelectedValues] = useState([]);
+
+  useEffect(() => {
+    if (props.data && props.colDef.field) {
+      const initial = props.data[props.colDef.field];
+      if (typeof initial === "string" && initial.length > 0) {
+        setSelectedValues(initial.split(",")); // string to array
+      } else if (Array.isArray(initial)) {
+        setSelectedValues(initial); // already array
+      } else {
+        setSelectedValues([]); // fallback empty
+      }
+    }
+  }, [props.data, props.colDef.field]);
+
+  React.useImperativeHandle(ref, () => ({
+    getValue() {
+      return selectedValues.join(","); // always string
+    },
+  }));
+
+  const handleChange = (values) => {
+    setSelectedValues(values);
+    props.data[props.colDef.field] = values.join(","); // update row data as string
+  };
+
+  return (
+    <Select
+      mode="multiple"
+      value={selectedValues}
+      style={{ width: "100%" }}
+      onChange={handleChange}
+      placeholder="Select Product Codes"
+      options={props.values.map((item) => ({ label: item.value, value: item.key }))}
+    />
+  );
+});
+
 
 const LineMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -127,7 +169,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
     },
-    {
+   /* {
       headerName: "Product Code",
       field: "productCode",
       filter: "agTextColumnFilter",
@@ -141,6 +183,27 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       const option = productData.find(item => item.key === params.value);
       return option ? option.value : params.value; // Display the value or the original code if not found
     },
+    },*/
+    
+
+
+    {
+      headerName: "Product Code",
+      field: "productCode",
+      filter: "agTextColumnFilter",
+      editable: true,
+      cellEditor: MultiSelectEditor,
+      cellEditorParams: { values: productData },
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const keys = typeof params.value === "string" ? params.value.split(",") : params.value;
+        return keys
+          .map((k) => {
+            const option = productData.find((item) => item.key === k);
+            return option ? option.value : k;
+          })
+          .join(", ");
+      },
     },
     {
       headerName: "IsActive",
