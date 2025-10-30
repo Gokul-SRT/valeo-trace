@@ -32,6 +32,10 @@ const Picklist = () => {
 // 🟢 State for title
 const [tableTitle, setTableTitle] = useState("Completed Picklist");
 
+const [pickListCodeVerrify, setPickListCodeVerrify] = useState("");
+const [scanValue, setScanValue] = useState("");
+const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = useState([]);
+
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -47,6 +51,7 @@ const [tableTitle, setTableTitle] = useState("Completed Picklist");
     fetchLineDetails();
     fetchStatusDetails();
     fetchDefaultCompletedTable();
+    setScanValue(""); // reset input
   }, []);
 
   const fetchProductDetails = async () => {
@@ -223,11 +228,13 @@ const onCancel = () => {
     setIsFilterApplied(false);
     setTableData([]);
     fetchDefaultCompletedTable();
+    setPickListCodeVerrify();
 };
 
 
 
 const handlePicklistClick = async (picklistCode) => {
+  setPickListCodeVerrify(picklistCode);
   try {
     const response = await serverApi.post("getRetrievePickdetails", {
       tenantId:tenantId,
@@ -244,14 +251,17 @@ const handlePicklistClick = async (picklistCode) => {
       setShowLineFeeder(true); // show the Line Feeder table
       console .log("showLineFeeder",showLineFeeder);
       setCurrentPage("main");   // if you need to track current page
+      setScanValue("");
     } else {
       setLineFeederDatas([]);
       setShowLineFeeder(false);
+      setScanValue("");
     }
   } catch (error) {
     toast.error("Error fetching line feeder data", error);
     setLineFeederDatas([]);
     setShowLineFeeder(false);
+    setScanValue("");
   }
 };
 
@@ -291,7 +301,115 @@ const partiallyCompletedColumns = [
 ];
 
 
+ // Handle scanning
+ const handleScan = async () => {
+  const scannedValue = scanValue.trim();
+  console.log("scannedValue",scannedValue)
+ if (!scannedValue) return;
 
+  // Extract values using regex for your barcode format
+ /* const match = scannedValue.match(/(\d{18})(\d{6})\s+(\d+)/);
+  
+  if (!match) {
+    toast.error("Invalid barcode format");
+    setScanValue("");
+    return;
+  }
+
+
+  const childPartC = match[2]; // 157042
+  const picketQt = Number(match[3]); // 400
+  */
+
+
+   // Regex: ignore anything before the 18-digit prefix
+   const match = scannedValue.match(/\d{18}([A-Z0-9]+)\s+(\d+)/i);
+
+   if (!match) {
+     toast.error("Invalid barcode format");
+     setScanValue("");
+     return;
+   }
+ 
+   const childPartC = match[1];  // e.g., 157042 or CF72760
+   const picketQt = Number(match[2]); // e.g., 400
+ 
+   if (isNaN(picketQt)) {
+     toast.error("Invalid picked quantity");
+     setScanValue("");
+     return;
+   }
+ 
+   console.log("childPartCode:", childPartC);
+   console.log("pickedQty:", picketQt);
+  
+  try {
+    // API call
+    const response = await serverApi.post("updatePickedQtywithChildPartCode", {
+      tenantId:tenantId,
+      branchCode:branchCode,
+      childPartCode:childPartC,
+      pickedQty:picketQt,
+      plsId:pickListCodeVerrify,
+    });
+
+    if (response.data==="success") {
+      // Update table
+      const updatedData = lineFeederDatas.map((r) =>
+        r.childPartCode === childPartC ? { ...r, pickedQty: Number(r.pickedQty) + Number(picketQt) } : r
+      );
+      setLineFeederDatas(updatedData);
+      setFinalSubmitAndPartialSubmitDatas(updatedData);
+      toast.success("Scan processed successfully!");
+    } else {
+      toast.error(response.data);
+    }
+  } catch (err) {
+    toast.error("Error while processing scan");
+  }
+
+  setScanValue(""); // reset input
+};
+
+
+
+const submitCompleted=async (isCompleted)=>{
+const finalSubmit=lineFeederDatas;
+
+  if (!finalSubmit || finalSubmit.length === 0) {
+    toast.error("No data to submit!");
+    return;
+  }
+try {
+  // API call
+const finalSubmitDatas=finalSubmit.map((item)=>({
+  childPartCode:item.childPartCode,
+  picklistQty:item.picklistQty,
+  pickedQty:item.pickedQty,
+  plsId:item.plsId,
+  plsdId:item.plsdId,
+  isCompleted:isCompleted,
+
+}))
+
+  const response = await serverApi.post("updateIssuedByChildPartCodeWithPlsId", finalSubmitDatas);
+
+  if (response.data==="submitcompleted") {
+    toast.success("Submit completed successfully!");
+    setShowLineFeeder(false);
+    setIsFilterApplied(false);
+  } else if(response.data==="partiallycompleted"){
+    toast.success("Partially completed successfully!");
+    setShowLineFeeder(false);
+     setIsFilterApplied(false);
+  }else {
+    toast.error(response.data);
+  }
+} catch (err) {
+  toast.error("Error while processing");
+}
+
+}
 
 
   
@@ -343,9 +461,10 @@ const partiallyCompletedColumns = [
     { title: "Child Part Code", dataIndex: "childPartCode", key: "childPartCode" },
     { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
     { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
+    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
     
 
-  {
+  /*{
       title: "Status",
       dataIndex: "pickedQty",
       key: "pickedQty",
@@ -365,7 +484,34 @@ const partiallyCompletedColumns = [
           );
         }
       },
+    },*/
+
+    {
+      title: "Status",
+      dataIndex: "pickedQty",
+      key: "pickedQty",
+      render: (value, record) => {
+    
+        const picked = Number(value); // ✅ convert to number
+        const total = Number(record.picklistQty);
+    
+        if (!picked || picked === 0) { 
+          return <FaQrcode size={18} color="#002147" />;
+        }
+    
+        const percent = (picked / total) * 100;
+    
+        return (
+          <Progress
+            percent={percent}
+            percentPosition={{ align: "start", type: "inner" }}
+            size={[100, 20]}
+            strokeColor="#B7EB8F"
+          />
+        );
+      },
     },
+    
   
     {
       title: "Action",
@@ -613,6 +759,18 @@ const partiallyCompletedColumns = [
           {/* Show Line Feeder below Pending Picklist */}
           {showLineFeeder && (
             <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Picklist Verification">
+               <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
+      <label htmlFor="scan" style={{ minWidth: "30px" }}>Scan:</label>
+      <Input
+        id="scanInput"
+        placeholder="Scan or paste barcode here"
+        value={scanValue}
+        onChange={(e) => setScanValue(e.target.value)}
+        onBlur={handleScan} // Enter key triggers API
+        style={{ marginBottom: "10px", width: "500px" }}
+        autoFocus
+      />
+       </div>
               <Table
                 columns={lineFeederColumns}
                 dataSource={lineFeederDatas}
@@ -620,10 +778,59 @@ const partiallyCompletedColumns = [
                 pagination={{ pageSize: 10 }}
                 //rowKey="plsdId"
               />
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
+              {/* <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
                 <Button type="primary" style={{ marginRight: "5px" }}>Allow to Partially Transfer</Button>
                 <Button type="primary">Submit</Button>
-              </div>
+              </div> */}
+
+{(() => {
+      // const hasZero = lineFeederDatas.some(item => !item.pickedQty || item.pickedQty === 0);
+      // const allFull = lineFeederDatas.every(item => item.pickedQty >= item.picklistQty);
+      // const someFilledNotFull = !hasZero && lineFeederDatas.some(item =>
+      //   item.pickedQty > 0 && item.pickedQty < item.picklistQty
+      // );
+
+      const pickedNumbers = lineFeederDatas.map(item => Number(item.pickedQty || 0));
+      const picklistNumbers = lineFeederDatas.map(item => Number(item.picklistQty || 0));
+    
+      const hasZero = pickedNumbers.some(qty => qty === 0);
+      const allFull = pickedNumbers.every((qty, i) => qty >= picklistNumbers[i]);
+      const someFilledNotFull = pickedNumbers.some((qty, i) =>
+        qty > 0 && qty < picklistNumbers[i]
+      );
+    
+      // ✅ Rule Implementation
+      // Partial enabled ONLY if someFilledNotFull AND NO ZERO VALUES
+      const disablePartial = !(someFilledNotFull && !hasZero);
+
+      return (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
+          
+          {/* Allow Partial Transfer Button */}
+          <Button
+            type="primary"
+            style={{ marginRight: "5px" }}
+            onClick={()=>submitCompleted("2")}
+            //disabled={!someFilledNotFull}
+            disabled={disablePartial}
+          >
+            Allow to Partially Transfer
+          </Button>
+
+          {/* Submit Button */}
+          <Button
+            type="primary"
+            onClick={()=>submitCompleted("3")}
+            disabled={!allFull}
+          >
+            Submit
+          </Button>
+
+        </div>
+      );
+    })()}
+
+              
             </Card>
           )}
 
