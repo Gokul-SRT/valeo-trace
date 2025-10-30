@@ -16,6 +16,8 @@ import PreventiveMaintenanceCheckList from "../pages/ToolMonitoring/Reports/PMch
 import ToolMonitoringMaster from "../pages/ToolMonitoring/Master/MainMaster";
 import TraceabilityLog from "../pages/Traceability/TraceabilityLog/TraceabilityLog";
 import CycleTimeAnalysis from "../pages/Traceability/CycleTimeAnalysis/CycleTimeAnalysis";
+import PickListPrintMain from "../pages/Traceability/Reports/Picklist/PrintPageWithQR";
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -51,6 +53,7 @@ export default function AppRouter() {
           <Route path="/toolmonitoringmaster" element={<ToolMonitoringMaster />} />
           <Route path="/traceabilitylog" element={<TraceabilityLog />} />
           <Route path="/cycletimeanalysis" element={<CycleTimeAnalysis />} />
+          <Route path="/picklistprint" element={<PickListPrintMain />} />
         </Route>
       </Routes>
     </BrowserRouter>
