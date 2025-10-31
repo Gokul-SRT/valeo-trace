@@ -6,8 +6,7 @@ import { Select, Modal } from "antd";
 import "ag-grid-enterprise";
 import store from "store";
 import { toast } from "react-toastify";
-import serverApi from "../../../../service/ToolServerApi";
-import api from "../../../../serverAPI"
+import { backendService } from "../../../../service/ToolServerApi";
 import commonApi from "../../../../CommonserverApi";
 import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/OperationMasterService";
@@ -97,7 +96,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async (e) => {
     try {
-      const response = await serverApi.post("gettoolmasterdtl", {
+      const response = await backendService("gettoolmasterdtl", {
         lineCode: e || "getAll",
         tenantId,
         branchCode,
@@ -132,7 +131,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         // branchCode,
         isActive: "1",
       }
-      const response = await api.post("getProductDropdown", payload);
+      const response = await backendService("getProductDropdown", payload);
 
       let returnData = [];
 
@@ -213,7 +212,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
           };
         });
 
-        const response = await serverApi.post("saveOrUpdate", updatedList);
+        const response = await backendService("saveOrUpdate", updatedList);
 
         if (response?.data?.responseCode === '200') {
           toast.success(response.data.responseMessage);
@@ -295,7 +294,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
   const columnDefs = [
-    { headerName: "Tool ID", field: "toolNo", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === "0" ? true : false), },
+    { headerName: "Tool Id", field: "toolNo", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === "0" ? true : false), },
     { headerName: "Tool Desc", field: "toolDesc", filter: "agTextColumnFilter" },
     {
       headerName: "Maximum Shot Count (Nos.)",

@@ -4,7 +4,7 @@ import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
 import "ag-grid-enterprise";
 import store from "store";
-import serverApi from "../../../../service/ToolServerApi";
+import { backendService } from "../../../../service/ToolServerApi";
 import { toast } from "react-toastify";
 
 const CustomerMaster = ({ modulesprop, screensprop }) => {
@@ -34,7 +34,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
    const fetchData = async (e) => {
     try {
-      const response = await serverApi.post("getCustmasterdtl", {
+      const response = await backendService("getCustmasterdtl", {
         tenantId,
         branchCode,
         status: "getAll"
@@ -70,7 +70,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
             tenantId,
             branchCode,
         }));
-        const response = await serverApi.post("custDtlsaveOrUpdate", updatedList);
+        const response = await backendService("custDtlsaveOrUpdate", updatedList);
 
         if (response?.data?.responseCode === '200') {
           toast.success(response.data.responseMessage);
@@ -141,7 +141,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     //   cellStyle: { textAlign: "center" },
     // },
      {
-      headerName: "Status",
+      headerName: "Is Active",
       field: "status",
       filter: true,
       editable: true,
