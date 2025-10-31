@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState,forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -6,11 +6,86 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
+import {Select} from "antd";
 import store from "store";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+
+
+const { Option } = Select;
+// 🔹 Custom MultiSelect Cell Editor
+const MultiSelectEditor = forwardRef((props, ref) => {
+  const [selectedValues, setSelectedValues] = useState([]);
+
+  // Initialize editor state from row data when editor opens
+  // useEffect(() => {
+  //   const initial = props.data[props.colDef.field]; // get the current row's value
+  //   setSelectedValues(initial ? initial.split(",") : []);
+  // }, [props.data, props.colDef.field]);
+
+  useEffect(() => {
+    if (props.data && props.colDef.field) {
+      const initial = props.data[props.colDef.field];
+      if (typeof initial === "string" && initial.length > 0) {
+        setSelectedValues(initial.split(",")); // string to array
+      } else if (Array.isArray(initial)) {
+        setSelectedValues(initial); // already array
+      } else {
+        setSelectedValues([]); // fallback empty
+      }
+    }
+  }, [props.data, props.colDef.field]);
+
+  // Expose value to ag-Grid when editing is done
+  React.useImperativeHandle(ref, () => ({
+    getValue() {
+      return selectedValues.join(",");
+    },
+  }));
+
+  // Update editor state AND row data immediately on change
+  /*const handleChange = (values) => {
+    setSelectedValues(values);
+    // Optional: update row data immediately
+    props.node.setDataValue(props.colDef.field, values.join(","));
+    //props.data[props.colDef.field] = values.join(","); // update row data as string
+  };*/
+
+  const handleChange = (values) => {
+    // Merge with current row value
+    const existing = props.data[props.colDef.field]
+      ? props.data[props.colDef.field].split(",")
+      : [];
+  
+    // Create a unique set of codes
+    const merged = Array.from(new Set([...existing, ...values]));
+  
+    setSelectedValues(merged);
+    props.node.setDataValue(props.colDef.field, merged.join(","));
+  };
+
+  return (
+    <Select
+      mode="multiple"
+      value={selectedValues}
+      style={{ width: "100%" }}
+      onChange={handleChange}
+      placeholder="Select Product Codes"
+      options={props.values.map((v) => ({
+        label: v.value,
+        value: v.key,
+      }))}
+    />
+  );
+});
+
+
+
+
+
+
 
 const OperationMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -18,7 +93,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
   const [productMastOptions, setProductMastOptions] = useState([]);
-  const [lineMastOptions, setLineMastOptions] = useState([]);
+  //const [lineMastOptions, setLineMastOptions] = useState([]);
   const gridRef = useRef(null);
 
 
@@ -40,7 +115,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     if (selectedModule && selectedScreen) {
       fetchData();
       productMastData();
-      lineMastData();
+      //lineMastData();
     }
   }, [selectedModule, selectedScreen]);
 
@@ -91,7 +166,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       }
     };
 
-    const lineMastData = async () => {
+   /* const lineMastData = async () => {
       try {
         const response = await serverApi.post("getLineDropdown", {
           tenantId,
@@ -111,7 +186,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       }
     };
 
-
+*/
 
     const createorUpdate = async () => {
     try {
@@ -126,7 +201,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         updatedBy: employeeId,
         branchCode,
         productCode:item.productCode,
-        lineCode:item.lineMstCode,
+       // lineCode:item.lineMstCode,
       }));
 
       const response = await serverApi.post("insertupdateoperationmaster", updatedList);
@@ -174,7 +249,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       filter: "agTextColumnFilter",
     },
 
-    {
+   /* {
       headerName: "Product Code",
       field: "productCode",
       editable: true,
@@ -192,8 +267,54 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         return found ? found.productDesc : ""; // search/filter by description
       },
     },
+*/
+{
+  headerName: "Product Code",
+  field: "productCode",
+  editable: true,
+  cellEditor: MultiSelectEditor,
 
-    {
+  cellEditorParams: (params) => ({
+    // ✅ Proper structure for custom editor
+    values: productMastOptions.map((p) => ({
+      key: p.productCode,
+      value: `${p.productCode} - ${p.productDesc}`
+    })),
+  }),
+
+  valueFormatter: (params) => {
+    if (!params.value) return "";
+    const codes = typeof params.value === "string"
+      ? params.value.split(",")
+      : params.value;
+
+    return codes
+      .map((code) => {
+        const cleanCode = code.trim();
+        const option = productMastOptions.find(
+          (p) => p.productCode === cleanCode
+        );
+        return option
+          ? `${option.productCode} - ${option.productDesc}`
+          : cleanCode;
+      })
+      .join(", ");
+  },
+
+  filter: "agTextColumnFilter",
+  filterValueGetter: (params) => {
+    const option = productMastOptions.find(
+      (p) => p.productCode === params.data.productCode
+    );
+    return option
+      ? `${option.productCode} - ${option.productDesc}`
+      : "";
+  },
+},
+
+
+
+   /* {
       headerName: "Line Code",
       field: "lineMstCode",
       editable: true,
@@ -211,7 +332,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         return found ? found.lineMstDesc : ""; // search/filter by description
       },
     },
-
+*/
 
     {
       headerName: "Status",
