@@ -1,243 +1,445 @@
-
-import React, { use, useState } from "react";
-
-import { Card, Col, DatePicker, Form, Input, Row, Select, Button, Switch, Title, Typography } from 'antd';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  Col,
+  Form,
+  Input,
+  Row,
+  Select,
+  Button,
+  Table,
+  DatePicker,
+  Modal,
+  message,
+} from "antd";
+import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
+import serverApi from "../../../serverAPI";
+import QRModal from "../../Traceability/Reports/Picklist/QRModal"; 
 
 const { Option } = Select;
 
 const Kitting = () => {
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [showTable, setShowTable] = useState(false);
+  const [showKittingCard, setShowKittingCard] = useState(false);
+  const [selectedPart, setSelectedPart] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  const [labelForm] = Form.useForm();
+  const [planOptions, setPlanOptions] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [tableData, setTableData] = useState([]);
+  const [loadingParts, setLoadingParts] = useState(false);
 
-  const [isStock, setIsStock] = useState(true);
+  // ✅ New states for QR Modal
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [selectedQrData, setSelectedQrData] = useState(null);
 
-  const name = "Type C"
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
 
-  const handleSwitchChange = (checked) => {
+  /** Fetch available Work Orders / Plans */
+  const fetchPlans = async () => {
+    setLoadingPlans(true);
+    try {
+      const response = await PicklistWODropdown(tenantId, branchCode);
+      const data = Array.isArray(response.data) ? response.data : response;
+      setPlanOptions(
+        data.map((item) => ({
+          code: item.plsCode,
+        }))
+      );
+      if (data.length === 0) {
+        message.info("No work orders found");
+      }
+    } catch (err) {
+      console.error("Error fetching work order plans:", err);
+      message.error("Failed to load work orders");
+      setPlanOptions([]);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
 
-    setIsStock(checked);
+  useEffect(() => {
+    fetchPlans();
+  }, []);
 
+  /** Fetch Kitting Part Details */
+  const fetchKittingPartDetails = async (planCode) => {
+    setLoadingParts(true);
+    try {
+      const payload = { tenantId, plscode: planCode };
+      const response = await serverApi.post("/getKittingPartDetails", payload);
+      const data = response.data.responseData || response.data || [];
+
+      if (!Array.isArray(data) || data.length === 0) {
+        message.info("No Kitting part details found for this plan");
+        setTableData([]);
+        setShowTable(false);
+        return;
+      }
+
+      const formatted = data.map((item, index) => ({
+        key: index + 1,
+        plsdId: item.plsdId,
+        childPartCode: item.childPartCode,
+        childPartDesc: item.childPartDesc,
+        itemType: item.itemType,
+        picklistQty: item.picklistQty,
+        pickedQty: item.pickedQty,
+        productCode: item.productCode,
+      }));
+
+      setTableData(formatted);
+      setShowTable(true);
+    } catch (error) {
+      console.error("Error fetching kitting details:", error);
+      message.error("Failed to fetch Kitting part details");
+    } finally {
+      setLoadingParts(false);
+    }
+  };
+
+  /** Handle form submit (fetch table) */
+  const handleSubmit = async (values) => {
+    setSelectedPlan(values.plan);
+    setShowKittingCard(false);
+    await fetchKittingPartDetails(values.plan);
+  };
+
+  /** When a row (part) is clicked */
+  const handlePartClick = async (record) => {
+    setSelectedPart(record);
+    setShowKittingCard(true);
+
+    try {
+      const payload = {
+        tenantId,
+        childPartCode: record.childPartCode,
+        branchCode,
+      };
+      const response = await serverApi.post(
+        "/getKittingChildPartDetails",
+        payload
+      );
+
+      const rawData = response.data?.responseData;
+      const data = Array.isArray(rawData)
+        ? rawData
+        : rawData
+        ? [rawData]
+        : [];
+
+      if (data.length > 0) {
+        setSelectedPart((prev) => ({
+          ...prev,
+          childParts: data,
+        }));
+      } else {
+        message.info("No child part details found for this part");
+      }
+    } catch (error) {
+      console.error("Error fetching child part details:", error);
+      message.error("Failed to fetch child part details");
+    }
+
+    setTimeout(() => {
+      document
+        .getElementById("kitting-card")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  /** Table Columns */
+  const columns = [
+    { title: "PLSD ID", dataIndex: "plsdId", key: "plsdId" },
+    {
+      title: "Child Part Code",
+      dataIndex: "childPartCode",
+      key: "childPartCode",
+      render: (text, record) => (
+        <a
+          onClick={() => handlePartClick(record)}
+          style={{
+            color: "#1890ff",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+        >
+          {text}
+        </a>
+      ),
+    },
+    { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
+    { title: "Item Type", dataIndex: "itemType", key: "itemType" },
+    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
+    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
+    { title: "Product Code", dataIndex: "productCode", key: "productCode" },
+  ];
+
+  /** Render Child Part Card */
+  const renderChildPartCard = () => {
+    const childParts = selectedPart?.childParts || [];
+
+    if (childParts.length === 0) {
+      return (
+        <Col xs={24}>
+          <Card>
+            <p>No child parts available for this item.</p>
+          </Card>
+        </Col>
+      );
+    }
+
+    return (
+      <Col xs={24}>
+        <Row gutter={[8, 8]}>
+          {childParts.map((part, i) => {
+            const kitPartCode = part.kitPartCode || `--`;
+            const inputId = `scannedCountInput_${kitPartCode}_${i}`;
+
+            return (
+              <Col span={8} key={i}>
+                <Card
+                  size="small"
+                  title={`Child Part ${kitPartCode}`}
+                  headStyle={{
+                    backgroundColor: "#f0f0f0",
+                    color: "#001F3E",
+                    fontSize: "12px",
+                  }}
+                  style={{ marginRight: 8 }}
+                >
+                  <Form layout="vertical">
+                    <Form.Item label="Part">
+                      <Input
+                        value={part.kitPartDesc}
+                        onFocus={() => {
+                          console.log(`Focused Part Input: ${inputId}`);
+                        }}
+                      />
+                    </Form.Item>
+
+                    <Form.Item label="Scanned Count">
+                      <Input
+                       type="number"
+                       placeholder="Enter count" />
+                    </Form.Item>
+                  </Form>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+
+        {/* Label Print Button */}
+        <Row style={{ marginTop: 16 }}>
+          <Col span={24}>
+            <Button
+              style={{ backgroundColor: "#001F3E", color: "white" }}
+              block
+              onClick={() => {
+                const picklistQty = Number(selectedPart.picklistQty) || 0;
+                labelForm.setFieldsValue({
+                  childPartCode: selectedPart.childPartCode,
+                  plan: picklistQty,
+                  scanCount: "",
+                  label: "",
+                });
+                setIsModalVisible(true);
+              }}
+            >
+              Label Print
+            </Button>
+          </Col>
+        </Row>
+      </Col>
+    );
   };
 
   return (
-<>
-<div>
-<Card
-
+    <>
+      {/* Top Form */}
+      <div style={{ marginBottom: 16 }}>
+        <Card
           title="Kitting Process"
-
           headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
->
-<Form layout="vertical">
-<Row gutter={16}>
-<Col span={6}>
-<Form.Item label="Date">
-<DatePicker style={{ width: "100%" }} />
-</Form.Item>
-</Col>
-<Col span={6}>
-<Form.Item label="Product">
-<Select placeholder="Select a Product">
-<Option value="z12e">Z12E</Option>
-<Option value="yta">YTA</Option>
-</Select>
-</Form.Item>
-</Col>
-<Col span={6}>
-<Form.Item label="Line">
-<Select placeholder="Select a line">
-<Option value="cover">Cover</Option>
-<Option value="disk">Disk</Option>
-</Select>
-</Form.Item>
-</Col>
- 
+        >
+          <Form layout="vertical" form={form} onFinish={handleSubmit}>
+            <Row gutter={16}>
               <Col span={6}>
-<Form.Item label="WO/Plan">
-<Select placeholder="Select a Plan">
-<Option value="1">Plan 1</Option>
-<Option value="2">Plan 2</Option>
-<Option value="3">Plan 3</Option>
-</Select>
-</Form.Item>
-</Col>
-</Row>
-<Row>
-<Col span={24} style={{ textAlign: 'center' }}>
-<Button style={{ backgroundColor: "#001F3E", color: "white" }} htmlType="submit">
+                <Form.Item label="Date">
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
 
-                  Submit
-</Button>
-<Button style={{ marginLeft: 8 }}>
+              <Col span={6}>
+                <Form.Item
+                  label="WO/Plan"
+                  name="plan"
+                  rules={[{ required: true, message: "Please select a plan" }]}
+                >
+                  <Select
+                    placeholder="Select Work Order"
+                    loading={loadingPlans}
+                    allowClear
+                  >
+                    {planOptions.map((plan) => (
+                      <Option key={plan.code} value={plan.code}>
+                        {plan.code}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
 
-                  Cancel
-</Button>
-</Col>
-</Row>
-</Form>
-</Card>
-</div>
-<div>
-<Card
+            <Row justify="center" style={{ marginTop: 8 }}>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{
+                  backgroundColor: "#001F3E",
+                  borderColor: "#001F3E",
+                  color: "white",
+                }}
+              >
+                Submit
+              </Button>
+              <Button
+                style={{ marginLeft: 8 }}
+                onClick={() => {
+                  form.resetFields();
+                  setShowTable(false);
+                  setShowKittingCard(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </Row>
+          </Form>
+        </Card>
+      </div>
 
-          title={`Kitting - ${name}`}
+      {/* Table */}
+      {showTable && (
+        <div style={{ marginBottom: 16 }}>
+          <Card
+            title={`Work Order Details - Plan ${selectedPlan}`}
+            headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
+          >
+            <Table
+              columns={columns}
+              dataSource={tableData}
+              loading={loadingParts}
+              pagination={{ pageSize: 5 }}
+              bordered
+            />
+          </Card>
+        </div>
+      )}
 
-          headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
->
-<Row gutter={16}>
-<div style={{ marginBottom: 16 }}>
+      {/* Child Part Card */}
+      {showKittingCard && (
+        <div id="kitting-card">
+          <Card
+            title={`Kitting - ${selectedPart?.childPartDesc || ""}`}
+            headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
+            extra={
+              <span style={{ color: "#fff", fontSize: 14 }}>
+                Child Code: {selectedPart?.childPartCode}
+              </span>
+            }
+          >
+            {renderChildPartCard()}
+          </Card>
+        </div>
+      )}
 
-              {isStock ? "Stock Quantity" : "Build In Quantity"}:{" "}
-<Switch checked={isStock} onChange={handleSwitchChange} />
-</div>
-</Row>
+      {/* Label Printing Modal */}
+      <Modal
+        title="Label Printing"
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={null}
+        width={700}
+      >
+        <Form
+          layout="vertical"
+          form={labelForm}
+          onFinish={(values) => {
+            // ✅ Open QRModal instead of just success message
+            setSelectedQrData(values.childPartCode || "QR123");
+            setIsModalVisible(false);
+            setQrModalVisible(true);
+          }}
+        >
+          <Row gutter={[16, 8]}>
+            <Col span={6}>
+              <Form.Item label="Child Part Code" name="childPartCode">
+                <Input disabled />
+              </Form.Item>
+            </Col>
 
-          {isStock ?
+            <Col span={6}>
+              <Form.Item label="Plan" name="plan">
+                <Input disabled />
+              </Form.Item>
+            </Col>
 
-            // <Form layout="vertical">
-<Row gutter={16}>
-<Col xs={24} sm={20} md={12} lg={8}>
-<Card title="Kitting Part Stock Qty" headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}>
-<Form layout="vertical">
-<Form.Item label="Stock QTY">
-<Input defaultValue={45} disabled />
-</Form.Item>
- 
-                    <Form.Item label="Label Print QTY">
-<Input placeholder="Please enter the Qty"/>
-</Form.Item>
- 
-                    <Form.Item>
-<Button style={{ backgroundColor: "#001F3E", color: "white" }} block>
+            <Col span={6}>
+              <Form.Item
+                label="Scan Count"
+                name="scanCount"
+                rules={[{ required: true, message: "Please enter scan count" }]}
+              >
+                <Input
+                  placeholder="Enter scan count"
+                  onChange={(e) => {
+                    const scanCount = Number(e.target.value) || 0;
+                    const plan = Number(labelForm.getFieldValue("plan")) || 0;
+                    const labelValue =
+                      scanCount > 0 ? Number((plan / scanCount).toFixed(2)) : 0;
+                    labelForm.setFieldsValue({ label: labelValue });
+                  }}
+                />
+              </Form.Item>
+            </Col>
 
-                        Submit
-</Button>
-</Form.Item>
-</Form>
-</Card>
-</Col>
-</Row>
- 
- 
- 
-            // </Form>
- 
-            :
-<Row gutter={16} justify="center" style={{ padding: 20 }}>
+            <Col span={6}>
+              <Form.Item label="Label" name="label">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
 
-              {/* Left Section */}
-<Col span={10}>
-<Card title="KIT PART A" headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}>
-<Form layout="vertical">
-<Row gutter={16} align="middle" wrap={true} style={{ display: "flex", flexWrap: "wrap" }}>
-<Col xs={24} sm={12}>
-<Form.Item label="Child Part A">
-<Input placeholder="Input 1" />
-</Form.Item>
-</Col>
- 
-                      <Col xs={24} sm={12}>
-<Form.Item label="Scanned Count">
-<Input placeholder="Input 2" />
-</Form.Item>
-</Col>
- 
-                    </Row>
-<span style={{ fontStyle: "italic", fontSize: 12 }}>(scan)</span>
- 
- 
-                    <Row gutter={16} align="middle" wrap={true} style={{ display: "flex", flexWrap: "wrap" }}>
-<Col xs={24} sm={12}>
-<Form.Item label="Child Part B">
-<Input placeholder="Input 1" />
-</Form.Item>
-</Col>
- 
-                      <Col xs={24} sm={12}>
-<Form.Item label="Scanned Count">
-<Input placeholder="Input 2" />
-</Form.Item>
-</Col>
- 
-                    </Row>
- 
-                    <Form.Item>
-<Button style={{ backgroundColor: "#001F3E", color: "white" }} block>
+          <Row justify="end">
+            <Button
+              onClick={() => setIsModalVisible(false)}
+              style={{ marginRight: 8 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{ backgroundColor: "#001F3E", color: "white" }}
+            >
+              Print
+            </Button>
+          </Row>
+        </Form>
+      </Modal>
 
-                        Label Print
-</Button>
-</Form.Item>
-</Form>
-</Card>
-</Col>
- 
-              {/* Right Section */}
-<Col span={10}>
-<Card title="KIT PART B" headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}>
-<Form layout="vertical">
- 
-                    <Row gutter={16} align="middle" wrap={true} style={{ display: "flex", flexWrap: "wrap" }}>
-<Col xs={24} sm={12}>
-<Form.Item label="Child Part A">
-<Input placeholder="Input 1" />
-</Form.Item>
-</Col>
- 
-                      <Col xs={24} sm={12}>
-<Form.Item label="Scanned Count">
-<Input placeholder="Input 2" />
-</Form.Item>
-</Col>
- 
-                    </Row>
- 
-                    <Row gutter={16} align="middle" wrap={true} style={{ display: "flex", flexWrap: "wrap" }}>
-<Col xs={24} sm={12}>
-<Form.Item label="Child Part A">
-<Input placeholder="Input 1" />
-</Form.Item>
-</Col>
- 
-                      <Col xs={24} sm={12}>
-<Form.Item label="Scanned Count">
-<Input placeholder="Input 2" />
-</Form.Item>
-</Col>
- 
-                    </Row>
- 
-                    <Row gutter={16} align="middle" wrap={true} style={{ display: "flex", flexWrap: "wrap" }}>
-<Col xs={24} sm={12}>
-<Form.Item label="Child Part A">
-<Input placeholder="Input 1" />
-</Form.Item>
-</Col>
- 
-                      <Col xs={24} sm={12}>
-<Form.Item label="Scanned Count">
-<Input placeholder="Input 2" />
-</Form.Item>
-</Col>
- 
-                    </Row>
- 
-                    <Form.Item>
-<Button style={{ backgroundColor: "#001F3E", color: "white" }} block>
-
-                        Label Print
-</Button>
-</Form.Item>
-</Form>
-</Card>
-</Col>
-</Row>
-
-          }
-</Card>
-</div>
-</>
-
+      {/* ✅ QR Preview Modal */}
+      <QRModal
+        qrModalVisible={qrModalVisible}
+        setQrModalVisible={setQrModalVisible}
+        selectedQrData={selectedQrData}
+      />
+    </>
   );
-
-}
+};
 
 export default Kitting;
- 
