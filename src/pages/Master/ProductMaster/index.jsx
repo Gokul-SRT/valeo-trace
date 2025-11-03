@@ -11,8 +11,9 @@ import {
 } from "ag-grid-enterprise";
 import { Modal, Select, message } from "antd";
 import { toast } from "react-toastify";
-import serverApi from "../../../serverAPI";
-import CommonserverApi from "../../../CommonserverApi";
+import { backendService, commonBackendService } from '../../../service/ToolServerApi'
+// import serverApi from "../../../serverAPI";
+// import CommonserverApi from "../../../CommonserverApi";
 
 ModuleRegistry.registerModules([
   SetFilterModule,
@@ -41,11 +42,11 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     const fetchGroupDropdown = async () => {
       try {
         const payload = { tenantId, branchCode };
-        const response = await CommonserverApi.post(
-          "getProductGrpDropdown",
-          payload
-        );
-        const data = response?.data?.responseData || response?.data || [];
+        const response = await commonBackendService({
+          requestPath:"getProductGrpDropdown",
+          requestData:payload
+        });
+        const data = response?.responseData || [];
         setGroupDropdown(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching group dropdown:", error);
@@ -65,8 +66,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
           branchCode,
         };
 
-        const response = await serverApi.post("getoperationMasterdtl", payload);
-        const data = response?.data?.responseData || response?.data || [];
+        const response = await backendService({requestPath:"getoperationMasterdtl", requestData: payload});
+        const data = response?.responseData  || [];
 
         const formatted = data.map((item) => ({
           value: item.operationId,
@@ -102,18 +103,19 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async () => {
     try {
-      const response = await serverApi.post("getproductmasterdtl", {
+      const response = await backendService({requestPath:"getproductmasterdtl", 
+        requestData:{
         isActive: "1",
         tenantId,
         branchCode,
-      });
+      }});
 
-      if (!response.data || response.data.length === 0) {
+      if (!response || response.length === 0) {
         setMasterList([]);
         setOriginalList([]);
       } else {
         // ✅ CORRECTED: Map API response fields to component fields
-        const updated = response.data.map((item) => ({
+        const updated = response.map((item) => ({
           ...item,
           isUpdate: 1,
           // Map grpCode to groupCode for consistency
@@ -404,17 +406,17 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
 
       console.log("Sending data to API:", updatedList);
 
-      const response = await serverApi.post(
-        "insertupdateproductmaster",
-        updatedList
-      );
+      const response = await backendService({
+        requestPath:"insertupdateproductmaster",
+        requestData:updatedList
+      });
 
-      if (response.data === "SUCCESS") {
+      if (response === "SUCCESS") {
         toast.success("Data saved successfully!");
 
         // Refresh data after successful save
         fetchData();
-      } else if (response.data === "DUBLICATE") {
+      } else if (response === "DUBLICATE") {
         toast.warning("Duplicate Product Code not allowed!");
       } else {
         toast.error("Save or Update failed.");

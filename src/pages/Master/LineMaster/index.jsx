@@ -8,9 +8,10 @@ import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
 import { ExcelExportModule } from "ag-grid-enterprise";
 import { Input, Button, Form, message,Select } from "antd";
+import { backendService } from "../../../service/ToolServerApi";
 import { toast } from "react-toastify";
 import store from "store";
-import serverApi from "../../../serverAPI";
+// import serverApi from "../../../serverAPI";
 ModuleRegistry.registerModules([
   SetFilterModule,
   DateFilterModule,
@@ -92,18 +93,19 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const employeeId = JSON.parse(localStorage.getItem("employeeId"));
   const fetchData = async () => {
     try {
-      const response = await serverApi.post("getlineMasterdtl", {
+      const response = await backendService({requestPath:"getlineMasterdtl", 
+        requestData:{
         isActive: "getAll",
         tenantId: tenantId,
         branchCode: branchCode,
-      });
+      }});
 
       // ✅ Handle if backend sends null, undefined, or empty array
-      if (!response.data || response.data.length === 0) {
+      if (!response || response.length === 0) {
         setMasterList([]);
         setOriginalList([]);
       } else {
-        const updatedResponseData = response.data.map((item) => ({
+        const updatedResponseData = response.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
@@ -133,15 +135,15 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         // branchCode,
         isActive: "1",
       }
-      const response = await serverApi.post("getProductDropdown", payload);
+      const response = await backendService({requestPath:"getProductDropdown", requestData:payload});
 
       let returnData = []; 
 
-      if (response?.data?.responseCode === '200' && response.data.responseData) {
+      if (response?.responseCode === '200' && response.responseData) {
         // toast.success(response.data.responseMessage);
-        returnData = response.data.responseData;
+        returnData = response.responseData;
       } else {
-        toast.error(response.data.responseMessage || "Failed to load Child Parts.");
+        toast.error(response.responseMessage || "Failed to load Child Parts.");
       }
       const options = returnData.map(item => ({
         key: item.productCode || "",
@@ -256,12 +258,12 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         branchCode: branchCode,
       }));
 
-      const response = await serverApi.post("insertupdatelinemaster", updatedList);
+    const response = await backendService({requestPath:"insertupdatelinemaster", requestData:updatedList});
 
-      if (response.data && response.data === "SUCCESS") {
+      if (response && response === "SUCCESS") {
         toast.success("Data saved successfully!");
         fetchData();
-      }  else if (response.data && response.data === "DUBLICATE") {
+      }  else if (response && response === "DUBLICATE") {
         toast.success("Do Not Allow Dublicate LineCode!");
 
       }  else {
