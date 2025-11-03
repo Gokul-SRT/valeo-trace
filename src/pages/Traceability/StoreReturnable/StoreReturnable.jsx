@@ -26,37 +26,35 @@ const { Option } = Select;
 const { Search } = Input;
 
 const StoreReturnable = () => {
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedLine, setSelectedLine] = useState(null);
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState(null);
-  const [selectedChildPart, setSelectedChildPart] = useState(null);
+  const [returnChildPart, setReturnChildPart] = useState(null);
+  const [pickListCode, setPickListCode] = useState(null);
+  const [childPartCode, setChildPartCode] = useState(null);
   const [quantity, setQuantity] = useState("");
-  const [searchDate, setSearchDate] = useState(moment().format("YYYY-MM-DD"));
+  const [childPartScan, setChildPartScan] = useState("");
+  const [remainQty, setRemainQty] = useState("");
   const [showTable, setShowTable] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState("");
   const [searchText, setSearchText] = useState("");
   const [filteredData, setFilteredData] = useState([]);
 
-  const products = [
-    { id: 1, name: "MSIL Z12E 200 OE" },
-    { id: 2, name: "MSIL Z12E 200 OE" },
+  const returnChildPartOptions = [
+    { id: 1, name: "Pending Qty" },
+    { id: 2, name: "Full Qty" },
   ];
 
-  const lines = [
-    { id: 1, name: "Disc Assy" },
-    { id: 2, name: "Cover Assy" },
+  const pickListCodes = [
+    { id: 1, name: "PL-001" },
+    { id: 2, name: "PL-002" },
+    { id: 3, name: "PL-003" },
   ];
 
-  const workOrders = [
-    { id: 1, name: "WO-001" },
-    { id: 2, name: "WO-002" },
-    { id: 3, name: "WO-003" },
-  ];
-
-  const childParts = [
-    { id: 1, name: "CF86625SF" },
-    { id: 2, name: "CF89046SF" },
+  const childPartCodes = [
+    { id: 1, name: "CF86625SF", pickList: "PL-001" },
+    { id: 2, name: "CF89046SF", pickList: "PL-001" },
+    { id: 3, name: "CF72760", pickList: "PL-002" },
+    { id: 4, name: "CF72760HF", pickList: "PL-002" },
+    { id: 5, name: "CF89045", pickList: "PL-003" },
   ];
 
   const dataSource = [
@@ -163,12 +161,6 @@ const StoreReturnable = () => {
                 icon: <DownloadOutlined />,
                 onClick: () => handleDownloadQR(record.qrCode),
               },
-            //   {
-            //     key: "3",
-            //     label: "Print QR Code",
-            //     icon: <PrinterOutlined />,
-            //     onClick: () => handlePrintQR(record.qrCode),
-            //   },
             ],
           }}
           trigger={["click"]}
@@ -187,12 +179,12 @@ const StoreReturnable = () => {
   };
 
   const handleReset = () => {
-    setSelectedProduct(null);
-    setSelectedLine(null);
-    setSelectedWorkOrder(null);
-    setSelectedChildPart(null);
+    setReturnChildPart(null);
+    setPickListCode(null);
+    setChildPartCode(null);
     setQuantity("");
-    setSearchDate(moment().format("YYYY-MM-DD"));
+    setChildPartScan("");
+    setRemainQty("");
     setSearchText("");
     setShowTable(false);
   };
@@ -242,6 +234,21 @@ const StoreReturnable = () => {
     });
   };
 
+  const handleReturnChildPartChange = (value) => {
+    setReturnChildPart(value);
+    // Reset other fields when changing return type
+    setPickListCode(null);
+    setChildPartCode(null);
+    setQuantity("");
+    setChildPartScan("");
+    setRemainQty("");
+  };
+
+  const handlePickListChange = (value) => {
+    setPickListCode(value);
+    setChildPartCode(null); // Reset child part when pick list changes
+  };
+
   useEffect(() => {
     if (searchText) {
       setFilteredData(
@@ -262,120 +269,155 @@ const StoreReturnable = () => {
     <>
       {/* Search Form Card */}
       <Card
-        style={{ marginBottom: 16, height: 340 }}
-        bodyStyle={{ padding: 24 }}
+        style={{ marginBottom: 16 }}
+        bodyStyle={{ padding: 24, paddingBottom: 16 }}
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
         title={<span>Store Returnable</span>}
       >
         <Form layout="vertical">
+          {/* Return Child Part Selection - Always visible */}
           <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Date">
-                <input
-                  type="date"
-                  value={searchDate}
-                  onChange={(e) => setSearchDate(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "4px 11px",
-                    borderRadius: 4,
-                    border: "1px solid #d9d9d9",
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label={
-                <> Product<span style={{ color: "red" }}>*</span></>
-              }>
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Form.Item
+                label={
+                  <>
+                    Return Child Part <span style={{ color: "red" }}>*</span>
+                  </>
+                }
+                style={{ marginBottom: 0 }}
+              >
                 <Select
-                  placeholder="Select Product"
-                  value={selectedProduct}
-                  onChange={setSelectedProduct}
+                  placeholder="Select Return Type"
+                  value={returnChildPart}
+                  onChange={handleReturnChildPartChange}
                   style={{ width: "100%" }}
                 >
-                  {products.map((p) => (
-                    <Option key={p.id} value={p.name}>
-                      {p.name}
+                  {returnChildPartOptions.map((option) => (
+                    <Option key={option.id} value={option.name}>
+                      {option.name}
                     </Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label={
-                <> Line<span style={{ color: "red" }}>*</span></>
-              }>
-                <Select
-                  placeholder="Select Line"
-                  value={selectedLine}
-                  onChange={setSelectedLine}
-                  style={{ width: "100%" }}
-                >
-                  {lines.map((l) => (
-                    <Option key={l.id} value={l.name}>
-                      {l.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Work Order">
-                <Select
-                  placeholder="Select Work Order"
-                  value={selectedWorkOrder}
-                  onChange={setSelectedWorkOrder}
-                  style={{ width: "100%" }}
-                >
-                  {workOrders.map((wo) => (
-                    <Option key={wo.id} value={wo.name}>
-                      {wo.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
+
+            {/* Pending Qty Fields */}
+            {returnChildPart === "Pending Qty" && (
+              <>
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item
+                    label={
+                      <>
+                        Pick List Code <span style={{ color: "red" }}>*</span>
+                      </>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="Select Pick List Code"
+                      value={pickListCode}
+                      onChange={handlePickListChange}
+                      style={{ width: "100%" }}
+                    >
+                      {pickListCodes.map((pl) => (
+                        <Option key={pl.id} value={pl.name}>
+                          {pl.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item
+                    label={
+                      <>
+                        Child Part Scan <span style={{ color: "red" }}>*</span>
+                      </>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      placeholder="Scan Child Part"
+                      value={childPartScan}
+                      onChange={(e) => setChildPartScan(e.target.value)}
+                      style={{ width: "100%" }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item
+                    label={
+                      <>
+                        Remain Quantity <span style={{ color: "red" }}>*</span>
+                      </>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <input
+                      type="number"
+                      placeholder="Enter Remain Qty"
+                      value={remainQty}
+                      onChange={(e) => setRemainQty(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "4px 11px",
+                        borderRadius: 4,
+                        border: "1px solid #d9d9d9",
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+
+            {/* Full Qty Fields */}
+            {returnChildPart === "Full Qty" && (
+              <>
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item
+                    label={
+                      <>
+                        Pick List Code <span style={{ color: "red" }}>*</span>
+                      </>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="Select Pick List Code"
+                      value={pickListCode}
+                      onChange={handlePickListChange}
+                      style={{ width: "100%" }}
+                    >
+                      {pickListCodes.map((pl) => (
+                        <Option key={pl.id} value={pl.name}>
+                          {pl.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item
+                    label={
+                      <>
+                        Child Part Scan <span style={{ color: "red" }}>*</span>
+                      </>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      placeholder="Scan Child Part"
+                      value={childPartScan}
+                      onChange={(e) => setChildPartScan(e.target.value)}
+                      style={{ width: "100%" }}
+                    />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
           </Row>
 
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            <Col xs={14} sm={6} md={6}>
-              <Form.Item label={
-                <>Child Part <span style={{ color: "red" }}>*</span></>
-              }>
-                <Select
-                  placeholder="Select Child Part"
-                  value={selectedChildPart}
-                  onChange={setSelectedChildPart}
-                  style={{ width: "100%" }}
-                >
-                  {childParts.map((cp) => (
-                    <Option key={cp.id} value={cp.name}>
-                      {cp.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={14} sm={6} md={6}>
-              <Form.Item label="Quantity">
-                <input
-                  type="number"
-                  placeholder="Enter Quantity"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "4px 6px",
-                    borderRadius: 4,
-                    border: "1px solid #d9d9d9",
-                  }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item style={{ textAlign: "center", marginTop: 24 }}>
+          <Form.Item style={{ textAlign: "center", marginTop: 24, marginBottom: 0 }}>
             <Space>
               <Button
                 type="primary"
