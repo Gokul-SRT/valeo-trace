@@ -6,8 +6,8 @@ import { Select, Modal } from "antd";
 import "ag-grid-enterprise";
 import store from "store";
 import { toast } from "react-toastify";
-import { backendService } from "../../../../service/ToolServerApi";
-import commonApi from "../../../../CommonserverApi";
+import { backendService, commonBackendService } from "../../../../service/ToolServerApi";
+// import commonApi from "../../../../CommonserverApi";
 import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/OperationMasterService";
 const ToolMaster = ({ modulesprop, screensprop }) => {
@@ -72,7 +72,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       if (response) {
         returnData = response;
         const options = returnData.map(item => ({
-          key: item.operationUniqueCode || "",
+          key: item.operationUniqueCode || item.operationId || "",
           value: item.operationDescription || "",
           // label: item.productCode || ""
         }));
@@ -96,14 +96,15 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async (e) => {
     try {
-      const response = await backendService("gettoolmasterdtl", {
+      const response = await backendService({requestPath:"gettoolmasterdtl", 
+        requestData: {
         lineCode: e || "getAll",
         tenantId,
         branchCode,
         status: "getAll"
-      });
-      if (response?.data?.responseCode === '200') {
-        const updatedResponseData = response?.data?.responseData.map((item) => ({
+      }});
+      if (response?.responseCode === '200') {
+        const updatedResponseData = response?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
@@ -116,7 +117,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       } else {
         setMasterList([]);
         setOriginalList([]);
-        toast.error(response.data.responseMessage)
+        toast.error(response.responseMessage)
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
@@ -131,14 +132,14 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         // branchCode,
         isActive: "1",
       }
-      const response = await backendService("getProductDropdown", payload);
+      const response = await backendService({requestPath:"getProductDropdown", requestData:payload});
 
       let returnData = [];
 
-      if (response?.data?.responseCode === '200' && response.data.responseData) {
-        returnData = response.data.responseData;
+      if (response?.responseCode === '200' && response.responseData) {
+        returnData = response.responseData;
       } else {
-        toast.error(response.data.responseMessage || "Failed to load Child Parts.");
+        toast.error(response.responseMessage);
       }
       const options = returnData.map(item => ({
         key: item.productCode || "",
@@ -162,14 +163,14 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         branchCode,
         isActive: "1",
       }
-      const response = await commonApi.post("getcustomerDropdown", payload);
+      const response = await commonBackendService({requestPath:"getcustomerDropdown",requestData: payload});
 
       let returnData = [];
-
-      if (response?.data?.responseCode === '200' && response.data.responseData) {
-        returnData = response.data.responseData;
+      console.log(response,"response customer")
+      if (response?.responseCode === '200' && response.responseData) {
+        returnData = response.responseData;
       } else {
-        toast.error(response.data.responseMessage || "Failed to load Child Parts.");
+        toast.error(response.responseMessage);
       }
       const options = returnData.map(item => ({
         key: item.customerId || "",
@@ -212,14 +213,14 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
           };
         });
 
-        const response = await backendService("saveOrUpdate", updatedList);
+        const response = await backendService({requestPath:"saveOrUpdate", requestData:updatedList});
 
-        if (response?.data?.responseCode === '200') {
-          toast.success(response.data.responseMessage);
-          fetchData();
+        if (response?.responseCode === '200') {
+          toast.success(response.responseMessage);    
         } else {
-          toast.error(response.data.responseMessage);
+          toast.error(response.responseMessage);
         }
+        fetchData();
       }else {
         toast.error("Please enter the Tool No for all the rows.");
       }

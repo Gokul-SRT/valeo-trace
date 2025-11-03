@@ -86,14 +86,15 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   const toolDropDownData = async (e) => {
     try {
-      const response = await backendService("gettoolmasterdtl", {
+      const response = await backendService({requestPath:"gettoolmasterdtl",
+        requestData: {
         lineCode: e || "getAll",
         tenantId,
         branchCode,
         status: "getAll"
-      });
-      if (response?.data?.responseCode === '200') {
-        const options = response?.data?.responseData.map((item) => ({
+      }});
+      if (response?.responseCode === '200') {
+        const options = response?.responseData.map((item) => ({
           key: item.toolNo || "",
           value: item.toolDesc || "",
         }));
@@ -116,16 +117,17 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async (type, e) => {
     try {
-      const response = await backendService("getPmCheckListDtl", {
+      const response = await backendService({requestPath:"getPmCheckListDtl",
+        requestData:{
         status: type === 'status' ? e : selectedStatus,
         lineCode: type === 'line' ? e : selectedLine,
         operationCode: type === 'operation' ? e : selectedOperat,
         toolNo: type === 'tool' ? e : selectedTool,
         tenantId,
         branchCode,
-      });
-      if (response?.data?.responseCode === '200') {
-        const updatedResponseData = response?.data?.responseData.map((item) => ({
+      }});
+      if (response?.responseCode === '200') {
+        const updatedResponseData = response?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
@@ -142,40 +144,87 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
+  // const createorUpdate = async () => {
+  //   try {
+  //     const characteristicNameEmpty = masterList.filter((item) => !item.characteristicName);
+  //     if (selectedLine && selectedTool && selectedOperat !== 'getall' ) {
+  //       if (characteristicNameEmpty && characteristicNameEmpty?.length === 0) {
+  //         const updatedList = [{
+  //           line: selectedLine,
+  //           toolNo: selectedTool,
+  //           operation: selectedOperat,
+  //           status: "1",
+  //           tenantId,
+  //           branchCode,
+  //           dtlList: masterList
+  //         }];
+  //         const response = await backendService({requestPath:"pmCheckListMstsaveOrUpdate", requestData: updatedList});
+
+  //         if (response?.responseCode === '200') {
+  //           toast.success(response.responseMessage);
+  //         } else {
+  //           toast.error(response.responseMessage);
+  //         }
+  //          fetchData();
+  //       } else {
+  //         toast.error("Please enter for the added row.");
+  //       }
+  //     } else {
+  //       toast.error("Please select any one of the drop-down value.");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error saving data:", error);
+  //     toast.error("Error while saving data!");
+  //   }
+  // }
+
   const createorUpdate = async () => {
-    try {
-      const characteristicNameEmpty = masterList.filter((item) => !item.characteristicName);
-      if (selectedLine && selectedTool && selectedOperat !== 'getall') {
-        if (characteristicNameEmpty && characteristicNameEmpty?.length === 0) {
-          const updatedList = [{
-            line: selectedLine,
-            toolNo: selectedTool,
-            operation: selectedOperat,
-            status: "1",
-            tenantId,
-            branchCode,
-            dtlList: masterList
-          }];
-          const response = await backendService("pmCheckListMstsaveOrUpdate", updatedList);
+  try {
+    const newRows = masterList.filter(item => item.isUpdate === "0");
+    const hasNewRows = newRows.length > 0;
+    const missingNames = newRows.some(item => !item.characteristicName);
 
-          if (response?.data?.responseCode === '200') {
-            toast.success(response.data.responseMessage);
-            fetchData();
-          } else {
-            toast.error(response.data.responseMessage);
-          }
-
-        } else {
-          toast.error("Please enter for the added row.");
-        }
-      } else {
-        toast.error("Please select any one of the drop-down value.");
+    // If there are new rows, validate dropdowns
+    if (hasNewRows) {
+      if (!selectedLine || !selectedTool || !selectedOperat === 'getall') {
+        toast.error("Please select any one Line, Tool, and Operation.");
+        return;
       }
-    } catch (error) {
-      console.error("Error saving data:", error);
-      toast.error("Error while saving data!");
+      if (missingNames) {
+        toast.error("Please enter all characteristic names for the added rows.");
+        return;
+      }
     }
+
+    const updatedList = [{
+      line: selectedLine,
+      toolNo: selectedTool,
+      operation: selectedOperat,
+      status: "1",
+      tenantId,
+      branchCode,
+      dtlList: masterList,
+    }];
+
+    const response = await backendService({
+      requestPath: "pmCheckListMstsaveOrUpdate",
+      requestData: updatedList,
+    });
+
+    if (response?.responseCode === '200') {
+      toast.success(response.responseMessage);
+    } else {
+      toast.error(response?.responseMessage || "Save failed");
+    }
+
+    fetchData();
+
+  } catch (error) {
+    console.error("Error saving data:", error);
+    toast.error("Error while saving data!");
   }
+};
+
 
   const defaultColDef = {
     sortable: true,
