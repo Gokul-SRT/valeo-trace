@@ -89,7 +89,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         isUpdate: item.isUpdate,
         childPartCode: item.childPartCode,
         childPartDesc: item.childPartDesc,
-        type_id:item.type,
+        type:item.type,
         product: item.product,
         line: item.line,
         tenantId,
@@ -102,10 +102,10 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
 
       if (response?.data?.responseCode === '200') {
         toast.success(response.data.responseMessage)
-        fetchData();
       } else {
         toast.error(response.data.responseMessage)
       }
+      fetchData();
     } catch (error) {
       console.error("Error saving data:", error);
       toast.error("Error while saving data!");
