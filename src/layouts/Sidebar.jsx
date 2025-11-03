@@ -16,6 +16,7 @@ export default function SidebarMenu({ collapsed }) {
       localStorage.removeItem("isAuthenticated");
       navigate("/");
     } else {
+      console.log("Menu item clicked:", e.key);
       navigate(`/${e.key}`);
     }
   };
@@ -116,7 +117,7 @@ export default function SidebarMenu({ collapsed }) {
                   label: "Kitting process screen",
                 },
                 {
-                  key: "A2 and B2 type label print screen",
+                  key: "picklistprint",
                   label: "A2 and B2 type label print screen",
                 },
                 { key: "lineDashboard", label: "Line Dashboard" },
