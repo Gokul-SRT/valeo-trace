@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState,forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -6,11 +6,130 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
+import {Select} from "antd";
 import store from "store";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+
+
+const { Option } = Select;
+// 🔹 Custom MultiSelect Cell Editor
+/*const MultiSelectEditor = forwardRef((props, ref) => {
+  const [selectedValues, setSelectedValues] = useState([]);
+
+  
+  useEffect(() => {
+    if (props.data && props.colDef.field) {
+      const initial = props.data[props.colDef.field];
+      if (typeof initial === "string" && initial.length > 0) {
+        setSelectedValues(initial.split(",")); // string to array
+      } else if (Array.isArray(initial)) {
+        setSelectedValues(initial); // already array
+      } else {
+        setSelectedValues([]); // fallback empty
+      }
+    }
+  }, [props.data, props.colDef.field]);
+
+  // Expose value to ag-Grid when editing is done
+  React.useImperativeHandle(ref, () => ({
+    getValue() {
+      return selectedValues.join(",");
+    },
+  }));
+
+  
+
+  const handleChange = (values) => {
+    // Merge with current row value
+    const existing = props.data[props.colDef.field]
+      ? props.data[props.colDef.field].split(",")
+      : [];
+  
+    // Create a unique set of codes
+    const merged = Array.from(new Set([...existing, ...values]));
+  
+    setSelectedValues(merged);
+    props.node.setDataValue(props.colDef.field, merged.join(","));
+  };
+
+  return (
+    <Select
+      mode="multiple"
+      value={selectedValues}
+      style={{ width: "100%" }}
+      onChange={handleChange}
+      placeholder="Select Product Codes"
+      options={props.values.map((v) => ({
+        label: v.value,
+        value: v.key,
+      }))}
+    />
+  );
+});
+
+
+*/
+
+const MultiSelectEditor = forwardRef((props, ref) => {
+  const field = props.colDef.field;
+  const [selectedValues, setSelectedValues] = useState([]);
+
+  // Initialize selection from row data
+  useEffect(() => {
+    const initial = props.data[field];
+    if (typeof initial === "string" && initial.length > 0) {
+      setSelectedValues(initial.split(",")); // convert string to array
+    } else if (Array.isArray(initial)) {
+      setSelectedValues(initial);
+    } else {
+      setSelectedValues([]);
+    }
+  }, [props.data, field]);
+
+  // Provide value back to AG Grid
+  React.useImperativeHandle(ref, () => ({
+    getValue() {
+      return selectedValues.join(","); // send as string to backend
+    },
+  }));
+
+  
+/*
+  const handleChange = (values) => {
+    // Merge with current row value
+    const existing = props.data[props.colDef.field]
+      ? props.data[props.colDef.field].split(",")
+      : [];
+  
+    // Create a unique set of codes
+    const merged = Array.from(new Set([...existing, ...values]));
+  
+    setSelectedValues(merged);
+    props.node.setDataValue(props.colDef.field, merged.join(","));
+  };
+*/
+const handleChange = (values) => {
+  setSelectedValues(values);                  // update local state
+  props.node.setDataValue(field, values.join(",")); // update AG Grid row
+};
+  return (
+    <Select
+      mode="multiple"
+      value={selectedValues}
+      style={{ width: "100%" }}
+      onChange={handleChange}
+      placeholder="Select ChildPart Codes"
+      options={(props.values || []).map((item) => ({
+        label: item.value,  // display childPartCode
+        value: item.key,    // send childPartId to backend
+      }))}
+    />
+  );
+});
+
 
 const OperationMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -18,7 +137,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
   const [productMastOptions, setProductMastOptions] = useState([]);
-  const [lineMastOptions, setLineMastOptions] = useState([]);
+  const [childPartMastOptions, setChildPartMastOptions] = useState([]);
+  //const [lineMastOptions, setLineMastOptions] = useState([]);
   const gridRef = useRef(null);
 
 
@@ -40,7 +160,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     if (selectedModule && selectedScreen) {
       fetchData();
       productMastData();
-      lineMastData();
+      childPartMastData();
+      //lineMastData();
     }
   }, [selectedModule, selectedScreen]);
 
@@ -91,7 +212,32 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       }
     };
 
-    const lineMastData = async () => {
+    const childPartMastData = async () => {
+      try {
+        const response = await serverApi.post("getChildPartDropDown", {
+          tenantId,
+          branchCode,
+          isActive: "1",
+        });
+    
+        const res = response.data;
+        if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+          const options = res.responseData.map(item => ({
+            key: item.childPartId,    // send this to backend
+            value: item.childPartCode // display this in dropdown
+          }));
+          setChildPartMastOptions(options);
+        } else {
+          setChildPartMastOptions([]);
+        }
+      } catch (error) {
+        
+        toast.error("Error fetching ChildPartMastData. Please try again later.");
+      }
+    };
+
+
+   /* const lineMastData = async () => {
       try {
         const response = await serverApi.post("getLineDropdown", {
           tenantId,
@@ -111,7 +257,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       }
     };
 
-
+*/
 
     const createorUpdate = async () => {
     try {
@@ -125,8 +271,9 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         updatedBy: employeeId,
         branchCode,
-        productCode:item.productCode,
-        lineCode:item.lineMstCode,
+        childPartCode:item.childPartId,
+        //productCode:item.productCode,
+       // lineCode:item.lineMstCode,
       }));
 
       const response = await serverApi.post("insertupdateoperationmaster", updatedList);
@@ -168,13 +315,13 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       field: "operationDesc",
       filter: "agTextColumnFilter",
     },
-     {
+   /*  {
       headerName: "Production Parameter Count",
       field: "productionParameterCount",
       filter: "agTextColumnFilter",
     },
-
-    {
+*/
+   /* {
       headerName: "Product Code",
       field: "productCode",
       editable: true,
@@ -192,8 +339,120 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         return found ? found.productDesc : ""; // search/filter by description
       },
     },
+*/
+/*{
+  headerName: "Product Code",
+  field: "productCode",
+  editable: true,
+  cellEditor: MultiSelectEditor,
 
-    {
+  cellEditorParams: (params) => ({
+    // ✅ Proper structure for custom editor
+    values: productMastOptions.map((p) => ({
+      key: p.productCode,
+      value: `${p.productCode} - ${p.productDesc}`
+    })),
+  }),
+
+  valueFormatter: (params) => {
+    if (!params.value) return "";
+    const codes = typeof params.value === "string"
+      ? params.value.split(",")
+      : params.value;
+
+    return codes
+      .map((code) => {
+        const cleanCode = code.trim();
+        const option = productMastOptions.find(
+          (p) => p.productCode === cleanCode
+        );
+        return option
+          ? `${option.productCode} - ${option.productDesc}`
+          : cleanCode;
+      })
+      .join(", ");
+  },
+
+  filter: "agTextColumnFilter",
+  filterValueGetter: (params) => {
+    const option = productMastOptions.find(
+      (p) => p.productCode === params.data.productCode
+    );
+    return option
+      ? `${option.productCode} - ${option.productDesc}`
+      : "";
+  },
+},*/
+
+/*{
+  headerName: "ChildPart Code",
+  field: "childPartCode",
+  editable: true,
+  cellEditor: MultiSelectEditor,
+
+  cellEditorParams: (params) => ({
+    // ✅ Proper structure for custom editor
+    values: childPartMastOptions.map((p) => ({
+      key: p.childPartId,
+      value: `${p.childPartCode} - ${p.childPartDesc}`
+    })),
+  }),
+
+  valueFormatter: (params) => {
+    if (!params.value) return "";
+    const codes = typeof params.value === "string"
+      ? params.value.split(",")
+      : params.value;
+
+    return codes
+      .map((code) => {
+        const cleanCode = code.trim();
+        const option = childPartMastOptions.find(
+          (p) => p.childPartId === cleanCode
+        );
+        return option
+          ? `${option.childPartId} - ${option.childPartDesc}`
+          : cleanCode;
+      })
+      .join(", ");
+  },
+
+  filter: "agTextColumnFilter",
+  filterValueGetter: (params) => {
+    const option = childPartMastOptions.find(
+      (p) => p.childPartId === params.data.childPartCode
+    );
+    return option
+      ? `${option.childPartCode} - ${option.childPartDesc}`
+      : "";
+  },
+},
+
+*/
+{
+  headerName: "ChildPart Code",
+  field: "childPartId", // holds childPartId(s) as string
+  filter: "agTextColumnFilter",
+  editable: true,
+  cellEditor: MultiSelectEditor,
+  cellEditorParams: { values: childPartMastOptions || [] }, // pass API data
+  valueFormatter: (params) => {
+    if (!params.value) return "";
+    const ids = typeof params.value === "string" ? params.value.split(",") : params.value;
+    return ids
+      .map((id) => {
+        const option = (childPartMastOptions || []).find((item) => item.key === id);
+        return option ? option.value : id; // display childPartCode
+      })
+      .join(", ");
+  },
+},
+
+
+
+
+
+   /* {
       headerName: "Line Code",
       field: "lineMstCode",
       editable: true,
@@ -211,7 +470,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         return found ? found.lineMstDesc : ""; // search/filter by description
       },
     },
-
+*/
 
     {
       headerName: "Status",

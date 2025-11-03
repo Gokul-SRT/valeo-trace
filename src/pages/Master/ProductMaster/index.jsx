@@ -59,7 +59,6 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     const fetchOperationDropdown = async () => {
       try {
-        // ✅ Updated payload as per reference
         const payload = {
           isActive: "1",
           tenantId,
@@ -67,13 +66,11 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
         };
 
         const response = await serverApi.post("getoperationMasterdtl", payload);
-
-        // Handle both response formats gracefully
         const data = response?.data?.responseData || response?.data || [];
 
         const formatted = data.map((item) => ({
           value: item.operationId,
-          label: item.operationId,
+          label: item.operationDesc,
         }));
 
         setOperationDropdown(formatted);
@@ -115,11 +112,18 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
         setMasterList([]);
         setOriginalList([]);
       } else {
+        // ✅ CORRECTED: Map API response fields to component fields
         const updated = response.data.map((item) => ({
           ...item,
           isUpdate: 1,
-          op: item.op || [],
+          // Map grpCode to groupCode for consistency
+          groupCode: item.grpCode || "",
+          groupId: item.grpId || "",
+          // Handle operation data - convert to array format
+          operationCodes: item.operationId ? [item.operationId] : [],
+          operationDescription: item.operationDescription || "",
         }));
+        console.log("Fetched and mapped data:", updated);
         setMasterList(updated);
         setOriginalList(updated);
       }
@@ -136,7 +140,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
-  // ✅ Group Code Dropdown Editor (keeps selected value after update)
+  // ✅ Group Code Dropdown Editor (FIXED)
   const GroupCodeDropdownEditor = (props) => {
     const [selectedValue, setSelectedValue] = useState(props.value || "");
 
@@ -149,8 +153,17 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       setSelectedValue(value);
 
       const selectedGrp = groupDropdown.find((g) => g.grpCode === value);
+
+      // ✅ Set both groupCode and groupId
       props.node.setDataValue("groupCode", selectedGrp?.grpCode || "");
       props.node.setDataValue("groupId", selectedGrp?.grpId || "");
+
+      // Force refresh to show the selected value
+      props.api.refreshCells({
+        rowNodes: [props.node],
+        columns: ["groupCode", "groupId"],
+        force: true,
+      });
     };
 
     return (
@@ -158,6 +171,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
         value={selectedValue}
         onChange={handleChange}
         style={{ width: "100%", height: "100%" }}
+        autoFocus
       >
         <option value="">Select Group Code</option>
         {groupDropdown.map((grp) => (
@@ -169,35 +183,43 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     );
   };
 
-  // ✅ Operation Id Cell Renderer
+  // ✅ Group Code Cell Renderer (NEW - to display selected value)
+  const GroupCodeCellRenderer = (props) => {
+    return <span>{props.value || ""}</span>;
+  };
+
+  // ✅ Operation Id Cell Renderer (FIXED)
   const OperationIdCellRenderer = (props) => {
-    const value = props.value || [];
-    const names = Array.isArray(value)
-      ? value.map((id) => {
-          const op = operationDropdown.find((item) => item.value === id);
-          return op ? op.label : id;
-        })
-      : [];
-    const displayValue = names.join(", ");
-    return (
-      <span
-        style={{ cursor: "pointer", color: displayValue ? "black" : "gray" }}
-        onClick={() => handleOperationClick(props.data)}
-        title="Click to edit Operation Ids"
-      >
-        {displayValue || "Select here.."}
-      </span>
-    );
+    // Make sure we have an array of codes
+    const rawCodes = props?.data.operationCodes || [];
+    const operationCodes =
+      typeof rawCodes[0] === "string"
+        ? rawCodes[0].split(",") // split the comma-separated string
+        : rawCodes;
+
+    const getDescription = operationCodes
+      .map((id) => {
+        const op = operationDropdown.find((item) => item.value === id.trim());
+        return op ? op.label : id;
+      })
+      .join(", ");
+
+    console.log("Operation Descriptions:", getDescription);
+
+    return <span title={getDescription}>{getDescription}</span>;
   };
 
   const handleOperationClick = (row) => {
     setEditingRow(row);
-    const existingOps = Array.isArray(row.op)
-      ? row.op
-      : row.op
-      ? String(row.op).split(",")
+    const existingOps = Array.isArray(row.operationCodes)
+      ? row.operationCodes
       : [];
-    setSelectedOperations(existingOps);
+    console.log("Existing operations:", existingOps);
+    const latestOps =
+      existingOps.length === 1 && typeof existingOps[0] === "string"
+        ? existingOps[0].split(",").map((op) => op.trim())
+        : existingOps;
+    setSelectedOperations(latestOps);
     setIsModalOpen(true);
   };
 
@@ -205,7 +227,19 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     if (editingRow) {
       const updatedList = masterList.map((item) =>
         item.productCode === editingRow.productCode
-          ? { ...item, op: selectedOperations, isUpdate: 1 }
+          ? {
+              ...item,
+              operationCodes: selectedOperations,
+              operationDescription: selectedOperations
+                .map((opId) => {
+                  const op = operationDropdown.find(
+                    (item) => item.value === opId
+                  );
+                  return op ? op.label : opId;
+                })
+                .join(", "),
+              isUpdate: 1,
+            }
           : item
       );
       setMasterList(updatedList);
@@ -214,6 +248,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       setSelectedOperations([]);
       setEditingRow(null);
       gridRef.current?.api.refreshCells({ force: true });
+      toast.success("Operations updated successfully!");
     }
   };
 
@@ -242,17 +277,18 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     },
     {
       headerName: "Group Code",
-      field: "groupCode",
+      field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
       cellEditor: GroupCodeDropdownEditor,
-      cellRenderer: (params) => params.value || "",
+      cellRenderer: GroupCodeCellRenderer,
     },
     {
       headerName: "Operation Id",
-      field: "op",
+      field: "operationDescription",
       editable: false,
       suppressNavigable: true,
       cellRenderer: OperationIdCellRenderer,
+      cellStyle: { cursor: "pointer" },
     },
     {
       headerName: "IsActive",
@@ -274,10 +310,21 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
   const handleAddRow = () => {
     const emptyRow = {
       isUpdate: 0,
+      productCode: "",
+      productDesc: "",
+      productUomCode: "",
       groupCode: "",
       groupId: "",
-      op: [],
+      operationCodes: [],
+      operationDescription: "",
+      isActive: "1",
+      productCategoryCode: "FG",
+      isInventory: "0",
+      tenantId,
+      branchCode,
+      updatedBy: employeeId,
     };
+
     const productcodeempty = masterList.filter((item) => !item.productCode);
     if (productcodeempty.length === 0) {
       const updated = [...masterList, emptyRow];
@@ -288,30 +335,74 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-  // ✅ Update function sends both Group Code & Group Id
+  // ✅ FIXED Update function
   const createorUpdate = async () => {
     try {
+      // Validate data before sending
+      const invalidRows = masterList.filter(
+        (item) =>
+          item.isUpdate === 0 && (!item.productCode || !item.productDesc)
+      );
+
+      if (invalidRows.length > 0) {
+        toast.error(
+          "Please fill Product Code and Description for all new rows."
+        );
+        return;
+      }
+
       const updatedList = masterList.map((item) => {
         const matchedGroup = groupDropdown.find(
           (grp) => grp.grpCode === item.groupCode
         );
 
-        return {
+        let operationCodes = [];
+
+        if (Array.isArray(item.operationCodes)) {
+          // Handle case like ["O0007,O0006"]
+          if (
+            item.operationCodes.length === 1 &&
+            typeof item.operationCodes[0] === "string" &&
+            item.operationCodes[0].includes(",")
+          ) {
+            operationCodes = item.operationCodes[0]
+              .split(",")
+              .map((s) => s.trim());
+          } else {
+            // Already proper array
+            operationCodes = item.operationCodes.map((s) => s.trim());
+          }
+        } else if (
+          typeof item.operationCodes === "string" &&
+          item.operationCodes.trim() !== ""
+        ) {
+          // Handle plain string like "O0007,O0006"
+          operationCodes = item.operationCodes.split(",").map((s) => s.trim());
+        }
+
+        console.log("After fix:", operationCodes);
+        // ✅ Prepare data for API - convert back to expected field names
+        const payload = {
           isUpdate: item.isUpdate,
           productCode: item.productCode,
           productCategoryCode: "FG",
           productUomCode: item.productUomCode,
           productDesc: item.productDesc,
-          groupCode: item.groupCode || "",
-          groupId: matchedGroup ? matchedGroup.grpId : item.groupId || "",
-          op: Array.isArray(item.op) ? item.op : [],
+          grpCode: item.groupCode || "", // ✅ Send as grpCode
+          groupId: matchedGroup ? matchedGroup.grpId : item.groupId || "", // ✅ Send as grpId
+          operationCodes: operationCodes,
+          operationDescription: item.operationDescription || "",
           tenantId,
           isActive: item.isActive,
           updatedBy: employeeId,
           branchCode,
           isInventory: "0",
         };
+
+        return payload;
       });
+
+      console.log("Sending data to API:", updatedList);
 
       const response = await serverApi.post(
         "insertupdateproductmaster",
@@ -321,20 +412,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       if (response.data === "SUCCESS") {
         toast.success("Data saved successfully!");
 
-        // ✅ After successful update, retain current Group Code values
-        const refreshedData = masterList.map((row) => {
-          const selectedGrp = groupDropdown.find(
-            (g) => g.grpCode === row.groupCode
-          );
-          return {
-            ...row,
-            groupCode: selectedGrp?.grpCode || row.groupCode,
-            groupId: selectedGrp?.grpId || row.groupId,
-          };
-        });
-        setMasterList(refreshedData);
-        setOriginalList(refreshedData);
-        gridRef.current?.api.refreshCells({ force: true });
+        // Refresh data after successful save
+        fetchData();
       } else if (response.data === "DUBLICATE") {
         toast.warning("Duplicate Product Code not allowed!");
       } else {
@@ -362,6 +441,16 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       ref.current.api.exportDataAsExcel({ fileName: "ProductMaster.xlsx" });
   };
 
+  const handlecellclicked = (params) => {
+    console.log("cell clicked", params);
+    if (params.colDef.field === "operationDescription") {
+      handleOperationClick(params.data);
+    }
+  };
+
+  useEffect(() => {
+    console.log("selectedOperations", selectedOperations);
+  }, [selectedOperations]);
   return (
     <div className="container mt-1 p-0">
       <div className="card shadow" style={{ borderRadius: "6px" }}>
@@ -410,6 +499,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
               setMasterList(updatedList);
               setOriginalList(updatedList);
             }}
+            onCellClicked={handlecellclicked}
           />
 
           <div className="text-center mt-4">

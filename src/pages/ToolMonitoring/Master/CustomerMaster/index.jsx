@@ -4,7 +4,7 @@ import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
 import "ag-grid-enterprise";
 import store from "store";
-import serverApi from "../../../../service/ToolServerApi";
+import { backendService } from "../../../../service/ToolServerApi";
 import { toast } from "react-toastify";
 
 const CustomerMaster = ({ modulesprop, screensprop }) => {
@@ -14,10 +14,10 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
   const gridRef = useRef(null);
-  
+
   const tenantId = store.get("tenantId")
   const branchCode = store.get('branchCode');
-  
+
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
     const allColumnIds = params.columnApi
@@ -32,15 +32,19 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     }
   }, [modulesprop, screensprop]);
 
-   const fetchData = async (e) => {
+  const fetchData = async (e) => {
     try {
-      const response = await serverApi.post("getCustmasterdtl", {
-        tenantId,
-        branchCode,
-        status: "getAll"
+      const response = await backendService({
+        requestPath: "getCustmasterdtl",
+        requestData: {
+          tenantId,
+          branchCode,
+          status: "getAll",
+        },
       });
-      if (response?.data?.responseCode === '200') {
-        const updatedResponseData = response?.data?.responseData.map((item) => ({
+       console.log(response,"response--------")
+      if (response?.responseCode === '200') {
+        const updatedResponseData = response?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
         }));
@@ -57,29 +61,29 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-   const createorUpdate = async () => {
+  const createorUpdate = async () => {
     try {
       const CustNoEmpty = masterList.filter((item) => !item.custId);
       if (CustNoEmpty && CustNoEmpty?.length === 0) {
-        const updatedList =  masterList.map((item) =>({
-         
-            isUpdate: item.isUpdate,
-            custId: item.custId,
-            custName: item.custName,
-            status: item.status,
-            tenantId,
-            branchCode,
-        }));
-        const response = await serverApi.post("custDtlsaveOrUpdate", updatedList);
+        const updatedList = masterList.map((item) => ({
 
-        if (response?.data?.responseCode === '200') {
-          toast.success(response.data.responseMessage);
-          fetchData();
+          isUpdate: item.isUpdate,
+          custId: item.custId,
+          custName: item.custName,
+          status: item.status,
+          tenantId,
+          branchCode,
+        }));
+        const response = await backendService({requestPath: "custDtlsaveOrUpdate", 
+          requestData: updatedList});
+
+        if (response?.responseCode === '200') {
+          toast.success(response.responseMessage);
         } else {
-          toast.error(response.data.responseMessage);
+          toast.error(response.responseMessage);
         }
-      
-      }else {
+        fetchData();
+      } else {
         toast.error("Please enter the Tool No for all the rows.");
       }
     } catch (error) {
@@ -140,8 +144,8 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     //   },
     //   cellStyle: { textAlign: "center" },
     // },
-     {
-      headerName: "Status",
+    {
+      headerName: "Is Active",
       field: "status",
       filter: true,
       editable: true,
@@ -163,16 +167,16 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       custName: "",
       status: "1",
       isUpdate: "0",
-      isDisabled: true, 
+      isDisabled: true,
     };
     const CustNoEmpty = masterList.filter((item) => !item.custId);
-        if (CustNoEmpty && CustNoEmpty?.length === 0) {
-          const updated = [...masterList, newRow];
-          setMasterList(updated);
-          setOriginalList(updated);
-        } else {
-          toast.error("Please enter the Customer Id for all the rows.");
-        }
+    if (CustNoEmpty && CustNoEmpty?.length === 0) {
+      const updated = [...masterList, newRow];
+      setMasterList(updated);
+      setOriginalList(updated);
+    } else {
+      toast.error("Please enter the Customer Id for all the rows.");
+    }
   };
 
   const handleCancel = () => {
@@ -186,7 +190,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   const handleFilterChange = (value) => {
     if (!value || value === "GetAll") {
       setMasterList(originalList);
-      console.log(originalList,'originalList-------------')
+      console.log(originalList, 'originalList-------------')
     } else if (value === "1") {
       setMasterList(originalList.filter((item) => item.status === "1"));
     } else if (value === "0") {
@@ -251,23 +255,23 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
               {/* Grid */}
               {/* {masterList.length > 0 && ( */}
-                <AgGridReact
-                  ref={gridRef}
-                  rowData={masterList}
-                  columnDefs={columnDefs}
-                  defaultColDef={defaultColDef}
-                  paginationPageSize={100}
-                  pagination={true}
-                  domLayout="autoHeight"
-                  singleClickEdit={true}
-                  onFirstDataRendered={autoSizeAllColumns}
-                  onCellValueChanged={(params) => {
-                    const updatedList = [...masterList];
-                    updatedList[params.rowIndex] = params.data;
-                    setMasterList(updatedList);
-                    setOriginalList(updatedList);
-                  }}
-                />
+              <AgGridReact
+                ref={gridRef}
+                rowData={masterList}
+                columnDefs={columnDefs}
+                defaultColDef={defaultColDef}
+                paginationPageSize={100}
+                pagination={true}
+                domLayout="autoHeight"
+                singleClickEdit={true}
+                onFirstDataRendered={autoSizeAllColumns}
+                onCellValueChanged={(params) => {
+                  const updatedList = [...masterList];
+                  updatedList[params.rowIndex] = params.data;
+                  setMasterList(updatedList);
+                  setOriginalList(updatedList);
+                }}
+              />
               {/* )} */}
 
               {/* Buttons */}

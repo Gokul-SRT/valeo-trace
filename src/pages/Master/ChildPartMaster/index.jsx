@@ -8,6 +8,7 @@ import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
 import { toast } from "react-toastify";
 import serverApi from '../../../serverAPI';
+import { gettypeMasterdtl } from "../../../services/ChildPartMasterService"
 import store from "store";
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
@@ -17,6 +18,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
+  const [typeListResp, setTypeList] = useState([])
   const gridRef = useRef(null);
 
   const tenantId = store.get("tenantId")
@@ -37,8 +39,23 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
+      fetchType();
     }
   }, [selectedModule, selectedScreen])
+
+  const fetchType = async () => {
+    let typeList = [];
+    const responseList = await gettypeMasterdtl(tenantId, branchCode)
+    if (responseList.responseCode == "200") {
+      console.log(responseList.responseData, "typeList")
+      typeList = responseList.responseData
+      setTypeList(typeList)
+    } else {
+      setTypeList(typeList)
+    }
+  }
+
+
 
   const fetchData = async (e) => {
     try {
@@ -55,7 +72,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
-      }else{
+      } else {
         setMasterList([]);
         setOriginalList([]);
         toast.error(response.data.responseMessage)
@@ -72,6 +89,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         isUpdate: item.isUpdate,
         childPartCode: item.childPartCode,
         childPartDesc: item.childPartDesc,
+        type:item.type,
         product: item.product,
         line: item.line,
         tenantId,
@@ -79,20 +97,22 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         updatedBy: employeeId,
         branchCode,
       }));
-
+      console.log();
       const response = await serverApi.post("insertupdatechildpartmaster", updatedList);
 
       if (response?.data?.responseCode === '200') {
         toast.success(response.data.responseMessage)
-        fetchData();
       } else {
         toast.error(response.data.responseMessage)
       }
+      fetchData();
     } catch (error) {
       console.error("Error saving data:", error);
       toast.error("Error while saving data!");
     }
   }
+
+  const handleUpdateRow = async (rowData) => { console.log(rowData, "rowDatarowDatarowDatarowData") }
   const defaultColDef = {
     sortable: true,
     filter: true,
@@ -104,8 +124,38 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     // { headerName: "Id", field: "id", filter: "agNumberColumnFilter", editable: false },
     { headerName: "Child Part Code", field: "childPartCode", filter: "agTextColumnFilter" },
     { headerName: "Child Part Desc", field: "childPartDesc", filter: "agTextColumnFilter" },
-    { headerName: "Product", field: "product", filter: "agTextColumnFilter" },
-    { headerName: "Line", field: "line", filter: "agTextColumnFilter" },
+    // {
+    //   headerName: "Type",
+    //   field: "type",
+    //   filter: "agTextColumnFilter",
+    //   editable: true,
+    //   cellEditor: "agSelectCellEditor",
+    //   cellEditorParams: {
+    //   values: typeListResp.map(item => item.typeId.toString()), // Ag-Grid typically expects an array of keys for 'values'
+    // },
+    // valueFormatter: (params) => {
+    //   // Find the corresponding display value (item.value) based on the stored key (params.value)
+    //   const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
+    //   return match ? match.typeDescription : "Select Type";
+    // },
+    // },
+ 
+    // {
+    //   headerName: "Type",
+    //   field: "typeId",
+    //   filter: "agTextColumnFilter",
+    //   editable: true,
+    //   cellEditor: "agSelectCellEditor",
+    //   cellEditorParams: (params) => ({
+    //     values: typeListResp.map((t) => t.typeId.toString()), // ensure string
+    //   }),
+    //   valueFormatter: (params) => {
+    //     const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
+    //     return match ? match.typeDescription : "Select Type";
+    //   },
+
+    // },
+    // { headerName: "Line", field: "line", filter: "agTextColumnFilter" },
     {
       headerName: "Status",
       field: "status",
@@ -121,23 +171,37 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       },
       cellStyle: { textAlign: "center" },
     },
+    // {
+    //   headerName: "Action",
+    //   editable: false,
+    //   sortable: false,
+    //   filter: false,
+    //   suppressMovable: true,
+    //   cellRenderer: (params) => (
+    //     <button
+    //       onClick={() => handleUpdateRow(params.data)}
+    //     >
+    //       update
+    //     </button>
+    //   ),
+    // },
   ];
 
   // Add new empty row
   const handleAddRow = () => {
     const emptyRow = {
-        isUpdate:0
-      };
-      const childPartCodeEmpty = masterList.filter((item)=> !item.childPartCode && !item.product);
-  
-        if(childPartCodeEmpty && childPartCodeEmpty?.length === 0){
-          const updated = [...masterList, emptyRow];
-          setMasterList(updated);
-          setOriginalList(updated);
-        }else{
-        // ("Please enter the empty rows.");
-        toast.error("Please enter the empty rows.");
-        }   
+      isUpdate: 0
+    };
+    const childPartCodeEmpty = masterList.filter((item) => !item.childPartCode && !item.product);
+
+    if (childPartCodeEmpty && childPartCodeEmpty?.length === 0) {
+      const updated = [...masterList, emptyRow];
+      setMasterList(updated);
+      setOriginalList(updated);
+    } else {
+      // ("Please enter the empty rows.");
+      toast.error("Please enter the empty rows.");
+    }
   };
 
   // Cancel
