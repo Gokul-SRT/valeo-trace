@@ -124,21 +124,21 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     // { headerName: "Id", field: "id", filter: "agNumberColumnFilter", editable: false },
     { headerName: "Child Part Code", field: "childPartCode", filter: "agTextColumnFilter" },
     { headerName: "Child Part Desc", field: "childPartDesc", filter: "agTextColumnFilter" },
-    {
-      headerName: "Type",
-      field: "type",
-      filter: "agTextColumnFilter",
-      editable: true,
-      cellEditor: "agSelectCellEditor",
-      cellEditorParams: {
-      values: typeListResp.map(item => item.typeId.toString()), // Ag-Grid typically expects an array of keys for 'values'
-    },
-    valueFormatter: (params) => {
-      // Find the corresponding display value (item.value) based on the stored key (params.value)
-      const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
-      return match ? match.typeDescription : "Select Type";
-    },
-    },
+    // {
+    //   headerName: "Type",
+    //   field: "type",
+    //   filter: "agTextColumnFilter",
+    //   editable: true,
+    //   cellEditor: "agSelectCellEditor",
+    //   cellEditorParams: {
+    //   values: typeListResp.map(item => item.typeId.toString()), // Ag-Grid typically expects an array of keys for 'values'
+    // },
+    // valueFormatter: (params) => {
+    //   // Find the corresponding display value (item.value) based on the stored key (params.value)
+    //   const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
+    //   return match ? match.typeDescription : "Select Type";
+    // },
+    // },
  
     // {
     //   headerName: "Type",
