@@ -14,7 +14,7 @@ import {
 } from "antd";
 import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
 import serverApi from "../../../serverAPI";
-import QRModal from "../../Traceability/Reports/Picklist/QRModal"; 
+import QRModal from "../../Traceability/Reports/Picklist/QRModal";
 
 const { Option } = Select;
 
@@ -125,11 +125,7 @@ const Kitting = () => {
       );
 
       const rawData = response.data?.responseData;
-      const data = Array.isArray(rawData)
-        ? rawData
-        : rawData
-        ? [rawData]
-        : [];
+      const data = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
 
       if (data.length > 0) {
         setSelectedPart((prev) => ({
@@ -171,7 +167,11 @@ const Kitting = () => {
         </a>
       ),
     },
-    { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
+    {
+      title: "Child Part Description",
+      dataIndex: "childPartDesc",
+      key: "childPartDesc",
+    },
     { title: "Item Type", dataIndex: "itemType", key: "itemType" },
     { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
     { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
@@ -197,13 +197,14 @@ const Kitting = () => {
         <Row gutter={[8, 8]}>
           {childParts.map((part, i) => {
             const kitPartCode = part.kitPartCode || `--`;
+            const kitPartDesc = part.kitPartDesc || `--`;
             const inputId = `scannedCountInput_${kitPartCode}_${i}`;
 
             return (
               <Col span={8} key={i}>
                 <Card
                   size="small"
-                  title={`Child Part ${kitPartCode}`}
+                  title={`Child Part ${kitPartCode}-${kitPartDesc}`}
                   headStyle={{
                     backgroundColor: "#f0f0f0",
                     color: "#001F3E",
@@ -212,19 +213,17 @@ const Kitting = () => {
                   style={{ marginRight: 8 }}
                 >
                   <Form layout="vertical">
-                    <Form.Item label="Part">
+                    <Form.Item label="Scan Barcode">
                       <Input
-                        value={part.kitPartDesc}
                         onFocus={() => {
-                          console.log(`Focused Part Input: ${inputId}`);
+                          console.log("Input focused");
+                          
                         }}
                       />
                     </Form.Item>
 
                     <Form.Item label="Scanned Count">
-                      <Input
-                       type="number"
-                       placeholder="Enter count" />
+                      <Input type="number" placeholder="Enter count" />
                     </Form.Item>
                   </Form>
                 </Card>
