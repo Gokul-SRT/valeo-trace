@@ -834,25 +834,27 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
         <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
           
           {/* Allow Partial Transfer Button */}
+          {!disablePartial && (
           <Button
             type="primary"
             style={{ marginRight: "5px" }}
             onClick={()=>submitCompleted("2")}
             //disabled={!someFilledNotFull}
-            disabled={disablePartial}
+            //disabled={disablePartial}
           >
             Allow to Partially Transfer
           </Button>
-
+      )}
           {/* Submit Button */}
+          {allFull && (
           <Button
             type="primary"
             onClick={()=>submitCompleted("3")}
             disabled={!allFull}
           >
-            Submit
+            Completed
           </Button>
-
+         )}
         </div>
       );
     })()}
