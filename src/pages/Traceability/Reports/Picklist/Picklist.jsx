@@ -293,7 +293,15 @@ const partiallyCompletedColumns = [
   ), },
   { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
   { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-  { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+  {
+    title: "Created Date",
+    dataIndex: "plsLogDate",
+    key: "plsLogDate",
+    render: (text) => {
+      if (!text) return "-";
+      return dayjs(text).format("DD-MMM-YYYY"); 
+    },
+  },
   { title: "Shift", dataIndex: "shift", key: "shift" },
   { title: "Status", dataIndex: "status", key: "status" },
   { title: "Partially Issued Qty", dataIndex: "partialQty", key: "partialQty" },
@@ -462,8 +470,8 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
 
     { title: "Child Part Code", dataIndex: "childPartCode", key: "childPartCode" },
     { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
-    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
-    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
+    { title: "Picklist Qty(Nos)", dataIndex: "picklistQty", key: "picklistQty", align: "right", },
+    { title: "Picked Qty(Nos)", dataIndex: "pickedQty", key: "pickedQty", align: "right", },
     
 
   /*{
@@ -581,7 +589,16 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
     },
     { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
     { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    //{ title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    {
+      title: "Created Date",
+      dataIndex: "plsLogDate",
+      key: "plsLogDate",
+      render: (text) => {
+        if (!text) return "-";
+        return dayjs(text).format("DD-MMM-YYYY"); 
+      },
+    },
     { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
    // { title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
@@ -597,7 +614,15 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
     { title: "Picklist Code", dataIndex: "plsCode", key: "plsCode" },
     { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
     { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    {
+      title: "Created Date",
+      dataIndex: "plsLogDate",
+      key: "plsLogDate",
+      render: (text) => {
+        if (!text) return "-";
+        return dayjs(text).format("DD-MMM-YYYY"); 
+      },
+    },
     { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
     //{ title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
