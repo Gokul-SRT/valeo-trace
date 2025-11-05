@@ -389,6 +389,8 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
   plsId:item.plsId,
   plsdId:item.plsdId,
   isCompleted:isCompleted,
+  tenantId:tenantId,
+  branchCode:branchCode,
 
 }))
 
