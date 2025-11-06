@@ -37,11 +37,13 @@ const [scanValue, setScanValue] = useState("");
 const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = useState([]);
 
 
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  // const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  // const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  // const employeeId = store.get("employeeId")
+
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
   const employeeId = store.get("employeeId")
-
-
   
 
 
