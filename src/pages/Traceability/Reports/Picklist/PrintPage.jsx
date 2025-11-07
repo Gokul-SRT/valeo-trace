@@ -1,7 +1,8 @@
-// PrintPage.js
-import React , {useState} from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Form, Row, Col, Select, Input, Button, Table, DatePicker } from "antd";
 import moment from "moment";
+import { toast } from "react-toastify";
+import serverApi from "../../../../serverAPI";
 
 const { Option } = Select;
 
@@ -18,22 +19,80 @@ const PrintPage = ({
   printB2Data,
   handleViewQR,
 }) => {
-
   const [addQty, setAddQty] = useState(0);
   const [binCount, setBinCount] = useState(0);
+  const [picklistOptions, setPicklistOptions] = useState([]); // ✅ store API response here
+  const [selectedPicklist, setSelectedPicklist] = useState(null); // ✅ selected picklist code
+  const [childPartOptions, setChildPartOptions] = useState([]); // ✅ store child part options
+
   const binQty = 200; // fixed bin quantity
+  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
 
   const handleAddQtyChange = (e) => {
-    console.log("Add Quantity Changed:", e.target.value);
     const value = Number(e.target.value);
     setAddQty(value);
 
     // Calculate bin count dynamically
-    if (value > 0 && value <= Number(qrData.quantity)) {
+    if (value > 0 && qrData?.quantity && value <= Number(qrData.quantity)) {
       const count = Math.ceil(value / binQty);
       setBinCount(count);
     } else {
       setBinCount(0);
+    }
+  };
+
+
+  const handlePicklistCodetoChildParts = (picklistCode) => {
+    // Implement logic to fetch and set child parts based on selected picklist code
+    console.log("Selected Picklist Code:", picklistCode);
+    fetchPlscodetoChildPartDetails(picklistCode);
+  }
+
+  useEffect(() => {
+    fetchPicklistPLSDetails();
+  }, []);
+
+  const fetchPicklistPLSDetails = async () => {
+    try {
+      const response = await serverApi.post("getPicklistWO", {
+        tenantId,
+        branchCode,
+        planDate: "",
+      });
+
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        console.log("Fetched PLS Details:", res.responseData);
+        setPicklistOptions(res.responseData);
+      } else {
+        setPicklistOptions([]);
+      }
+    } catch (error) {
+      toast.error("Error fetching picklist codes. Please try again later.");
+    }
+  };
+
+
+  const fetchPlscodetoChildPartDetails = async (plsCode) => {
+    try {
+      const response = await serverApi.post("getPicklistCodetoChildPartCode", {
+        tenantId,
+        branchCode,
+        plsCode: plsCode,
+        itemType :"A2",
+        childPartCode: ""
+      });
+
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        console.log("Fetched Product Details:", res.responseData);
+        setChildPartOptions(res.responseData);
+      } else {
+        setChildPartOptions([]);
+      }
+    } catch (error) {
+      toast.error("Error fetching picklist codes. Please try again later.");
     }
   };
 
@@ -46,29 +105,22 @@ const PrintPage = ({
       >
         <Form layout="vertical">
           <Row gutter={16}>
+            {/* ✅ Dynamic Picklist Select Box */}
             <Col span={4}>
-              <Form.Item label="Product">
-                <Select placeholder="Select Product">
-                  <Option value="prod1">Product 1</Option>
-                  <Option value="prod2">Product 2</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col span={4}>
-              <Form.Item label="Line">
-                <Select placeholder="Select Line">
-                  <Option value="line1">Line 1</Option>
-                  <Option value="line2">Line 2</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col span={4}>
-              <Form.Item label="Work Order">
-                <Select placeholder="Select Work Order">
-                  <Option value="wo1">Work Order 1</Option>
-                  <Option value="wo2">Work Order 2</Option>
+              <Form.Item label="PickList Code">
+                <Select
+                  placeholder="Select PickList Code"
+                  value={selectedPicklist}
+                  onChange={(value) => handlePicklistCodetoChildParts(value)}
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                >
+                  {picklistOptions.map((item, index) => (
+                    <Option key={index} value={item.plsCode}>
+                      {item.plsCode}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>
@@ -116,7 +168,9 @@ const PrintPage = ({
                 <Col span={4}>
                   <Form.Item label="Delivery Date">
                     <DatePicker
-                      value={qrData?.deliveryDate ? moment(qrData.deliveryDate, "YYYY-MM-DD") : null}
+                      value={
+                        qrData?.deliveryDate ? moment(qrData.deliveryDate, "YYYY-MM-DD") : null
+                      }
                       format="YYYY-MM-DD"
                       readOnly
                       disabled
@@ -128,7 +182,11 @@ const PrintPage = ({
                 <Col span={4}>
                   <Form.Item label="Manufacturing Date">
                     <DatePicker
-                      value={qrData?.manufactureDate ? moment(qrData.manufactureDate, "YYYY-MM-DD") : null}
+                      value={
+                        qrData?.manufactureDate
+                          ? moment(qrData.manufactureDate, "YYYY-MM-DD")
+                          : null
+                      }
                       format="YYYY-MM-DD"
                       readOnly
                       disabled
@@ -136,23 +194,29 @@ const PrintPage = ({
                     />
                   </Form.Item>
                 </Col>
+
                 <Col span={4}>
                   <Form.Item label="Scanned Quantity">
                     <Input type="number" placeholder="Enter Quantity" value={qrData.quantity} />
                   </Form.Item>
                 </Col>
 
-                 <Col span={4}>
-              <Form.Item label="Add Quantity">
-                <Input type="number" placeholder="Enter Quantity" value={addQty} onChange={handleAddQtyChange} />
-              </Form.Item>
-            </Col>
+                <Col span={4}>
+                  <Form.Item label="Add Quantity">
+                    <Input
+                      type="number"
+                      placeholder="Enter Quantity"
+                      value={addQty}
+                      onChange={handleAddQtyChange}
+                    />
+                  </Form.Item>
+                </Col>
 
-            <Col span={4}>
-              <Form.Item label="Bin Count">
-                <Input type="number" placeholder="Bin Count" value={binCount} />
-              </Form.Item>
-            </Col>
+                <Col span={4}>
+                  <Form.Item label="Bin Count">
+                    <Input type="number" placeholder="Bin Count" value={binCount} readOnly />
+                  </Form.Item>
+                </Col>
               </>
             )}
           </Row>
