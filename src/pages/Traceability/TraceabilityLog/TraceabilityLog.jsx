@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Card, Select, Row, Col, Button, Typography, Progress,Input } from "antd";
+import React, { useRef ,useState, useEffect } from "react";
+import { Card, Select, Row, Col, Button, Typography, Progress,Input ,Form} from "antd";
 import "antd/dist/reset.css";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
@@ -10,6 +10,7 @@ const { Option } = Select;
 const { Text } = Typography;
 
 const TraceabilityLog = () => {
+  const [form] = Form.useForm();
   const [lines, setLines] = useState([]);
   const [products, setProducts] = useState([]);
   const [workOrders, setWorkOrders] = useState([]);
@@ -101,10 +102,7 @@ const TraceabilityLog = () => {
     }
   };
 
-  // Fetch Traceability Data when Work Order is selected
-  // useEffect(() => {
-  //   if (selectedWorkOrder) fetchTraceabilityData(selectedWorkOrder);
-  // }, [selectedWorkOrder]);
+  
 
   const fetchTraceabilityData = async (workOrderId) => {
     setPickListCodeVerrify(workOrderId);
@@ -148,8 +146,9 @@ const TraceabilityLog = () => {
     setShowDetails(false);
   };
 
-  const handleScan = async () => {
-    const scannedValue = scanValue.trim();
+  const handleScan = async (scanned) => {
+    const scannedValue = scanned.trim();
+   
     console.log("scannedValue",scannedValue)
    if (!scannedValue) return;
   
@@ -163,16 +162,16 @@ const TraceabilityLog = () => {
      }
    
      const childPartC = match[1];  // e.g., 157042 or CF72760
-     const picketQt = Number(match[2]); // e.g., 400
+     const lineQt = Number(match[2]); // e.g., 400
    
-     if (isNaN(picketQt)) {
+     if (isNaN(lineQt)) {
        toast.error("Invalid line quantity");
        setScanValue("");
        return;
      }
    
      console.log("childPartCode:", childPartC);
-     console.log("lineQty:", picketQt);
+     console.log("lineQty:", lineQt);
     
     try {
       // API call
@@ -180,17 +179,14 @@ const TraceabilityLog = () => {
         tenantId:tenantId,
         branchCode:branchCode,
         childPartCode:childPartC,
-        lineQty:picketQt,
-        plsId:pickListCodeVerrify,
+        lineQty:lineQt,
+        picklistCode:pickListCodeVerrify,
       });
   
       if (response.data==="success") {
-        // Update table
-        const updatedData = traceabilityData.map((r) =>
-          r.childPartCode === childPartC ? { ...r, lineQty: Number(r.lineQty) + Number(picketQt) } : r
-        );
-        setTraceabilityData(updatedData);
-       // setFinalSubmitAndPartialSubmitDatas(updatedData);
+      
+        fetchTraceabilityData(selectedWorkOrder);
+       
         toast.success("Scan processed successfully!");
       } else {
         toast.error(response.data);
@@ -200,6 +196,28 @@ const TraceabilityLog = () => {
     }
   
     setScanValue(""); // reset input
+  };
+
+  const inputRef = useRef(null);
+  const scanTimerRef = useRef(null);
+
+  const processScan = async () => {
+    const value = form.getFieldValue("scan")?.trim();
+
+    if (!value) return;
+
+    const response = await handleScan(value); // API call
+
+    form.resetFields(["scan"]); // clear only this field
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = () => {
+    clearTimeout(scanTimerRef.current);
+
+    scanTimerRef.current = setTimeout(() => {
+      processScan();
+    }, 300);
   };
 
 
@@ -266,7 +284,7 @@ const TraceabilityLog = () => {
 
         <div style={{ textAlign: "center", marginTop: 30 }}>
           <Button type="primary" onClick={handleSubmit} style={{ marginRight: 16 }}>Submit</Button>
-          <Button type="default" onClick={handleCancel}>Cancel</Button>
+          <Button type="primary" onClick={handleCancel}>Cancel</Button>
         </div>
       </Card>
 
@@ -285,18 +303,34 @@ const TraceabilityLog = () => {
   style={{ marginTop: 24 }}
 >
   {/* Scan Input */}
-  <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
-    <label htmlFor="scan" style={{ minWidth: "30px" }}>Scan:</label>
-    <Input
-      id="scanInput"
-      placeholder="Scan or paste barcode here"
-      value={scanValue}
-      onChange={(e) => setScanValue(e.target.value)}
-      onBlur={handleScan}
-      style={{ marginBottom: "10px", width: "500px" }}
-      autoFocus
-    />
-  </div>
+  <Form form={form} autoComplete="off">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          margin: "10px 0"
+        }}
+      >
+        <label htmlFor="scanInput" style={{ minWidth: "30px" }}>
+          Scan:
+        </label>
+
+        <Form.Item name="scan" style={{ margin: 0 }}>
+          <Input
+            id="scanInput"
+            placeholder="Scan or paste barcode here"
+            ref={inputRef}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            style={{
+              marginBottom: "10px",
+              width: "500px"
+            }}
+          />
+        </Form.Item>
+      </div>
+    </Form>
 
   <div className="table-wrapper">
     {/* Table Header */}
@@ -323,6 +357,8 @@ const TraceabilityLog = () => {
         const allComplete = op.lineTraceabilityList.every(
           (part) => part.storeQty > 0 && part.lineQty === part.storeQty
         );
+       //console.log("lineQt",part.lineQty)
+       
         const opColor = allComplete ? "#52c41a" : "#d9d9d9"; // green or gray
 
         return (
@@ -394,7 +430,28 @@ const TraceabilityLog = () => {
     </div>
 
     {/* Next Process Button */}
+    {(() => {
+ if (!traceabilityData || traceabilityData.length === 0) return null;
+
+ // Flatten all child part rows into one list
+ const allParts = traceabilityData.flatMap(op =>
+   op.lineTraceabilityList.map(item => ({
+     lineQty: Number(item.lineQty || 0),
+     storeQty: Number(item.storeQty || 0)
+   }))
+ );
+
+ const hasZero = allParts.some(p => p.lineQty === 0);
+ const someFilledNotFull = allParts.some(p => p.lineQty > 0 && p.lineQty < p.storeQty);
+ const allCompleted = allParts.every(p => p.storeQty > 0 && p.lineQty === p.storeQty);
+
+// ✅ Rule Implementation
+// Partial enabled ONLY if someFilledNotFull AND NO ZERO VALUES
+const showNextProcess  = !(someFilledNotFull && !hasZero);
+
+      return (
     <div style={{ textAlign: "center", marginTop: 30 }}>
+      {(!showNextProcess || allCompleted) && (
       <Button
         type="primary"
         style={{
@@ -409,7 +466,10 @@ const TraceabilityLog = () => {
       >
         Next Process
       </Button>
+    )}
     </div>
+      );
+ })()}
   </div>
 </Card>
 

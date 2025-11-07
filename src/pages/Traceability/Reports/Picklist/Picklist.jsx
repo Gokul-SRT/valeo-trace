@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useRef,useState,useEffect } from "react";
 import { Table, Button, Modal, Card, Select, Input, Form, Row, Col, Progress, Space,DatePicker } from "antd";
 import { PlusCircleOutlined, PrinterOutlined, DownloadOutlined } from "@ant-design/icons";
 import { FaQrcode } from "react-icons/fa";
@@ -312,26 +312,12 @@ const partiallyCompletedColumns = [
 
 
  // Handle scanning
- const handleScan = async () => {
-  const scannedValue = scanValue.trim();
-  console.log("scannedValue",scannedValue)
+ const handleScan = async (scanned) => {
+  const scannedValue = scanned.trim();
+    console.log("scannedValue",scannedValue)
  if (!scannedValue) return;
 
-  // Extract values using regex for your barcode format
- /* const match = scannedValue.match(/(\d{18})(\d{6})\s+(\d+)/);
-  
-  if (!match) {
-    toast.error("Invalid barcode format");
-    setScanValue("");
-    return;
-  }
-
-
-  const childPartC = match[2]; // 157042
-  const picketQt = Number(match[3]); // 400
-  */
-
-
+ 
    // Regex: ignore anything before the 18-digit prefix
    const match = scannedValue.match(/\d{18}([A-Z0-9]+)\s+(\d+)/i);
 
@@ -423,7 +409,29 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
 
 }
 
+//scanning process
 
+const inputRef = useRef(null);
+  const scanTimerRef = useRef(null);
+
+  const processScan = async () => {
+    const value = form.getFieldValue("scan")?.trim();
+
+    if (!value) return;
+
+    const response = await handleScan(value); // API call
+
+    form.resetFields(["scan"]); // clear only this field
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = () => {
+    clearTimeout(scanTimerRef.current);
+
+    scanTimerRef.current = setTimeout(() => {
+      processScan();
+    }, 300);
+  };
   
   // States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -476,27 +484,7 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
     { title: "Picked Qty(Nos)", dataIndex: "pickedQty", key: "pickedQty", align: "right", },
     
 
-  /*{
-      title: "Status",
-      dataIndex: "pickedQty",
-      key: "pickedQty",
-      render: (value, record) => {
-       
-        if (value === 0 || value === null || value === undefined) {
-          return <FaQrcode size={18} color="#002147" />;
-        } else {
-          const percent=(value / record.picklistQty) * 100; 
-          return (
-            <Progress
-              percent={percent}
-              percentPosition={{ align: "start", type: "inner" }}
-              size={[100, 20]}
-              strokeColor="#B7EB8F"
-            />
-          );
-        }
-      },
-    },*/
+  
 
     {
       title: "Status",
@@ -530,7 +518,7 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
       dataIndex: "itemType",
       key: "itemType",
       render: (_, record) =>
-        record.itemType === "A2" || record.itemType === "B2" || record.itemType === "A1"? (
+        record.itemType === "A2" || record.itemType === "B2"? (
           <Button
             type="link"
             icon={<PrinterOutlined />}
@@ -568,16 +556,7 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
       dataIndex: "plsCode",
       key: "plsCode",
       render: (text, record) => (
-        // <Button
-        //   type="link"
-        //   onClick={() => {
-        //     setShowLineFeeder(true);
-        //     setCurrentPage("main");
-        //   }}
-        //   style={{ padding: 0 }}
-        // >
-        //   {text}
-        // </Button>
+        
 
         <Button
         type="link"
@@ -754,21 +733,6 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
       {currentPage === "main" && (
         <>
 
-          {/* {renderPicklist("Pending Picklist", pendingData, pendingColumns, true)} */}
-
-
-           {/* Render table: Default Completed or Filtered */}
-          {/* {isFilterApplied ? (
-         renderPicklist(
-          selectedStatus.toLowerCase() === "completed" ? "Completed Picklist" : "Pending Picklist",
-          tableData,
-          getColumns()
-        )
-      ) : (
-        renderPicklist("Completed Picklist", completedDatas, completedColumns)
-      )} */}
-
-
         {isFilterApplied ? (
          renderPicklist(
          // getTableTitle(), // table title based on selected status
@@ -789,35 +753,46 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
           {showLineFeeder && (
             <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Picklist Verification">
                <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
-      <label htmlFor="scan" style={{ minWidth: "30px" }}>Scan:</label>
-      <Input
-        id="scanInput"
-        placeholder="Scan or paste barcode here"
-        value={scanValue}
-        onChange={(e) => setScanValue(e.target.value)}
-        onBlur={handleScan} // Enter key triggers API
-        style={{ marginBottom: "10px", width: "500px" }}
-        autoFocus
-      />
+               <Form form={form} autoComplete="off">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          margin: "10px 0"
+        }}
+      >
+        <label htmlFor="scanInput" style={{ minWidth: "30px" }}>
+          Scan:
+        </label>
+
+        <Form.Item name="scan" style={{ margin: 0 }}>
+          <Input
+            id="scanInput"
+            placeholder="Scan or paste barcode here"
+            ref={inputRef}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            style={{
+              marginBottom: "10px",
+              width: "500px"
+            }}
+          />
+        </Form.Item>
+      </div>
+    </Form>
        </div>
               <Table
                 columns={lineFeederColumns}
                 dataSource={lineFeederDatas}
                 bordered
                 pagination={{ pageSize: 10 }}
-                //rowKey="plsdId"
+                
               />
-              {/* <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
-                <Button type="primary" style={{ marginRight: "5px" }}>Allow to Partially Transfer</Button>
-                <Button type="primary">Submit</Button>
-              </div> */}
+             
 
 {(() => {
-      // const hasZero = lineFeederDatas.some(item => !item.pickedQty || item.pickedQty === 0);
-      // const allFull = lineFeederDatas.every(item => item.pickedQty >= item.picklistQty);
-      // const someFilledNotFull = !hasZero && lineFeederDatas.some(item =>
-      //   item.pickedQty > 0 && item.pickedQty < item.picklistQty
-      // );
+      
 
       const pickedNumbers = lineFeederDatas.map(item => Number(item.pickedQty || 0));
       const picklistNumbers = lineFeederDatas.map(item => Number(item.picklistQty || 0));
@@ -865,12 +840,7 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
             </Card>
           )}
 
-          {/* Hide Completed Picklist when Line Feeder is open */}
-          {/* {!showLineFeeder && (
-            <div style={{ marginTop: "30px" }}>
-              {renderPicklist("Completed Picklist", completedData, completedColumns)}
-            </div>
-          )} */}
+          
         </>
       )}
 
