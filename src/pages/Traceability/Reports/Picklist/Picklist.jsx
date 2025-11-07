@@ -670,8 +670,8 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
             <Form.Item label="Product" name="product" rules={[{ required: true }]}>
                 <Select placeholder="Select a Product">
                 {productList.map((productLis) => (
-                <Option key={productLis.productCode} value={productLis.productCode || productLis.productDesc}>
-                  {productLis.productDesc}
+                <Option key={productLis.productCode} value={productLis.productCode}>
+                  {productLis.productCode+"-"+productLis.productDesc}
                 </Option>
               ))}
                 </Select>
