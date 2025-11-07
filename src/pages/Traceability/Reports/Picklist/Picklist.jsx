@@ -37,11 +37,13 @@ const [scanValue, setScanValue] = useState("");
 const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = useState([]);
 
 
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  // const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  // const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  // const employeeId = store.get("employeeId")
+
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
   const employeeId = store.get("employeeId")
-
-
   
 
 
@@ -293,7 +295,15 @@ const partiallyCompletedColumns = [
   ), },
   { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
   { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-  { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+  {
+    title: "Created Date",
+    dataIndex: "plsLogDate",
+    key: "plsLogDate",
+    render: (text) => {
+      if (!text) return "-";
+      return dayjs(text).format("DD-MMM-YYYY"); 
+    },
+  },
   { title: "Shift", dataIndex: "shift", key: "shift" },
   { title: "Status", dataIndex: "status", key: "status" },
   { title: "Partially Issued Qty", dataIndex: "partialQty", key: "partialQty" },
@@ -389,6 +399,8 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
   plsId:item.plsId,
   plsdId:item.plsdId,
   isCompleted:isCompleted,
+  tenantId:tenantId,
+  branchCode:branchCode,
 
 }))
 
@@ -460,8 +472,8 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
 
     { title: "Child Part Code", dataIndex: "childPartCode", key: "childPartCode" },
     { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
-    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
-    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
+    { title: "Picklist Qty(Nos)", dataIndex: "picklistQty", key: "picklistQty", align: "right", },
+    { title: "Picked Qty(Nos)", dataIndex: "pickedQty", key: "pickedQty", align: "right", },
     
 
   /*{
@@ -579,7 +591,16 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
     },
     { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
     { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    //{ title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    {
+      title: "Created Date",
+      dataIndex: "plsLogDate",
+      key: "plsLogDate",
+      render: (text) => {
+        if (!text) return "-";
+        return dayjs(text).format("DD-MMM-YYYY"); 
+      },
+    },
     { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
    // { title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
@@ -595,7 +616,15 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
     { title: "Picklist Code", dataIndex: "plsCode", key: "plsCode" },
     { title: "Product", dataIndex: "plsgFgProdCode", key: "plsgFgProdCode" },
     { title: "Line", dataIndex: "lineCode", key: "lineCode" },
-    { title: "Created Date", dataIndex: "plsLogDate", key: "plsLogDate" },
+    {
+      title: "Created Date",
+      dataIndex: "plsLogDate",
+      key: "plsLogDate",
+      render: (text) => {
+        if (!text) return "-";
+        return dayjs(text).format("DD-MMM-YYYY"); 
+      },
+    },
     { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
     //{ title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
@@ -807,25 +836,27 @@ const finalSubmitDatas=finalSubmit.map((item)=>({
         <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
           
           {/* Allow Partial Transfer Button */}
+          {!disablePartial && (
           <Button
             type="primary"
             style={{ marginRight: "5px" }}
             onClick={()=>submitCompleted("2")}
             //disabled={!someFilledNotFull}
-            disabled={disablePartial}
+            //disabled={disablePartial}
           >
             Allow to Partially Transfer
           </Button>
-
+      )}
           {/* Submit Button */}
+          {allFull && (
           <Button
             type="primary"
             onClick={()=>submitCompleted("3")}
             disabled={!allFull}
           >
-            Submit
+            Completed
           </Button>
-
+         )}
         </div>
       );
     })()}
