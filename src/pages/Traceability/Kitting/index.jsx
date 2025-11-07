@@ -20,7 +20,7 @@ const { Option } = Select;
 
 
 
-const ChildPartValidationCard = ({ kitPartCode, kitPartDesc }) => {
+const ChildPartValidationCard = ({ plsCode, childPartCode,kitPartCode, kitPartDesc }) => {
   const [scannedValue, setScannedValue] = useState("");
   const [indicatorColor, setIndicatorColor] = useState("#d9d9d9");
 
@@ -35,8 +35,8 @@ const ChildPartValidationCard = ({ kitPartCode, kitPartDesc }) => {
 
     try {
       const payload = {
-        scannedCode: scanned,           // full scanned barcode
-        subChildPartCode: kitPartCode,  // expected part code
+        scannedCode: scanned,          
+        subChildPartCode: kitPartCode,  
       };
 
       const response = await serverApi.post("/verifySubChildPart", payload);
@@ -69,12 +69,16 @@ const ChildPartValidationCard = ({ kitPartCode, kitPartDesc }) => {
       style={{ marginRight: 8 }}
     >
       <Form layout="vertical">
-        <Form.Item label="Child Part Code">
-          <Input value={kitPartCode} disabled />
+        <Form.Item label="PLS Code">
+          <Input value={plsCode} disabled />
         </Form.Item>
 
-        <Form.Item label="Child Part Description">
-          <Input value={kitPartDesc} disabled />
+        <Form.Item label="Child Part Code ">
+          <Input value={childPartCode} disabled />
+        </Form.Item>
+        
+        <Form.Item label="Sub Child Part">
+          <Input value={kitPartCode} disabled />
         </Form.Item>
 
         <Form.Item label="Scan Barcode">
@@ -285,6 +289,8 @@ const Kitting = () => {
           {childParts.map((part, i) => (
             <Col span={8} key={i}>
               <ChildPartValidationCard
+                plsCode={selectedPlan}
+                childPartCode={selectedPart?.childPartCode || "--"}
                 kitPartCode={part.kitPartCode || "--"}
                 kitPartDesc={part.kitPartDesc || "--"}
               />
