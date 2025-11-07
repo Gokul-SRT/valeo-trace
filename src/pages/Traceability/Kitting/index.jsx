@@ -18,6 +18,98 @@ import QRModal from "../../Traceability/Reports/Picklist/QRModal";
 
 const { Option } = Select;
 
+
+
+const ChildPartValidationCard = ({ kitPartCode, kitPartDesc }) => {
+  const [scannedValue, setScannedValue] = useState("");
+  const [indicatorColor, setIndicatorColor] = useState("#d9d9d9");
+
+  const handleScanChange = async (e) => {
+    const scanned = e.target.value.trim();
+    setScannedValue(scanned);
+
+    if (!scanned) {
+      setIndicatorColor("#d9d9d9");
+      return;
+    }
+
+    try {
+      const payload = {
+        scannedCode: scanned,           // full scanned barcode
+        subChildPartCode: kitPartCode,  // expected part code
+      };
+
+      const response = await serverApi.post("/verifySubChildPart", payload);
+      const resData = response.data;
+
+      // Handle success response
+      if (resData.responseCode === "200" && resData.responseDataMessage === "true") {
+        setIndicatorColor("green");
+        message.success("Child part successfully verified");
+      } else {
+        setIndicatorColor("red");
+        message.error(resData.responseDataMessage || "Verification failed");
+      }
+    } catch (error) {
+      console.error("Error verifying child part:", error);
+      message.error("Error verifying child part");
+      setIndicatorColor("red");
+    }
+  };
+
+  return (
+    <Card
+      size="small"
+      title={`Child Part ${kitPartCode} - ${kitPartDesc}`}
+      headStyle={{
+        backgroundColor: "#f0f0f0",
+        color: "#001F3E",
+        fontSize: "12px",
+      }}
+      style={{ marginRight: 8 }}
+    >
+      <Form layout="vertical">
+        <Form.Item label="Child Part Code">
+          <Input value={kitPartCode} disabled />
+        </Form.Item>
+
+        <Form.Item label="Child Part Description">
+          <Input value={kitPartDesc} disabled />
+        </Form.Item>
+
+        <Form.Item label="Scan Barcode">
+          <Input
+            placeholder="Scan barcode here"
+            onBlur={handleScanChange}
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Button
+            style={{
+              backgroundColor: indicatorColor,
+              borderColor: indicatorColor,
+              color: "white",
+              cursor: "default",
+            }}
+            block
+            disabled
+          >
+            {indicatorColor === "green"
+              ? "✓ Childpart Code and Scan Barcode Match"
+              : indicatorColor === "red"
+              ? "✗ Childpart Code and Scan Barcode No Match"
+              : "Waiting for Scan"}
+          </Button>
+        </Form.Item>
+      </Form>
+    </Card>
+  );
+};
+
+
+
+
 const Kitting = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showTable, setShowTable] = useState(false);
@@ -31,14 +123,13 @@ const Kitting = () => {
   const [tableData, setTableData] = useState([]);
   const [loadingParts, setLoadingParts] = useState(false);
 
-  // ✅ New states for QR Modal
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState(null);
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
 
-  /** Fetch available Work Orders / Plans */
+  // Fetch available Work Orders / Plans
   const fetchPlans = async () => {
     setLoadingPlans(true);
     try {
@@ -65,7 +156,7 @@ const Kitting = () => {
     fetchPlans();
   }, []);
 
-  /** Fetch Kitting Part Details */
+  // Fetch Kitting Part Details
   const fetchKittingPartDetails = async (planCode) => {
     setLoadingParts(true);
     try {
@@ -101,14 +192,14 @@ const Kitting = () => {
     }
   };
 
-  /** Handle form submit (fetch table) */
+  // Handle form submit (fetch table)
   const handleSubmit = async (values) => {
     setSelectedPlan(values.plan);
     setShowKittingCard(false);
     await fetchKittingPartDetails(values.plan);
   };
 
-  /** When a row (part) is clicked */
+  // When a row (part) is clicked
   const handlePartClick = async (record) => {
     setSelectedPart(record);
     setShowKittingCard(true);
@@ -147,7 +238,7 @@ const Kitting = () => {
     }, 100);
   };
 
-  /** Table Columns */
+  // Table Columns
   const columns = [
     { title: "PLSD ID", dataIndex: "plsdId", key: "plsdId" },
     {
@@ -157,11 +248,7 @@ const Kitting = () => {
       render: (text, record) => (
         <a
           onClick={() => handlePartClick(record)}
-          style={{
-            color: "#1890ff",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
+          style={{ color: "#1890ff", cursor: "pointer", textDecoration: "underline" }}
         >
           {text}
         </a>
@@ -173,12 +260,12 @@ const Kitting = () => {
       key: "childPartDesc",
     },
     { title: "Item Type", dataIndex: "itemType", key: "itemType" },
-    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty" },
-    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty" },
+    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty", align: "right" },
+    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty", align: "right" },
     { title: "Product Code", dataIndex: "productCode", key: "productCode" },
   ];
 
-  /** Render Child Part Card */
+  // Render Child Part Cards using the separate validation card component
   const renderChildPartCard = () => {
     const childParts = selectedPart?.childParts || [];
 
@@ -195,41 +282,14 @@ const Kitting = () => {
     return (
       <Col xs={24}>
         <Row gutter={[8, 8]}>
-          {childParts.map((part, i) => {
-            const kitPartCode = part.kitPartCode || `--`;
-            const kitPartDesc = part.kitPartDesc || `--`;
-            const inputId = `scannedCountInput_${kitPartCode}_${i}`;
-
-            return (
-              <Col span={8} key={i}>
-                <Card
-                  size="small"
-                  title={`Child Part ${kitPartCode}-${kitPartDesc}`}
-                  headStyle={{
-                    backgroundColor: "#f0f0f0",
-                    color: "#001F3E",
-                    fontSize: "12px",
-                  }}
-                  style={{ marginRight: 8 }}
-                >
-                  <Form layout="vertical">
-                    <Form.Item label="Scan Barcode">
-                      <Input
-                        onFocus={() => {
-                          console.log("Input focused");
-                          
-                        }}
-                      />
-                    </Form.Item>
-
-                    <Form.Item label="Scanned Count">
-                      <Input type="number" placeholder="Enter count" />
-                    </Form.Item>
-                  </Form>
-                </Card>
-              </Col>
-            );
-          })}
+          {childParts.map((part, i) => (
+            <Col span={8} key={i}>
+              <ChildPartValidationCard
+                kitPartCode={part.kitPartCode || "--"}
+                kitPartDesc={part.kitPartDesc || "--"}
+              />
+            </Col>
+          ))}
         </Row>
 
         {/* Label Print Button */}
@@ -261,10 +321,7 @@ const Kitting = () => {
     <>
       {/* Top Form */}
       <div style={{ marginBottom: 16 }}>
-        <Card
-          title="Kitting Process"
-          headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
-        >
+        <Card title="Kitting Process" headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}>
           <Form layout="vertical" form={form} onFinish={handleSubmit}>
             <Row gutter={16}>
               <Col span={6}>
@@ -279,11 +336,7 @@ const Kitting = () => {
                   name="plan"
                   rules={[{ required: true, message: "Please select a plan" }]}
                 >
-                  <Select
-                    placeholder="Select Work Order"
-                    loading={loadingPlans}
-                    allowClear
-                  >
+                  <Select placeholder="Select Work Order" loading={loadingPlans} allowClear>
                     {planOptions.map((plan) => (
                       <Option key={plan.code} value={plan.code}>
                         {plan.code}
@@ -298,11 +351,7 @@ const Kitting = () => {
               <Button
                 type="primary"
                 htmlType="submit"
-                style={{
-                  backgroundColor: "#001F3E",
-                  borderColor: "#001F3E",
-                  color: "white",
-                }}
+                style={{ backgroundColor: "#001F3E", borderColor: "#001F3E", color: "white" }}
               >
                 Submit
               </Button>
@@ -368,7 +417,6 @@ const Kitting = () => {
           layout="vertical"
           form={labelForm}
           onFinish={(values) => {
-            // ✅ Open QRModal instead of just success message
             setSelectedQrData(values.childPartCode || "QR123");
             setIsModalVisible(false);
             setQrModalVisible(true);
@@ -414,10 +462,7 @@ const Kitting = () => {
           </Row>
 
           <Row justify="end">
-            <Button
-              onClick={() => setIsModalVisible(false)}
-              style={{ marginRight: 8 }}
-            >
+            <Button onClick={() => setIsModalVisible(false)} style={{ marginRight: 8 }}>
               Cancel
             </Button>
             <Button
@@ -431,7 +476,7 @@ const Kitting = () => {
         </Form>
       </Modal>
 
-      {/* ✅ QR Preview Modal */}
+      {/* QR Preview Modal */}
       <QRModal
         qrModalVisible={qrModalVisible}
         setQrModalVisible={setQrModalVisible}
