@@ -1,5 +1,5 @@
 // src/Service/EquipmentMstService.js
-import serverApi from "../../CommonserverApi";
+import serverApi from "../../../CommonserverApi";
 
 const EquipMstdropdown = async () => {
   try {
