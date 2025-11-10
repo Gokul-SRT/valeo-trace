@@ -9,6 +9,7 @@ import PacketQtyMaster from "../PacketQtyMaster/PacketQtyMaster";
 import TypeMaster from "../TypeMaster/TypeMaster";
 import ChildPartToTypeMasterMapping from "../ChildPartToTypeMasterMapping/ChildPartToTypeMasterMapping";
 import ProductChildPartGrid from "../ProductToChildpartMap";
+import CycleTimeMaster from '../CycleTimeMaster/CycleTimeMaster';
 
 const Traceability = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
@@ -26,6 +27,7 @@ const Traceability = () => {
       { id: 8, name: "Type Master", value: TypeMaster },
       { id: 9, name: "Child Part To Type Master Mapping", value: ChildPartToTypeMasterMapping },
       { id: 9, name: "Product To Child Part Mapping", value: ProductChildPartGrid },
+      { id: 10, name: "Cycle Time Master ", value: CycleTimeMaster },
     ],
   };
 
