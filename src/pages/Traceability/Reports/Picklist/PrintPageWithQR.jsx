@@ -4,8 +4,9 @@ import QRModal from "./QRModal";
 
 const PickListPrintMain = () => {
   const [selectType] = useState("A2");
-  const [selectedPrintPart, setSelectedPrintPart] = useState("Part-001");
+  const [selectedPrintPart, setSelectedPrintPart] = useState("");
   const [qrData, setQrData] = useState(null);
+  const [printB2Data, setPrintB2Data] = useState([]);
   const [showPrintDetails, setShowPrintDetails] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState("");
@@ -13,9 +14,9 @@ const PickListPrintMain = () => {
 
   // Example table data and columns
   const printB2Columns = [
-    { title: "S.No", dataIndex: "sno", key: "sno" },
-    { title: "Part Name", dataIndex: "partName", key: "partName" },
-    { title: "Quantity", dataIndex: "quantity", key: "quantity" },
+    { title: "S.No",dataIndex: "sno", key: "sno"  },
+    { title: "Part Name", dataIndex: "childPartDesc", key: "childPartDesc" },
+    { title: "Quantity", dataIndex: "binCountQty", key: "binCountQty" },
     {
       title: "Action",
       key: "action",
@@ -25,10 +26,10 @@ const PickListPrintMain = () => {
     },
   ];
 
-  const printB2Data = [
-    { sno: 1, partName: "Part-001", quantity: 10, qrValue: "QR001" },
-    { sno: 2, partName: "Part-002", quantity: 20, qrValue: "QR002" },
-  ];
+  // const printB2Data = [
+  //   { sno: 1, partName: "Part-001", quantity: 10, qrValue: "QR001" },
+  //   { sno: 2, partName: "Part-002", quantity: 20, qrValue: "QR002" },
+  // ];
 
   const handleViewQR = (qrValue) => {
     setSelectedQrData(qrValue);
@@ -73,7 +74,8 @@ const PickListPrintMain = () => {
         setCurrentPage={() => {}}
         handleQrBlur={handleQrBlur}
         printB2Columns={printB2Columns}
-        printB2Data={printB2Data}
+        printB2Data={printB2Data} // pass data
+        setPrintB2Data={setPrintB2Data} // pass setter
         handleViewQR={handleViewQR}
       />
 

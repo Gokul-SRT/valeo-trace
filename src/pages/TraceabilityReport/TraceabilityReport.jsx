@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Select, Input, Button, Table, Switch, Row, Col, Spin } from 'antd';
-
+import {backendService} from '../../service/ToolServerApi'
+import store from 'store';
+import { toast } from 'react-toastify';
 const { Option } = Select;
 
 const Traceabilityreports = () => {
@@ -25,7 +27,8 @@ const Traceabilityreports = () => {
   const [showTraceReportHeader, setShowTraceReportHeader] = useState(false);
   const [showQualityTable, setShowQualityTable] = useState(false);
   const [showEmployeeTable, setShowEmployeeTable] = useState(false);
-
+  const tenantId = store.get('tenantId');
+  const branchCode = store.get('branchCode');
   // Initialize component
   useEffect(() => {
     initializeData();
@@ -174,7 +177,32 @@ const Traceabilityreports = () => {
     fetchReportData();
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    const reqdata = {
+      key: 'Traceability_report',
+      branchCode,
+      serialNo:"SN001",  
+      tenantId,
+    }
+    const response = await backendService({
+      requestPath: 'getTraceabilityReportPdf',
+      requestData: reqdata,
+    })
+
+    if (response.responseCode === '200') {
+      if (response?.responseData[0]?.fileContent !== null) {
+        const link = document.createElement('a')
+        link.href = `data:application/octet-stream;base64,${response?.responseData[0]?.fileContent}`
+        link.download = response?.fileName
+        link.click()
+        toast.success(response.responseMessage)
+      } else {
+        toast.error(response.responseMessage)
+      }
+    }
+  };
+
+  const exportToPDFss = () => {
     // Simulate PDF export
     alert("PDF export functionality would be implemented here");
   };
@@ -339,7 +367,7 @@ const Traceabilityreports = () => {
             Cancel
           </Button>
           {toggleValue && (
-            <Button onClick={exportToPDF}>
+            <Button onClick={exportToPDFss}>
               Download
             </Button>
           )}
