@@ -5,11 +5,13 @@ import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
 import "./style.css";
 import store from "store";
+import { useNavigate } from "react-router-dom";
 
 const { Option } = Select;
 const { Text } = Typography;
 
 const TraceabilityLog = () => {
+  const navigate = useNavigate(); 
   const [form] = Form.useForm();
   const [lines, setLines] = useState([]);
   const [products, setProducts] = useState([]);
@@ -25,8 +27,10 @@ const TraceabilityLog = () => {
   const [scanValue, setScanValue] = useState("");
   const [pickListCodeVerrify, setPickListCodeVerrify] = useState("");
 
+  const [selectedLineDesc, setSelectedLineDesc] = useState("");
+  const [selectedProductDesc, setSelectedProductDesc] = useState("");
 
-
+  const [isProcess, setIsProcess] = useState(0);
 
   const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
@@ -115,6 +119,10 @@ const TraceabilityLog = () => {
       if (response?.data?.length>0) {
         setTraceabilityData(response.data);
         setShowDetails(true);
+        // For Next Process
+        const firstOp = response.data[0];
+        const firstLineTrace = firstOp?.lineTraceabilityList?.[0];
+        setIsProcess(String(firstLineTrace?.isProcess ?? "0"));
       } else {
         setTraceabilityData([]);
         setShowDetails(false);
@@ -137,7 +145,9 @@ const TraceabilityLog = () => {
 
   const handleCancel = () => {
     setSelectedLine(null);
+    setSelectedLineDesc("");
     setSelectedProduct(null);
+    setSelectedProductDesc("");
     setSelectedWorkOrder(null);
     setProducts([]);
     setWorkOrders([]);
@@ -232,7 +242,11 @@ const TraceabilityLog = () => {
     <Select
       placeholder="Select Line"
       value={selectedLine}
-      onChange={setSelectedLine}
+      onChange={(value) => {
+        setSelectedLine(value);
+        const line = lines.find(l => l.lineMstCode === value);
+        setSelectedLineDesc(line ? line.lineMstDesc : "");
+      }}
       style={{ width: "100%", marginTop: 4 }}
     >
       {lines.map(line => (
@@ -250,7 +264,11 @@ const TraceabilityLog = () => {
     <Select
       placeholder="Select Product"
       value={selectedProduct}
-      onChange={setSelectedProduct}
+      onChange={(value) => {
+        setSelectedProduct(value);
+        const product = products.find(p => p.productCode === value);
+        setSelectedProductDesc(product ? product.prodDesc : "");
+      }}
       style={{ width: "100%", marginTop: 4 }}
       disabled={!selectedLine}
     >
@@ -451,7 +469,8 @@ const showNextProcess  = !(someFilledNotFull && !hasZero);
 
       return (
     <div style={{ textAlign: "center", marginTop: 30 }}>
-      {(!showNextProcess || allCompleted) && (
+      {/* {(!showNextProcess || allCompleted) && ( */}
+      {isProcess === "0" && (!showNextProcess || allCompleted) && (
       <Button
         type="primary"
         style={{
@@ -462,7 +481,47 @@ const showNextProcess  = !(someFilledNotFull && !hasZero);
           height: "40px",
           borderRadius: "6px",
         }}
-        onClick={() => console.log("Next Process Clicked")}
+        // onClick={() => navigate("/nextProcess",{
+        //   state:{
+        //     lineCode:selectedLine,
+        //     modelId:selectedProduct,
+        //     lineDesc:selectedLineDesc,
+        //     productDesc:selectedProductDesc,
+        //   }
+        // })}
+
+        onClick={async () => {
+          try {
+            // 1️ Call update API before navigation
+            const response = await serverApi.post("updateLineTraceabilityIsProcess", {
+              tenantId,
+              branchCode,
+              picklistCode: pickListCodeVerrify, // or whatever identifies this record
+              isProcess: "1",          // example status update
+            });
+      
+            if (response.data === "success") {
+              // 2️ Update table in UI (refresh data)
+              await fetchTraceabilityData(pickListCodeVerrify);
+      
+              toast.success("Traceability status updated successfully!");
+      
+              // 3️ Navigate to next process screen
+              navigate("/nextProcess", {
+                state: {
+                  lineCode: selectedLine,
+                  modelId: selectedProduct,
+                  lineDesc: selectedLineDesc,
+                  productDesc: selectedProductDesc,
+                },
+              });
+            } else {
+              toast.error(response.data || "Failed to update traceability status.");
+            }
+          } catch (error) {
+            toast.error("Error updating traceability status");
+          }
+        }}
       >
         Next Process
       </Button>

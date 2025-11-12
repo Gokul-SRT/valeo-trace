@@ -163,12 +163,7 @@ const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = u
         pickDate: date.format("YYYY-MM-DD"),
         status:status,
       });
-    //  const res = response.data;
-      /*if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-        setTableData(res.responseData);
-      } else {
-        setTableData([]);
-      }*/
+    
       const resData = response.data;
       if (resData != null && Array.isArray(resData.pendingScanHdrList) && resData.pendingScanHdrList.length > 0) {
         setTableData(resData.pendingScanHdrList);
@@ -181,11 +176,7 @@ const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = u
     }
   };
 
-  // const getColumns = () => {
-  //   if (selectedStatus.toLowerCase() === "completed") return completedColumns;
-  //   if (selectedStatus === "Partially Completed") return partiallyCompletedColumns;
-  //   return pendingColumns;
-  // };
+  
 
 
   const getColumns = () => {
@@ -273,17 +264,6 @@ const partiallyCompletedColumns = [
   { title: "S.No", key: "sno",render:(text,reord,index)=>index+1},
   { title: "Picklist Code", dataIndex: "plsCode", key: "plsCode", 
      render: (text, record) => (
-    // <Button
-    //   type="link"
-    //   onClick={() => {
-    //     setShowLineFeeder(true);
-    //     setCurrentPage("main");
-    //   }}
-    //   style={{ padding: 0 }}
-    // >
-    //   {text}
-    // </Button>
-
     <Button
     type="link"
     onClick={() => handlePicklistClick(record.plsId)}
@@ -307,7 +287,7 @@ const partiallyCompletedColumns = [
   { title: "Shift", dataIndex: "shift", key: "shift" },
   { title: "Status", dataIndex: "status", key: "status" },
   { title: "Partially Issued Qty", dataIndex: "partialQty", key: "partialQty" },
-  //{ title: "Issue Status", dataIndex: "issueStatus", key: "issueStatus" },
+ 
 ];
 
 
@@ -499,7 +479,8 @@ const inputRef = useRef(null);
           return <FaQrcode size={18} color="#002147" />;
         }
     
-        const percent = (picked / total) * 100;
+       // const percent = (picked / total) * 100;
+        const percent = Math.round((picked / total) * 100);
     
         return (
           <Progress
