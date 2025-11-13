@@ -9,21 +9,23 @@ import {
   Button,
   Table,
   DatePicker,
-  Modal,
   message,
 } from "antd";
+import moment from "moment";
 import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
 import serverApi from "../../../serverAPI";
 import QRModal from "../../Traceability/Reports/Picklist/QRModal";
+import store from "store";
 
 const { Option } = Select;
 
-const ChildPartValidationCard = ({ 
-  plsCode, 
-  childPartCode, 
-  kitPartCode, 
-  kitPartDesc, 
-  onValidationComplete 
+// Child Part Validation Card
+const ChildPartValidationCard = ({
+  plsCode,
+  childPartCode,
+  kitPartCode,
+  kitPartDesc,
+  onValidationComplete,
 }) => {
   const [scannedValue, setScannedValue] = useState("");
   const [indicatorColor, setIndicatorColor] = useState("#d9d9d9");
@@ -36,37 +38,61 @@ const ChildPartValidationCard = ({
     if (!scanned) {
       setIndicatorColor("#d9d9d9");
       setIsVerified(false);
-      if (onValidationComplete) onValidationComplete(kitPartCode, false);
+      if (onValidationComplete) onValidationComplete(kitPartCode, false, "");
       return;
     }
 
+    const tenantId = store.get("tenantId");
+    const branchCode = store.get("branchCode");
+
     try {
       const payload = {
-        scannedCode: scanned,          
-        subChildPartCode: kitPartCode,  
+        scannedCode: scanned,
+        subChildPartCode: kitPartCode,
+        plsCode,
+        childPartCode,
+        tenantId,
+        branchCode,
       };
 
-      const response = await serverApi.post("/verifySubChildPart", payload);
-      const resData = response.data;
+      const verifyResponse = await serverApi.post(
+        "/verifySubChildPart",
+        payload
+      );
+      const verifyData = verifyResponse.data;
 
-      // Handle success response
-      if (resData.responseCode === "200" && resData.responseDataMessage === "true") {
+      if (
+        verifyData.responseCode === "200" &&
+        verifyData.responseDataMessage === "true"
+      ) {
         setIndicatorColor("green");
         setIsVerified(true);
         message.success("Child part successfully verified");
-        if (onValidationComplete) onValidationComplete(kitPartCode, true);
+        if (onValidationComplete) onValidationComplete(kitPartCode, true, scanned);
+
+        const insertResponse = await serverApi.post(
+          "/insertSubChildPart",
+          payload
+        );
+        const insertData = insertResponse.data;
+        if (insertData.responseCode === "200") {
+          message.success("Scan record inserted successfully!");
+        } else {
+          message.error(
+            insertData.responseDataMessage || "Failed to insert scan record"
+          );
+        }
       } else {
         setIndicatorColor("red");
         setIsVerified(false);
-        message.error(resData.responseDataMessage || "Verification failed");
-        if (onValidationComplete) onValidationComplete(kitPartCode, false);
+        message.error(verifyData.responseDataMessage || "Verification failed");
+        if (onValidationComplete) onValidationComplete(kitPartCode, false, scanned);
       }
     } catch (error) {
-      console.error("Error verifying child part:", error);
-      message.error("Error verifying child part");
+      message.error("Error verifying or inserting scan");
       setIndicatorColor("red");
       setIsVerified(false);
-      if (onValidationComplete) onValidationComplete(kitPartCode, false);
+      if (onValidationComplete) onValidationComplete(kitPartCode, false, scanned);
     }
   };
 
@@ -85,15 +111,12 @@ const ChildPartValidationCard = ({
         <Form.Item label="PLS Code">
           <Input value={plsCode} disabled />
         </Form.Item>
-
         <Form.Item label="Child Part Code ">
           <Input value={childPartCode} disabled />
         </Form.Item>
-        
         <Form.Item label="Sub Child Part">
           <Input value={kitPartCode} disabled />
         </Form.Item>
-
         <Form.Item label="Scan Barcode">
           <Input
             placeholder="Scan barcode here"
@@ -102,7 +125,6 @@ const ChildPartValidationCard = ({
             onBlur={handleScanChange}
           />
         </Form.Item>
-
         <Form.Item>
           <Button
             style={{
@@ -126,85 +148,248 @@ const ChildPartValidationCard = ({
   );
 };
 
-const LabelPrintCard = ({ 
-  childPartCode, 
-  planQty, 
-  onPrint, 
-  onCancel 
+// Consignee Details Card with scanResultsTable on top
+const ConsigneeDetailsCard = ({
+  childPartCode,
+  childPartDesc,
+  planQty,
+  onPrint,
+  onCancel,
+  scanResultsTable,
 }) => {
   const [form] = Form.useForm();
-  const [scanCount, setScanCount] = useState("");
-  const [labelValue, setLabelValue] = useState("");
+  const [binQty, setBinQty] = useState(100);
+  const [labelCount, setLabelCount] = useState(0);
 
-  const handleScanCountChange = (e) => {
+  const getCurrentDate = () => moment();
+
+  const calculateLabelCount = (planQtyValue, binQtyValue) => {
+    const planQtyNum = Number(planQtyValue) || 0;
+    const binQtyNum = Number(binQtyValue) || 100;
+    if (binQtyNum === 0) return 0;
+    return Math.ceil(planQtyNum / binQtyNum);
+  };
+
+  const handleBinQtyChange = (e) => {
     const value = e.target.value;
-    setScanCount(value);
-    
-    const scanCountNum = Number(value) || 0;
-    const planNum = Number(planQty) || 0;
-    const calculatedLabel = scanCountNum > 0 ? Number((planNum / scanCountNum).toFixed(2)) : 0;
-    setLabelValue(calculatedLabel.toString());
-    form.setFieldsValue({ label: calculatedLabel.toString() });
+    const newBinQty = value ? Number(value) : 100;
+    setBinQty(newBinQty);
+    const planQtyValue = form.getFieldValue("quantity") || planQty;
+    const newLabelCount = calculateLabelCount(planQtyValue, newBinQty);
+    setLabelCount(newLabelCount);
+    form.setFieldsValue({ labelCount: newLabelCount });
+  };
+
+  const handleQuantityChange = (e) => {
+    const value = e.target.value;
+    const quantity = value ? Number(value) : 0;
+    const newLabelCount = calculateLabelCount(quantity, binQty);
+    setLabelCount(newLabelCount);
+    form.setFieldsValue({ labelCount: newLabelCount });
   };
 
   const handlePrint = () => {
-    form.validateFields().then(values => {
-      if (onPrint) {
-        onPrint({
-          childPartCode: values.childPartCode,
-          scanCount: values.scanCount,
-          label: values.label
-        });
-      }
-    });
+    form.validateFields()
+      .then((values) => {
+        if (onPrint) {
+          const formattedValues = {
+            ...values,
+            deliveryDate:
+              values.deliveryDate && moment.isMoment(values.deliveryDate)
+                ? values.deliveryDate.format("YYYY-MM-DD")
+                : null,
+            manufacturingDate:
+              values.manufacturingDate && moment.isMoment(values.manufacturingDate)
+                ? values.manufacturingDate.format("YYYY-MM-DD")
+                : null,
+            expirationDate:
+              values.expirationDate && moment.isMoment(values.expirationDate)
+                ? values.expirationDate.format("YYYY-MM-DD")
+                : null,
+            binQty: binQty,
+            labelCount: labelCount,
+            childPartCode: childPartCode,
+            childPartDesc: childPartDesc,
+          };
+          onPrint(formattedValues);
+        }
+      })
+      .catch(() => {
+        message.error("Please fill all required fields correctly");
+      });
   };
+
+  useEffect(() => {
+    const initialLabelCount = calculateLabelCount(planQty, binQty);
+    setLabelCount(initialLabelCount);
+    form.setFieldsValue({
+      consignee: "Amalgamations Valeo Clutch Private - Chennai",
+      storageLocation: "CH35",
+      deliveryDate: getCurrentDate(),
+      manufacturingDate: getCurrentDate(),
+      description: childPartDesc || "Delivery Service",
+      quantity: planQty || 0,
+      itemNo: `000000000000${childPartCode}`,
+      binQty: binQty,
+      labelCount: initialLabelCount,
+    });
+  }, [planQty, binQty, form, childPartCode, childPartDesc]);
 
   return (
     <Card
-      title="Label Printing"
+      title="Consignee Details"
       headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
       style={{ marginTop: 16 }}
     >
-      <Form
-        layout="vertical"
-        form={form}
-        initialValues={{
-          childPartCode: childPartCode,
-          plan: planQty,
-          scanCount: "",
-          label: ""
-        }}
-      >
+      {/* Show scan results table here */}
+      {scanResultsTable}
+
+      <Form layout="vertical" form={form}>
         <Row gutter={[16, 8]}>
-          <Col span={6}>
-            <Form.Item label="Child Part Code" name="childPartCode">
+          {/* First Row */}
+          <Col span={8}>
+            <Form.Item label="Consignee" name="consignee">
               <Input disabled />
             </Form.Item>
           </Col>
-
-          <Col span={6}>
-            <Form.Item label="Plan" name="plan">
+          <Col span={8}>
+            <Form.Item label="Storage Location" name="storageLocation">
               <Input disabled />
             </Form.Item>
           </Col>
-
-          <Col span={6}>
+          <Col span={8}>
             <Form.Item
-              label="Scan Count"
-              name="scanCount"
-              rules={[{ required: true, message: "Please enter scan count" }]}
+              label="Delivery No"
+              name="deliveryNo"
+              rules={[{ required: true, message: "Please enter delivery number" }]}
             >
-              <Input
-                placeholder="Enter scan count"
-                value={scanCount}
-                onChange={handleScanCountChange}
+              <Input placeholder="Enter delivery number" />
+            </Form.Item>
+          </Col>
+
+          {/* Second Row */}
+          <Col span={8}>
+            <Form.Item label="Item No. Customer" name="itemNo">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item 
+              label="Delivery Date" 
+              name="deliveryDate"
+              rules={[{ required: true, message: "Please select delivery date" }]}
+            >
+              <DatePicker 
+                style={{ width: "100%" }} 
+                format="YYYY-MM-DD"
+              />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item 
+              label="Manufacturing Date" 
+              name="manufacturingDate"
+              rules={[{ required: true, message: "Please select manufacturing date" }]}
+            >
+              <DatePicker 
+                style={{ width: "100%" }} 
+                format="YYYY-MM-DD"
               />
             </Form.Item>
           </Col>
 
+          {/* Third Row */}
+          <Col span={8}>
+            <Form.Item label="Expiration Date" name="expirationDate">
+              <DatePicker 
+                style={{ width: "100%" }} 
+                format="YYYY-MM-DD"
+              />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Description" name="description">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item 
+              label="Quantity" 
+              name="quantity"
+              rules={[{ required: true, message: "Please enter quantity" }]}
+            >
+              <Input 
+                type="number"
+                style={{ width: "100%" }}
+                placeholder="Enter quantity" 
+                onChange={handleQuantityChange}
+                min={0}
+              />
+            </Form.Item>
+          </Col>
+
+          {/* Fourth Row - Bin Qty and Label Count */}
           <Col span={6}>
-            <Form.Item label="Label" name="label">
-              <Input value={labelValue} disabled />
+            <Form.Item 
+              label="Bin Qty" 
+              name="binQty"
+              rules={[{ required: true, message: "Please enter bin quantity" }]}
+            >
+              <Input 
+                type="number"
+                style={{ width: "100%" }}
+                placeholder="Enter bin quantity"
+                defaultValue={100}
+                onChange={handleBinQtyChange}
+                min={1}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item label="Label Count" name="labelCount">
+              <Input 
+                style={{ width: "100%" }}
+                value={labelCount}
+                disabled
+              />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item 
+              label="Package Reference No" 
+              name="packageReferenceNo"
+              rules={[{ required: true, message: "Please enter package reference no" }]}
+            >
+              <Input placeholder="Enter package reference no" />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item 
+              label="Supplier Number" 
+              name="supplierNumber"
+              rules={[{ required: true, message: "Please enter supplier number" }]}
+            >
+              <Input placeholder="Enter supplier number" />
+            </Form.Item>
+          </Col>
+
+          {/* Fifth Row */}
+          <Col span={6}>
+            <Form.Item 
+              label="Pkg No." 
+              name="pkgNo"
+              rules={[{ required: true, message: "Please enter package number" }]}
+            >
+              <Input placeholder="Enter package number" />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item 
+              label="Batch No." 
+              name="batchNo"
+              rules={[{ required: true, message: "Please enter batch number" }]}
+            >
+              <Input placeholder="Enter batch number" />
             </Form.Item>
           </Col>
         </Row>
@@ -217,8 +402,9 @@ const LabelPrintCard = ({
             type="primary"
             onClick={handlePrint}
             style={{ backgroundColor: "#001F3E", color: "white" }}
+            disabled={labelCount === 0}
           >
-            Print
+            Print {labelCount > 0 ? `${labelCount} Label(s)` : "Labels"}
           </Button>
         </Row>
       </Form>
@@ -226,12 +412,13 @@ const LabelPrintCard = ({
   );
 };
 
+// Main Kitting Component
 const Kitting = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [showTable, setShowTable] = useState(false);
   const [showKittingCard, setShowKittingCard] = useState(false);
-  const [showLabelCard, setShowLabelCard] = useState(false);
+  const [showConsigneeCard, setShowConsigneeCard] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
   const [form] = Form.useForm();
   const [planOptions, setPlanOptions] = useState([]);
@@ -239,31 +426,22 @@ const Kitting = () => {
   const [tableData, setTableData] = useState([]);
   const [loadingParts, setLoadingParts] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState({});
+  const [scannedValues, setScannedValues] = useState({});
   const [allChildPartsVerified, setAllChildPartsVerified] = useState(false);
-  const [formChanged, setFormChanged] = useState(false);
-
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState(null);
+  const [childPartCountList, setChildPartCountList] = useState([]);
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
 
-  // Fetch available Work Orders / Plans
   const fetchPlans = async () => {
     setLoadingPlans(true);
     try {
       const response = await PicklistWODropdown(tenantId, branchCode);
       const data = Array.isArray(response.data) ? response.data : response;
-      setPlanOptions(
-        data.map((item) => ({
-          code: item.plsCode,
-        }))
-      );
-      if (data.length === 0) {
-        message.info("No work orders found");
-      }
+      setPlanOptions(data.map((item) => ({ code: item.plsCode })));
     } catch (err) {
-      console.error("Error fetching work order plans:", err);
       message.error("Failed to load work orders");
       setPlanOptions([]);
     } finally {
@@ -275,21 +453,12 @@ const Kitting = () => {
     fetchPlans();
   }, []);
 
-  // Fetch Kitting Part Details
   const fetchKittingPartDetails = async (planCode) => {
     setLoadingParts(true);
     try {
       const payload = { tenantId, plscode: planCode };
       const response = await serverApi.post("/getKittingPartDetails", payload);
       const data = response.data.responseData || response.data || [];
-
-      if (!Array.isArray(data) || data.length === 0) {
-        message.info("No Kitting part details found for this plan");
-        setTableData([]);
-        setShowTable(false);
-        return;
-      }
-
       const formatted = data.map((item, index) => ({
         key: index + 1,
         plsdId: item.plsdId,
@@ -300,50 +469,27 @@ const Kitting = () => {
         pickedQty: item.pickedQty,
         productCode: item.productCode,
       }));
-
       setTableData(formatted);
       setShowTable(true);
     } catch (error) {
-      console.error("Error fetching kitting details:", error);
       message.error("Failed to fetch Kitting part details");
     } finally {
       setLoadingParts(false);
     }
   };
 
-  // Handle form submit (fetch table)
   const handleSubmit = async (values) => {
     setSelectedPlan(values.plan);
     setSelectedDate(values.date);
-    setShowKittingCard(false);
-    setShowLabelCard(false);
-    setVerificationStatus({});
-    setAllChildPartsVerified(false);
-    setFormChanged(false);
     await fetchKittingPartDetails(values.plan);
   };
 
-  // Handle form field changes
-  const handleFormChange = (changedValues, allValues) => {
-    // Check if either date or plan has changed from the current submitted values
-    const isDateChanged = changedValues.date && selectedDate !== changedValues.date;
-    const isPlanChanged = changedValues.plan && selectedPlan !== changedValues.plan;
-    
-    if (isDateChanged || isPlanChanged) {
-      setFormChanged(true);
-      // Hide all cards when form changes
-      setShowTable(false);
-      setShowKittingCard(false);
-      setShowLabelCard(false);
-    }
-  };
-
-  // When a row (part) is clicked
   const handlePartClick = async (record) => {
     setSelectedPart(record);
     setShowKittingCard(true);
-    setShowLabelCard(false);
+    setShowConsigneeCard(false);
     setVerificationStatus({});
+    setScannedValues({});
     setAllChildPartsVerified(false);
 
     try {
@@ -352,89 +498,99 @@ const Kitting = () => {
         childPartCode: record.childPartCode,
         branchCode,
       };
-      const response = await serverApi.post(
-        "/getKittingChildPartDetails",
-        payload
-      );
-
+      const response = await serverApi.post("/getKittingChildPartDetails", payload);
       const rawData = response.data?.responseData;
       const data = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
-
       if (data.length > 0) {
         setSelectedPart((prev) => ({
           ...prev,
           childParts: data,
         }));
-        
-        // Initialize verification status for all child parts
         const initialStatus = {};
-        data.forEach(part => {
+        data.forEach((part) => {
           initialStatus[part.kitPartCode] = false;
         });
         setVerificationStatus(initialStatus);
       } else {
         message.info("No child part details found for this part");
-        setVerificationStatus({});
       }
     } catch (error) {
-      console.error("Error fetching child part details:", error);
       message.error("Failed to fetch child part details");
-      setVerificationStatus({});
     }
-
-    setTimeout(() => {
-      document
-        .getElementById("kitting-card")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
   };
 
-  // Handle validation completion from child parts
-  const handleValidationComplete = (kitPartCode, isVerified) => {
-    setVerificationStatus(prev => ({
+  const handleValidationComplete = (kitPartCode, isVerified, scannedValue) => {
+    setVerificationStatus((prev) => ({
       ...prev,
-      [kitPartCode]: isVerified
+      [kitPartCode]: isVerified,
     }));
+    if (isVerified && scannedValue) {
+      setScannedValues((prev) => ({
+        ...prev,
+        [kitPartCode]: scannedValue,
+      }));
+    } else if (!isVerified) {
+      setScannedValues((prev) => ({
+        ...prev,
+        [kitPartCode]: "",
+      }));
+    }
   };
 
-  // Check if all child parts are verified
   useEffect(() => {
-    if (selectedPart?.childParts && Object.keys(verificationStatus).length > 0) {
+    if (
+      selectedPart?.childParts &&
+      Object.keys(verificationStatus).length > 0
+    ) {
       const allVerified = selectedPart.childParts.every(
-        part => verificationStatus[part.kitPartCode] === true
+        (part) => verificationStatus[part.kitPartCode] === true
       );
       setAllChildPartsVerified(allVerified);
-      
       if (allVerified) {
-        message.success("All child parts have been verified successfully!");
+        message.success("All child parts verified successfully!");
       }
     }
   }, [verificationStatus, selectedPart]);
 
-  // Handle label print button click
-  const handleLabelPrintClick = () => {
+  const handleConsigneeClick = async() => {
     if (!allChildPartsVerified) return;
-    setShowLabelCard(true);
-    
-    setTimeout(() => {
-      document
-        .getElementById("label-print-card")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    setShowConsigneeCard(true);
+    try {
+      const payload = {
+        tenantId,
+        childPartCode: selectedPart.childPartCode,
+        branchCode,
+        plsCode: selectedPlan
+      };
+      
+      const response = await serverApi.post("/getSubAssyCount", payload);
+      console.log(response);
+      const rawData = response.data?.responseData;
+      if (rawData.length > 0) {
+        console.log(rawData);
+        setChildPartCountList(rawData);
+      } else {
+        setChildPartCountList([]);
+        message.info("Error");
+      }
+    } catch (error) {
+      message.error("Failed to fetch count");
+    }
+  };
+  
+
+  const handleConsigneePrint = (printData) => {
+    if (printData && printData.childPartCode) {
+      setSelectedQrData(printData.childPartCode);
+      setQrModalVisible(true);
+      message.success(`Printing ${printData.labelCount} label(s) for ${printData.childPartCode}`);
+    } else {
+      message.error("Invalid print data");
+    }
   };
 
-  // Handle label print submission
-  const handleLabelPrint = (printData) => {
-    setSelectedQrData(printData.childPartCode || "QR123");
-    setQrModalVisible(true);
-  };
+  const handleConsigneeCardClose = () => setShowConsigneeCard(false);
 
-  // Handle label card close
-  const handleLabelCardClose = () => {
-    setShowLabelCard(false);
-  };
-
-  // Table Columns
   const columns = [
     { title: "PLSD ID", dataIndex: "plsdId", key: "plsdId" },
     {
@@ -444,27 +600,42 @@ const Kitting = () => {
       render: (text, record) => (
         <a
           onClick={() => handlePartClick(record)}
-          style={{ color: "#1890ff", cursor: "pointer", textDecoration: "underline" }}
+          style={{
+            color: "#1890ff",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
         >
           {text}
         </a>
       ),
     },
-    {
-      title: "Child Part Description",
-      dataIndex: "childPartDesc",
-      key: "childPartDesc",
-    },
+    { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
     { title: "Item Type", dataIndex: "itemType", key: "itemType" },
     { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty", align: "right" },
     { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty", align: "right" },
     { title: "Product Code", dataIndex: "productCode", key: "productCode" },
   ];
 
-  // Render Child Part Cards using the separate validation card component
+  // Build scan results table for ConsigneeDetailsCard, only after completion
+  const scanResultsTable = childPartCountList && childPartCountList.length > 0 ? (
+    <Card title="Sub Child Part Scan Results" style={{ marginBottom: 24 }}>
+      <Table
+        dataSource={childPartCountList}
+        columns={[
+          { title: "Kitting Child Part Code", dataIndex: "kittingChildPartCode", key: "kittingChildPartCode" },
+          { title: "Total Count", dataIndex: "totalCount", key: "totalCount" },
+        ]}
+        pagination={false}
+        bordered
+        size="small"
+      />
+    </Card>
+  ) : null;
+
+  // Render child part cards and Completed button
   const renderChildPartCard = () => {
     const childParts = selectedPart?.childParts || [];
-
     if (childParts.length === 0) {
       return (
         <Col xs={24}>
@@ -474,7 +645,6 @@ const Kitting = () => {
         </Col>
       );
     }
-
     return (
       <Col xs={24}>
         <Row gutter={[8, 8]}>
@@ -490,23 +660,22 @@ const Kitting = () => {
             </Col>
           ))}
         </Row>
-
-        {/* Label Print Button */}
         <Row style={{ marginTop: 16 }}>
           <Col span={24}>
             <Button
-              style={{ 
-                backgroundColor: allChildPartsVerified ? "#001F3E" : "#d9d9d9", 
+              style={{
+                backgroundColor: allChildPartsVerified ? "#001F3E" : "#d9d9d9",
                 color: allChildPartsVerified ? "white" : "#666666",
-                borderColor: allChildPartsVerified ? "#001F3E" : "#d9d9d9"
               }}
               block
-              onClick={handleLabelPrintClick}
-              disabled={!allChildPartsVerified}
+              onClick={handleConsigneeClick}
+              // disabled={!allChildPartsVerified}
             >
-              {allChildPartsVerified 
-                ? "Label Print" 
-                : `Complete ${Object.values(verificationStatus).filter(Boolean).length}/${childParts.length} Child Parts`}
+              {allChildPartsVerified
+                ? "Completed"
+                : `Complete ${
+                    Object.values(verificationStatus).filter(Boolean).length
+                  }/${childParts.length} Child Parts`}
             </Button>
           </Col>
         </Row>
@@ -516,47 +685,29 @@ const Kitting = () => {
 
   return (
     <>
-      {/* Top Form */}
       <div style={{ marginBottom: 16 }}>
-        <Card title="Kitting Process" headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}>
-          <Form 
-            layout="vertical" 
-            form={form} 
-            onFinish={handleSubmit}
-            onValuesChange={handleFormChange}
-          >
+        <Card
+          title="Kitting Process"
+          headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
+        >
+          <Form layout="vertical" form={form} onFinish={handleSubmit}>
             <Row gutter={16}>
               <Col span={6}>
-                <Form.Item 
-                  label="Date" 
+                <Form.Item
+                  label="Date"
                   name="date"
                   rules={[{ required: true, message: "Please select date" }]}
                 >
-                  <DatePicker 
-                    style={{ width: "100%" }} 
-                    onChange={(date) => {
-                      setFormChanged(true);
-                    }}
-                  />
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item
                   label="WO/Plan"
                   name="plan"
                   rules={[{ required: true, message: "Please select a plan" }]}
                 >
-                  <Select 
-                    placeholder="Select Work Order" 
-                    loading={loadingPlans} 
-                    allowClear
-                    onChange={(value) => {
-                      if (value) {
-                        setFormChanged(true);
-                      }
-                    }}
-                  >
+                  <Select placeholder="Select Work Order" loading={loadingPlans} allowClear>
                     {planOptions.map((plan) => (
                       <Option key={plan.code} value={plan.code}>
                         {plan.code}
@@ -566,53 +717,44 @@ const Kitting = () => {
                 </Form.Item>
               </Col>
             </Row>
-
-            <Row justify="center" style={{ marginTop: 8 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{ backgroundColor: "#001F3E", borderColor: "#001F3E", color: "white" }}
-              >
-                Submit
-              </Button>
-              <Button
-                style={{ marginLeft: 8,backgroundColor: "#001F3E", borderColor: "#001F3E", color: "white" }}
-                onClick={() => {
-                  form.resetFields();
-                  setShowTable(false);
-                  setShowKittingCard(false);
-                  setShowLabelCard(false);
-                  setVerificationStatus({});
-                  setAllChildPartsVerified(false);
-                  setFormChanged(false);
-                  setSelectedPlan(null);
-                  setSelectedDate(null);
-                }}
-              >
-                Cancel
-              </Button>
+            <Row justify="center" style={{ marginTop: 8 }} gutter={16}>
+              <Col>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  style={{
+                    backgroundColor: "#001F3E",
+                    borderColor: "#001F3E",
+                    color: "white",
+                  }}
+                >
+                  Submit
+                </Button>
+              </Col>
+              <Col>
+                <Button
+                  style={{
+                    backgroundColor: "#001F3E",
+                    borderColor: "#001F3E",
+                    color: "white",
+                  }}
+                  onClick={() => {
+                    form.resetFields();
+                    setShowTable(false);
+                    setShowKittingCard(false);
+                    setShowConsigneeCard(false);
+                    setSelectedPart(null);
+                    message.info("Search form reset");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </Col>
             </Row>
-
-            {/* Warning message when form is changed */}
-            {/* {formChanged && (
-              <Row style={{ marginTop: 8 }}>
-                <Col span={24}>
-                  <div style={{ 
-                    backgroundColor: '#fffbe6', 
-                    border: '1px solid #ffe58f', 
-                    padding: '8px 12px', 
-                    borderRadius: '4px',
-                    textAlign: 'center'
-                  }}>
-                  </div>
-                </Col>
-              </Row>
-            )} */}
           </Form>
         </Card>
       </div>
 
-      {/* Table */}
       {showTable && (
         <div style={{ marginBottom: 16 }}>
           <Card
@@ -630,7 +772,6 @@ const Kitting = () => {
         </div>
       )}
 
-      {/* Child Part Card */}
       {showKittingCard && (
         <div id="kitting-card">
           <Card
@@ -647,19 +788,19 @@ const Kitting = () => {
         </div>
       )}
 
-      {/* Label Print Card - Shows as new card instead of modal */}
-      {showLabelCard && (
-        <div id="label-print-card">
-          <LabelPrintCard
+      {showConsigneeCard && (
+        <div id="consignee-card">
+          <ConsigneeDetailsCard
             childPartCode={selectedPart?.childPartCode || ""}
+            childPartDesc={selectedPart?.childPartDesc || ""}
             planQty={selectedPart?.picklistQty || 0}
-            onPrint={handleLabelPrint}
-            onCancel={handleLabelCardClose}
+            onPrint={handleConsigneePrint}
+            onCancel={handleConsigneeCardClose}
+            scanResultsTable={scanResultsTable}
           />
         </div>
       )}
 
-      {/* QR Preview Modal */}
       <QRModal
         qrModalVisible={qrModalVisible}
         setQrModalVisible={setQrModalVisible}
