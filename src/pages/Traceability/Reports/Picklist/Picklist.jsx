@@ -290,7 +290,7 @@ const partiallyCompletedColumns = [
  
 ];
 
-
+/*
  // Handle scanning
  const handleScan = async (scanned) => {
   const scannedValue = scanned.trim();
@@ -346,6 +346,134 @@ const partiallyCompletedColumns = [
 
   setScanValue(""); // reset input
 };
+
+*/
+
+
+// Handle scanning
+const handleScan = async (scanned) => {
+ /* const scannedValue = scanned; // don't trim, spaces are important
+  console.log("lentgh",scannedValue.length)
+
+  if (scannedValue.length > 104) {
+    toast.error("Invalid barcode length");
+    return;
+  }
+
+  // Extract fields based on fixed positions
+  const invoiceNumber = scannedValue.substring(0, 16);   // 0 to 16
+  const childPartCode = scannedValue.substring(16, 34); // 16 to 34
+  const vendorCode = scannedValue.substring(34, 41);    // 34 to 41
+  const pickedQtyStr = scannedValue.substring(41, 49);  // 41 to 49
+  const labelNumber = scannedValue.substring(49, 67);   // 49 to 67
+  const batchNumber = scannedValue.substring(67, 79);   // 67 to 79
+
+  // Convert quantity to number
+  const pickedQty = Number(pickedQtyStr.trim());
+
+  if (isNaN(pickedQty)) {
+    toast.error("Invalid quantity");
+    return;
+  }
+
+  console.log("Invoice Number:", invoiceNumber);
+  console.log("Child Part Code:", childPartCode);
+  console.log("Vendor Code:", vendorCode);
+  console.log("Picked Qty:", pickedQty);
+  console.log("Label Number:", labelNumber);
+  console.log("Batch Number:", batchNumber);
+
+  // Check child part in list
+  const matchedChildPart = lineFeederDatas.find(cp => childPartCode.includes(cp.childPartCode));
+
+  if (!matchedChildPart) {
+    toast.error("Child part not found");
+    return;
+  }
+
+  console.log("Matched Child Part:", matchedChildPart);
+ */
+
+
+
+
+  const scannedValue = scanned; // spaces are important, do not trim
+  console.log("Length:", scannedValue.length);
+
+  // Check if barcode is at least the expected length
+  if (scannedValue.length > 104) {
+    toast.error("Invalid barcode length");
+    return;
+  }
+
+  // Extract fields based on fixed positions (spaces included)
+  const invoiceNumber   = scannedValue.substring(0, 17);  // 0 - 16 (17 chars)
+  const childPartCode   = scannedValue.substring(17, 35); // 17 - 34 (18 chars)
+  const vendorCode      = scannedValue.substring(35, 42); // 35 - 41 (7 chars)
+  const pickedQtyStr    = scannedValue.substring(42, 50); // 42 - 49 (8 chars)
+  const labelNumber     = scannedValue.substring(50, 68); // 50 - 67 (18 chars)
+  const batchNumber     = scannedValue.substring(68, 80); // 68 - 79 (12 chars)
+  const deliveryDate    = scannedValue.substring(80, 88); // 80 - 87 (8 chars)
+  const productionDate  = scannedValue.substring(88, 96); // 88 - 95 (8 chars)
+  const expirationDate  = scannedValue.substring(96, 104);// 96 - 103 (8 chars)
+
+  // Convert quantity to number safely
+  const pickedQty = Number(pickedQtyStr.trim());
+  if (isNaN(pickedQty)) {
+    toast.error("Invalid quantity");
+    return;
+  }
+
+  console.log("Invoice Number:", invoiceNumber);
+  console.log("Child Part Code:", childPartCode);
+  console.log("Vendor Code:", vendorCode);
+  console.log("Picked Qty:", pickedQty);
+  console.log("Label Number:", labelNumber);
+  console.log("Batch Number:", batchNumber);
+  console.log("Delivery Date:", deliveryDate);
+  console.log("Production Date:", productionDate);
+  console.log("Expiration Date:", expirationDate);
+
+  // Check if child part exists in your list
+  const matchedChildPart = lineFeederDatas.find(cp =>
+    childPartCode.includes(cp.childPartCode)
+  );
+
+  if (!matchedChildPart) {
+    toast.error("Child part not found");
+    return;
+  }
+
+  console.log("Matched Child Part:", matchedChildPart.childPartCode);
+  
+  try {
+    // API call
+    const response = await serverApi.post("updatePickedQtywithChildPartCode", {
+      tenantId:tenantId,
+      branchCode:branchCode,
+      childPartCode:matchedChildPart.childPartCode,
+      pickedQty:pickedQty,
+      plsId:pickListCodeVerrify,
+    });
+
+    if (response.data==="success") {
+      // Update table
+      const updatedData = lineFeederDatas.map((r) =>
+        r.childPartCode === matchedChildPart.childPartCode ? { ...r, pickedQty: Number(r.pickedQty) + Number(pickedQty) } : r
+      );
+      setLineFeederDatas(updatedData);
+      setFinalSubmitAndPartialSubmitDatas(updatedData);
+      toast.success("Scan processed successfully!");
+    } else {
+      toast.error(response.data);
+    }
+  } catch (err) {
+    toast.error("Error while processing scan");
+  }
+
+  setScanValue(""); // reset input
+};
+
 
 
 

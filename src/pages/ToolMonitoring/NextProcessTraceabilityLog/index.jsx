@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Table, Card, Button, Input, Form, Modal } from "antd";
+import { Table, Card, Button, Input, Form, Modal, Spin  } from "antd";
 import "antd/dist/reset.css";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
@@ -82,6 +82,12 @@ const NextProcessTraceabilityLog = () => {
     console.log(toolNo, "toolNo");
 
     const row = toolMonitorDetails.find((item) => item.toolNo === toolNo);
+if(!row){
+  toast.error("ToolNo Not Found");
+
+  return;
+}
+
     if (row) {
       // setScannedIds(previoues=> new Set([...previoues,row.toolNo]))
       setScannedIds((prev) => {

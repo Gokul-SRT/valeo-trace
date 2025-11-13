@@ -16,6 +16,7 @@ import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
 import serverApi from "../../../serverAPI";
 import QRModal from "../../Traceability/Reports/Picklist/QRModal";
 import store from "store";
+import { toast } from "react-toastify";
 
 const { Option } = Select;
 
@@ -160,6 +161,7 @@ const ConsigneeDetailsCard = ({
   const [form] = Form.useForm();
   const [binQty, setBinQty] = useState(100);
   const [labelCount, setLabelCount] = useState(0);
+  const [quantity, setQuantity] = useState(planQty || 0);
 
   const getCurrentDate = () => moment();
 
@@ -179,15 +181,36 @@ const ConsigneeDetailsCard = ({
     setLabelCount(newLabelCount);
     form.setFieldsValue({ labelCount: newLabelCount });
   };
-
+/*
   const handleQuantityChange = (e) => {
     const value = e.target.value;
-    const quantity = value ? Number(value) : 0;
-    const newLabelCount = calculateLabelCount(quantity, binQty);
+    const quantitys = value ? Number(value) : 0;
+    const planQtyNum = Number(planQty) || 0;
+    
+    if (quantitys > planQtyNum) {
+      toast.error("Quantity cannot exceed plan quantity!");
+      setQuantity(""); // clear input
+      setLabelCount(0);
+      form.setFieldsValue({ quantity: "", labelCount: 0 }); // sync Form value
+      return;
+    }
+
+    if (quantitys % Number(binQty) !== 0) {
+      toast.error(`Quantity must be a multiple of ${binQty}`);
+      setQuantity(""); // clear input
+      setLabelCount(0);
+      form.setFieldsValue({ quantity: "", labelCount: 0 }); // sync Form value
+      return;
+    }
+
+    // valid quantity
+    setQuantity(quantitys);
+
+    const newLabelCount = calculateLabelCount(quantitys, binQty);
     setLabelCount(newLabelCount);
     form.setFieldsValue({ labelCount: newLabelCount });
   };
-
+*/
   const handlePrint = () => {
     form.validateFields()
       .then((values) => {
@@ -222,12 +245,14 @@ const ConsigneeDetailsCard = ({
   useEffect(() => {
     const initialLabelCount = calculateLabelCount(planQty, binQty);
     setLabelCount(initialLabelCount);
+    setQuantity(planQty || 0);
     form.setFieldsValue({
       consignee: "Amalgamations Valeo Clutch Private - Chennai",
       storageLocation: "CH35",
       deliveryDate: getCurrentDate(),
       manufacturingDate: getCurrentDate(),
       description: childPartDesc || "Delivery Service",
+      planQty: planQty || 0,
       quantity: planQty || 0,
       itemNo: `000000000000${childPartCode}`,
       binQty: binQty,
@@ -247,17 +272,17 @@ const ConsigneeDetailsCard = ({
       <Form layout="vertical" form={form}>
         <Row gutter={[16, 8]}>
           {/* First Row */}
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item label="Consignee" name="consignee">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item label="Storage Location" name="storageLocation">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item
               label="Delivery No"
               name="deliveryNo"
@@ -268,12 +293,12 @@ const ConsigneeDetailsCard = ({
           </Col>
 
           {/* Second Row */}
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item label="Item No. Customer" name="itemNo">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item 
               label="Delivery Date" 
               name="deliveryDate"
@@ -285,7 +310,7 @@ const ConsigneeDetailsCard = ({
               />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item 
               label="Manufacturing Date" 
               name="manufacturingDate"
@@ -299,7 +324,7 @@ const ConsigneeDetailsCard = ({
           </Col>
 
           {/* Third Row */}
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item label="Expiration Date" name="expirationDate">
               <DatePicker 
                 style={{ width: "100%" }} 
@@ -307,12 +332,18 @@ const ConsigneeDetailsCard = ({
               />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Form.Item label="Description" name="description">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
+            <Form.Item label="Plan Qty" name="planQty">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
             <Form.Item 
               label="Quantity" 
               name="quantity"
@@ -322,7 +353,33 @@ const ConsigneeDetailsCard = ({
                 type="number"
                 style={{ width: "100%" }}
                 placeholder="Enter quantity" 
-                onChange={handleQuantityChange}
+                value={quantity}      // controlled input
+              //  onChange={handleQuantityChange}
+              onChange={(e) => setQuantity(e.target.value)} // just update state while typing
+              onBlur={() => {
+                const quantityNum = Number(quantity);
+                if (quantityNum > planQty) {
+                  toast.error("Quantity cannot exceed plan quantity!");
+                  setQuantity(""); // now clear after typing
+                  form.setFieldsValue({ quantity: "" });
+                  setLabelCount(0);
+                  form.setFieldsValue({ labelCount: 0 });
+                  return;
+                }
+                if (quantityNum % binQty !== 0) {
+                  toast.error(`Quantity must be a multiple of ${binQty}`);
+                  setQuantity("");
+                  form.setFieldsValue({ quantity: "" });
+                  setLabelCount(0);
+                  form.setFieldsValue({ labelCount: 0 });
+                  return;
+                }
+          
+                // valid input
+                const newLabelCount = calculateLabelCount(quantityNum, binQty);
+                setLabelCount(newLabelCount);
+                form.setFieldsValue({ labelCount: newLabelCount });
+              }}
                 min={0}
               />
             </Form.Item>
@@ -342,6 +399,7 @@ const ConsigneeDetailsCard = ({
                 defaultValue={100}
                 onChange={handleBinQtyChange}
                 min={1}
+                disabled
               />
             </Form.Item>
           </Col>
