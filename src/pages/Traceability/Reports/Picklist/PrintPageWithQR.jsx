@@ -21,7 +21,7 @@ const PickListPrintMain = () => {
       title: "Action",
       key: "action",
       render: (_, record) => (
-        <a onClick={() => handleViewQR(record.qrValue)}>View QR</a>
+        <a onClick={() => handleViewQR(record)}>View QR</a>
       ),
     },
   ];
@@ -32,6 +32,7 @@ const PickListPrintMain = () => {
   // ];
 
   const handleViewQR = (qrValue) => {
+    console.log("qrValue",qrValue);
     setSelectedQrData(qrValue);
     setQrModalVisible(true);
   };

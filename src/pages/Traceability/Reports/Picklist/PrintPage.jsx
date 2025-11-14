@@ -42,7 +42,7 @@ const PrintPage = ({
     const value = Number(e.target.value);
     const standardQty = Number(printform.getFieldValue("pickedQty") || 0);
     const binQty = Number(printform.getFieldValue("binQty") || 0);
-    const label = value > 0 ? Math.floor(binQty / value) : 0;
+    const label = value > 0 ? Math.floor(value / binQty) : 0;
     if (value <= standardQty) {
       printform.setFieldsValue({
         addQty: value,

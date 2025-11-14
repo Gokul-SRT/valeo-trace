@@ -100,6 +100,7 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
   const fetchEquipmentDropdown = async () => {
     try {
       const result = await EquipMstdropdown();
+      console.log("Equipment Dropdown Result:", result.data?.responseData);
       if (Array.isArray(result)) {
         const formatted = result.map((item) => ({
           key: item.equipmentId,
@@ -175,6 +176,13 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
           })
           .join(", ");
       },
+    },
+    {
+      headerName: "Gateway Location",
+      field: "gatewayLocation",
+      filter: "agTextColumnFilter",
+
+
     },
   ];
 

@@ -9,16 +9,16 @@ const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData }) => {
     unloadingPoint: "CH35 - -",
     deliveryNoteNo: "TEST",
     itemNo: "PKKT0002",
-    deliveryDate: "D20250417",
-    manufactureDate: "",
+    deliveryDate: `D${selectedQrData?.deliveryDate.replaceAll("-", "")}`,
+    manufactureDate:`P${selectedQrData?.manufacturingDate.replaceAll("-", "")}`,
     expirationDate: "",
-    description: "Packing Kit - AL 380 CA 480X480X90",
-    quantityFilled: "50",
-    packageRefNo: "PKPL0001",
-    supplierNo: "185267",
-    pkgNo: "125",
+    description: selectedQrData?.childPartDesc,
+    quantityFilled: selectedQrData?.binCountQty,
+    packageRefNo:  `PKPL${selectedQrData?.packageNo}`,
+    supplierNo: selectedQrData?.supplierCode,
+    pkgNo: selectedQrData?.packageNo,
     batchNo: "123456",
-    traceability: selectedQrData || "QR123"
+    traceability: selectedQrData?.childPartDesc || "QR123"
   };
 
   return (

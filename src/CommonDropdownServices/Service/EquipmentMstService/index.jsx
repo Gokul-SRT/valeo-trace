@@ -19,7 +19,8 @@ const EquipMstdropdown = async () => {
       },
     });
 
-    const equipInfo = response.data;
+    const equipInfo = response.data?.responseData;
+    console.log("Equipment Master Info:", equipInfo);
 
     if (equipInfo && equipInfo.length > 0) {
       return equipInfo;
