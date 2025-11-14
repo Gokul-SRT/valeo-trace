@@ -1,8 +1,14 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Card, Form, Select, Row, Col, Button, DatePicker } from "antd";
 import dayjs from "dayjs";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import { AgGridReact } from "ag-grid-react";
+import { backendService } from "../../../../service/ToolServerApi";
+import store from "store";
 import "ag-grid-enterprise";
+import { toast } from "react-toastify";
+import moment from "moment";
 
 const { Option } = Select;
 
@@ -11,136 +17,100 @@ const ToolHistoryLog = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [selectedTool, setSelectedTool] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
+  const [toolData, setToolData] = useState([])
+  const [historyData, setHistoryData] = useState([])
   const gridRef = useRef(null);
+  const tenantId = store.get('tenantId')
+  const branchCode = store.get('branchCode')
 
-  // 🔹 Sample Tool List (can later come from API)
-  const chartData = [
-  { toolName: "Greasing Fixture", maxUsage: 100000, usedUsage: 60000 },
-  { toolName: "1st Top Tool", maxUsage: 90000, usedUsage: 70000 },
-  { toolName: "1st Bottom Tool", maxUsage: 120000, usedUsage: 80000 },
-  { toolName: "2nd Top Tool", maxUsage: 80000, usedUsage: 50000 },
-  { toolName: "2nd Bottom Tool", maxUsage: 110000, usedUsage: 85000 },
-  { toolName: "3rd Top Tool", maxUsage: 95000, usedUsage: 75000 },
-  { toolName: "3rd Bottom Tool", maxUsage: 105000, usedUsage: 65000 },
-  { toolName: "Balancing Fixture", maxUsage: 115000, usedUsage: 95000 },
-  { toolName: "Balancing Riveting Fixture", maxUsage: 100000, usedUsage: 80000 },
-  { toolName: "Rebalancing Fixture", maxUsage: 90000, usedUsage: 60000 },
-  { toolName: "R/o Depositor", maxUsage: 95000, usedUsage: 70000 },
-  { toolName: "R/o Lever", maxUsage: 100000, usedUsage: 85000 },
-  { toolName: "R/o Bunk", maxUsage: 120000, usedUsage: 95000 },
-  { toolName: "R/o Probe", maxUsage: 110000, usedUsage: 70000 },
-  { toolName: "R/o Po Plate", maxUsage: 95000, usedUsage: 80000 },
-  { toolName: "EOL Bunk", maxUsage: 100000, usedUsage: 90000 },
-  { toolName: "EOL Top Plate", maxUsage: 95000, usedUsage: 85000 },
-  { toolName: "EOL Bottom Plate", maxUsage: 105000, usedUsage: 95000 },
-  { toolName: "EOL Po Plate", maxUsage: 115000, usedUsage: 100000 },
-  { toolName: "EOL Marking Fixture", maxUsage: 100000, usedUsage: 85000 },
-];
+  useEffect(() => {
+    toolDropDownData()
+  }, []);
 
-// generate tool options dynamically from chartData
-const toolOptions = chartData.map(item => item.toolName);
+  const toolDropDownData = async (e) => {
+    try {
+      const response = await backendService({
+        requestPath: "gettoolmasterdtl",
+        requestData: {
+          lineCode: e || "getAll",
+          tenantId,
+          branchCode,
+          status: "getAll"
+        }
+      });
+      if (response?.responseCode === '200') {
+        const options = response?.responseData.map((item) => ({
+          key: item.toolNo || "",
+          value: item.toolDesc || "",
+        }));
+        setToolData(options);
+      }
+    } catch (error) {
+      console.error("Error fetching master data:", error);
+    }
+  };
 
-  // 🔹 Sample data for Tool History Log Details grid
-const rowData = [
-  {
-    date: "16-Sep-2025",
-    nosProduced: "73839",
-    defects: "-",
-    rectification: "Polished surface",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "19-Sep-2025",
-    nosProduced: "76890",
-    defects: "Minor burrs",
-    rectification: "Deburred manually",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "22-Sep-2025",
-    nosProduced: "79020",
-    defects: "-",
-    rectification: "Checked alignment",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "25-Sep-2025",
-    nosProduced: "80339",
-    defects: "-",
-    rectification: "Replaced insert",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "28-Sep-2025",
-    nosProduced: "81234",
-    defects: "-",
-    rectification: "Cleaned fixture",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "02-Oct-2025",
-    nosProduced: "84560",
-    defects: "Oil leakage",
-    rectification: "Replaced seal",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "05-Oct-2025",
-    nosProduced: "89040",
-    defects: "-",
-    rectification: "Checked lubrication system",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "07-Oct-2025",
-    nosProduced: "90215",
-    defects: "-",
-    rectification: "Tightened clamping bolts",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "09-Oct-2025",
-    nosProduced: "95049",
-    defects: "-",
-    rectification: "Re-aligned tooling",
-    rectifiedBy: "Nagaraj T/M",
-  },
-  {
-    date: "12-Oct-2025",
-    nosProduced: "98773",
-    defects: "Slight misalignment",
-    rectification: "Adjusted jig",
-    rectifiedBy: "Nagaraj T/M",
-  },
-];
+  const handleToolHistoryLog = async () => {
+    const formValues = form.getFieldsValue()
+    console.log(formValues, 'formValues---')
+    try {
+      const response = await backendService({
+        requestPath: 'getToolHistoryLogHdr',
+        requestData: {
+          toolNo: formValues.toolNo,
+          tenantId,
+          branchCode,
+          year: formValues.year ? moment(formValues.year, "YYYY") : null,
+        }
+      })
+      if (response) {
+        if (response.responseCode === '200') {
+          if (response.responseData !== null && response.responseData.length > 0) {
+            const updatedData = response.responseData
+            console.log(updatedData, "updatedData--------")
+            setHistoryData(updatedData)
+          }
+        } else {
+          toast.error(response.responseMessage)
+          setHistoryData([])
+          form.resetFields()
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+
+  }
 
 
   // 🔹 Grid column definitions with sorting & filtering
   const columnDefs = [
     {
       headerName: "Date",
-      field: "date",
+      field: "createdDateTime",
       flex: 1,
       sortable: true,
       filter: "agTextColumnFilter",
+      valueFormatter: (params) =>
+        params.value ? moment(params.value).format("DD-MMM-YYYY") : "",
     },
     {
       headerName: "Components produced in the last run (in Nos.)",
-      field: "nosProduced",
+      field: "usageTillDate",
       flex: 2,
       sortable: true,
       filter: "agTextColumnFilter",
     },
     {
       headerName: "Defects noticed",
-      field: "defects",
+      field: "defectsNoticed",
       flex: 2,
       sortable: true,
       filter: "agTextColumnFilter",
     },
     {
       headerName: "Rectification Done",
-      field: "rectification",
+      field: "rectificationDone",
       flex: 2,
       sortable: true,
       filter: "agTextColumnFilter",
@@ -178,11 +148,128 @@ const rowData = [
   };
 
   // 🔹 CSV Export
-  const handleExport = () => {
-    gridRef.current.api.exportDataAsCsv({
-      fileName: `Tool_History_${selectedTool}_${selectedYear}.csv`,
-    });
+  const handleExport = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Tool History Report");
+
+      // --- Set column widths ---
+      worksheet.getColumn(1).width = 35; // Customer Logo / Date
+      worksheet.getColumn(2).width = 50; // Middleware Screen / Components produced
+      worksheet.getColumn(3).width = 35; // Company Logo / Defects noticed
+      worksheet.getColumn(4).width = 35; // Rectification Done
+      worksheet.getColumn(5).width = 25; // Rectified By T/M
+
+      // --- Row 1 height for logos ---
+      worksheet.getRow(1).height = 65;
+
+      // --- Insert Customer Logo in A1 ---
+      const customerLogoResp = await fetch("/pngwing.com.png");
+      const customerBlob = await customerLogoResp.blob();
+      const customerBuffer = await customerBlob.arrayBuffer();
+      const customerImageId = workbook.addImage({
+        buffer: customerBuffer,
+        extension: "png",
+      });
+      worksheet.addImage(customerImageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 1 } });
+
+      // --- Middleware Screen Name in B1 ---
+      const toolDesc = form.getFieldValue("toolNo");
+      const year = form.getFieldValue("year") ? form.getFieldValue("year").format("YYYY") : ""; // Format year
+
+
+      const middlewareCell = worksheet.getCell("B1");
+
+      // Use rich text for multiple font sizes in the same cell
+      middlewareCell.value = {
+        richText: [
+          { text: "Tool History Report\n", font: { bold: true, size: 14 } }, // main title
+          { text: `Tool: ${toolDesc} | Year: ${year}`, font: { size: 10 } }, // subtitle smaller
+        ],
+      };
+
+      middlewareCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      middlewareCell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+
+      // --- Company Logo in C1 ---
+      const companyLogoResp = await fetch("/smartrunLogo.png");
+      const companyBlob = await companyLogoResp.blob();
+      const companyBuffer = await companyBlob.arrayBuffer();
+      const companyImageId = workbook.addImage({
+        buffer: companyBuffer,
+        extension: "png",
+      });
+      worksheet.addImage(companyImageId, { tl: { col: 2, row: 0 }, br: { col: 3, row: 1 } });
+
+      // --- Table header at row 3 ---
+      const startRow = 3;
+      const headers = [
+        "Date",
+        "Components produced in the last run (in Nos.)",
+        "Defects noticed",
+        "Rectification Done",
+        "Rectified By T/M",
+      ];
+      const headerRow = worksheet.getRow(startRow);
+      headers.forEach((header, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      // --- Add data rows as arrays ---
+      historyData.forEach((row) => {
+        worksheet.addRow([
+          row.createdDateTime ? moment(row.createdDateTime).format("DD-MMM-YYYY") : "",
+          row.usageTillDate || "",
+          row.defectsNoticed || "",
+          row.rectificationDone || "",
+          row.rectifiedBy || "",
+        ]);
+      });
+
+      // --- Apply borders and alignment to all data rows ---
+      const totalRows = worksheet.rowCount;
+      for (let i = startRow + 1; i <= totalRows; i++) {
+        worksheet.getRow(i).eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+          cell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+        });
+      }
+
+      // --- Save Excel file ---
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Tool_History_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+    } catch (err) {
+      console.error("Excel export error:", err);
+      alert("Error exporting report. Please try again.");
+    }
   };
+
+
+
+
 
   return (
     <>
@@ -203,13 +290,13 @@ const rowData = [
             <Col span={4}>
               <Form.Item
                 label="Tool Desc"
-                name="toolId"
+                name="toolNo"
                 rules={[{ required: true, message: "Please select Tool Desc." }]}
               >
                 <Select placeholder="Select Tool Desc.">
-                  {toolOptions.map((tool) => (
-                    <Option key={tool} value={tool}>
-                      {tool}
+                  {toolData.map((tool) => (
+                    <Option key={tool.key} value={tool.key}>
+                      {tool.value}
                     </Option>
                   ))}
                 </Select>
@@ -245,6 +332,7 @@ const rowData = [
                 backgroundColor: "#00264d",
                 borderColor: "#00264d",
               }}
+              onClick={handleToolHistoryLog}
             >
               Submit
             </Button>
@@ -270,7 +358,7 @@ const rowData = [
           style={{ marginTop: "30px", borderRadius: "8px" }}
         >
           {/* Export Button */}
-          <div style={{ marginBottom: "10px", textAlign: "right" , display:'none' }}>
+          <div style={{ marginBottom: "10px", textAlign: "left", display: 'block' }}>
             <Button
               type="primary"
               onClick={handleExport}
@@ -279,14 +367,14 @@ const rowData = [
                 borderColor: "#28a745",
               }}
             >
-              Export CSV
+              Export to CSV
             </Button>
           </div>
 
           <div className="ag-theme-alpine" style={{ height: 300, width: "100%" }}>
             <AgGridReact
               ref={gridRef}
-              rowData={rowData}
+              rowData={historyData}
               columnDefs={columnDefs}
               pagination={true}
               paginationPageSize={10}

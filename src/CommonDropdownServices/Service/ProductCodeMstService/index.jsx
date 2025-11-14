@@ -1,4 +1,4 @@
-import serverApi from "../../serverAPI";
+import serverApi from "../../../serverAPI";
 import store from "store";
 
 export const fetchProductMstList = async () => {
@@ -25,3 +25,5 @@ export const fetchProductMstList = async () => {
     return [];
   }
 };
+
+export default fetchProductMstList;
