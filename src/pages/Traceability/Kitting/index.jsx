@@ -151,6 +151,10 @@ const ChildPartValidationCard = ({
 
 // Consignee Details Card with scanResultsTable on top
 const ConsigneeDetailsCard = ({
+  tenantId,
+  branchCode,
+  employeeId,
+  plsCode,
   childPartCode,
   childPartDesc,
   planQty,
@@ -162,6 +166,8 @@ const ConsigneeDetailsCard = ({
   const [binQty, setBinQty] = useState(100);
   const [labelCount, setLabelCount] = useState(0);
   const [quantity, setQuantity] = useState(planQty || 0);
+
+  const[subAssemblyKittingList ,setSubAssemblyKittingList] = useState([]);
 
   const getCurrentDate = () => moment();
 
@@ -211,6 +217,53 @@ const ConsigneeDetailsCard = ({
     form.setFieldsValue({ labelCount: newLabelCount });
   };
 */
+const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
+  try {
+    const payload = {
+      tenantId: tenantId,
+      branchCode: branchCode,
+      employeeId: employeeId,
+      plsCode: plsCode,
+      childPartCode: formattedValues.childPartCode,
+      childPartDesc: formattedValues.childPartDesc,
+      consignee: formattedValues.consignee,
+      storageLocation: formattedValues.storageLocation,
+      deliveryNo: formattedValues.deliveryNo,
+      itemNoCustomer: formattedValues.itemNo,
+      deliveryDate: formattedValues.deliveryDate,
+      manufacturingDate: formattedValues.manufacturingDate,
+      expirationDate: formattedValues.expirationDate,
+      description: formattedValues.description,
+      quantity: formattedValues.quantity,
+      binQuantity: formattedValues.binQty,
+      labelCount: formattedValues.labelCount,
+      packageReferenceNo: formattedValues.packageReferenceNo,
+      supplierNumber: formattedValues.supplierNumber,
+      pkgNo: formattedValues.pkgNo,
+      batchNo: formattedValues.batchNo,
+    };
+
+    const response = await serverApi.post("insertAndRetrieveSubAssemblyPartDetails", payload
+      );
+
+    const res = response.data;
+    if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+      setSubAssemblyKittingList(res.responseData);
+      toast.success(res.responseData.setResponseMessage);
+
+      console.log("setSubAssemblyKittingList",subAssemblyKittingList)
+    } else {
+      setSubAssemblyKittingList([]);
+      toast.error(res.responseData.setResponseMessage);
+    }
+  } catch (error) {
+   
+    toast.error("Error fetching SubAssembly. Please try again later.");
+  }
+};
+
+
+
   const handlePrint = () => {
     form.validateFields()
       .then((values) => {
@@ -234,7 +287,10 @@ const ConsigneeDetailsCard = ({
             childPartCode: childPartCode,
             childPartDesc: childPartDesc,
           };
-          onPrint(formattedValues);
+          //onPrint(formattedValues);
+          insertSubAssemblyPartKittingDetails(plsCode,formattedValues);
+
+
         }
       })
       .catch(() => {
@@ -490,8 +546,10 @@ const Kitting = () => {
   const [selectedQrData, setSelectedQrData] = useState(null);
   const [childPartCountList, setChildPartCountList] = useState([]);
 
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
+  const employeeId = store.get("employeeId")
 
   const fetchPlans = async () => {
     setLoadingPlans(true);
@@ -849,6 +907,10 @@ const Kitting = () => {
       {showConsigneeCard && (
         <div id="consignee-card">
           <ConsigneeDetailsCard
+            tenantId={tenantId}
+            branchCode={branchCode}
+            employeeId={employeeId}
+            plsCode={selectedPlan}
             childPartCode={selectedPart?.childPartCode || ""}
             childPartDesc={selectedPart?.childPartDesc || ""}
             planQty={selectedPart?.picklistQty || 0}
