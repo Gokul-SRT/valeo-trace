@@ -168,7 +168,10 @@ const ConsigneeDetailsCard = ({
   const [quantity, setQuantity] = useState(planQty || 0);
 
   const[subAssemblyKittingList ,setSubAssemblyKittingList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
+  
   const getCurrentDate = () => moment();
 
   const calculateLabelCount = (planQtyValue, binQtyValue) => {
@@ -217,7 +220,90 @@ const ConsigneeDetailsCard = ({
     form.setFieldsValue({ labelCount: newLabelCount });
   };
 */
+
+
+const subAssemblyColumns = [
+  { title: "S.No", key: "sno", render: (text, record, index) => index + 1 },
+  {
+    title: "PicList Code",
+    dataIndex: "plsCode",
+    key: "plsCode",
+  },
+  {
+    title: "ChildPart Code",
+    dataIndex: "childPartCode",
+    key: "childPartCode",
+  },
+  {
+    title: "Quantity",
+    dataIndex: "qty",
+    key: "qty",
+    align: "right",
+    render: (value) =>
+      value !== null && value !== undefined && value !== "" ? value : 0,
+  },
+  {
+    title: "Label Code",
+    dataIndex: "labelCode",
+    key: "labelCode",
+    render: (text) => (
+      <div style={{ whiteSpace: "pre", fontFamily: "monospace" }}>
+        {text}
+      </div>
+    ),
+
+  },
+  {
+    title: "Action",
+    key: "printSts",
+    render: (_, record) => {
+      const val = record.printSts;  // 0 or 1
+  
+      return (
+        <>
+          {/* PRINT BUTTON */}
+          <Button
+            type="primary"
+            disabled={val === "1"}      // Disable when printSts = 1
+            style={{
+              marginRight: 8,
+              opacity: val === "1" ? 0.5 : 1,
+              cursor: val === "1" ? "not-allowed" : "pointer",
+            }}
+          >
+            Print
+          </Button>
+  
+          {/* REPRINT BUTTON */}
+          <Button
+            type="default"
+            disabled={val === "0"}      // Disable when printSts = 0
+            style={{
+              opacity: val === "0" ? 0.5 : 1,
+              cursor: val === "0" ? "not-allowed" : "pointer",
+            }}
+          >
+            Reprint
+          </Button>
+        </>
+      );
+    },
+  }
+  
+];
+
+
+//search
+const filteredData = subAssemblyKittingList.filter((item) =>
+Object.values(item)
+  .join(" ")
+  .toLowerCase()
+  .includes(searchText.toLowerCase())
+);
+
 const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
+  console.log("date",formattedValues.expirationDate)
+  setLoading(true);
   try {
     const payload = {
       tenantId: tenantId,
@@ -248,17 +334,20 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
 
     const res = response.data;
     if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+      
+      toast.success(res.responseMessage);
       setSubAssemblyKittingList(res.responseData);
-      toast.success(res.responseData.setResponseMessage);
-
-      console.log("setSubAssemblyKittingList",subAssemblyKittingList)
+      console.log("setSubAssemblyKittingList",res.responseData)
+      console.log("setSubAssemblyKittingList",res.responseData[0].labelCode)
     } else {
       setSubAssemblyKittingList([]);
-      toast.error(res.responseData.setResponseMessage);
+      toast.error(res.responseMessage);
     }
   } catch (error) {
    
     toast.error("Error fetching SubAssembly. Please try again later.");
+  }finally{
+    setLoading(false);
   }
 };
 
@@ -278,10 +367,10 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
               values.manufacturingDate && moment.isMoment(values.manufacturingDate)
                 ? values.manufacturingDate.format("YYYY-MM-DD")
                 : null,
-            expirationDate:
-              values.expirationDate && moment.isMoment(values.expirationDate)
-                ? values.expirationDate.format("YYYY-MM-DD")
-                : null,
+            // expirationDate:
+            //   values.expirationDate && moment.isMoment(values.expirationDate)
+            //     ? values.expirationDate.format("YYYY-MM-DD")
+            //     : null,
             binQty: binQty,
             labelCount: labelCount,
             childPartCode: childPartCode,
@@ -317,6 +406,45 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
   }, [planQty, binQty, form, childPartCode, childPartDesc]);
 
   return (
+<>
+{subAssemblyKittingList && subAssemblyKittingList.length > 0 && (
+<Card
+        headStyle={{ backgroundColor: "#00264d", color: "white" }}
+        title={`Sub Assembly Details`}
+      >
+       <Input
+        placeholder="Search..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        style={{ marginBottom: 16, width: 300 }}
+      />
+        <Table
+          columns={subAssemblyColumns}
+          dataSource={filteredData}
+          bordered
+          locale={{ emptyText: "No data " }}
+          pagination={{ pageSize: 10 }}
+          loading={loading} //  Show loader
+          scroll={{ x: 'max-content' }}
+        />
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "10px",
+            marginTop: "20px",
+          }}
+        >
+         
+        </div>
+      </Card>
+)}
+
+
+
+{subAssemblyKittingList?.length === 0 && (
+
     <Card
       title="Consignee Details"
       headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
@@ -523,6 +651,9 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
         </Row>
       </Form>
     </Card>
+
+    )}
+    </>
   );
 };
 
