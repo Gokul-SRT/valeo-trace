@@ -132,7 +132,8 @@ const columns = [
   };
 
   return (
-    <div className="container mt-3 p-2">
+    // <div className="container mt-3 p-2">
+    <>
       {/* <Card
         bordered={false}
         style={{ borderRadius: 8, backgroundColor: "#00264d" }}
@@ -225,8 +226,9 @@ const columns = [
       </Card>
     </div>
 
-
-    </div>
+   
+    {/* </div> */}
+    </>
   );
 };
 
