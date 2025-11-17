@@ -1,10 +1,11 @@
 
 import serverApi from "../../../../serverAPI";
 
-const PicklistWODropdown = async (tenantId, branchCode) => {
+const PicklistWODropdown = async (tenantId, branchCode,selectedDate) => {
   try {
     const payload = {
-      planDate:'2025-10-23',
+     // planDate:'2025-10-23',
+     planDate:selectedDate,
       tenantId: tenantId,
     //   isActive: "1",
       branchCode: branchCode,

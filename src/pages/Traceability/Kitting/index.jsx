@@ -14,7 +14,7 @@ import {
 import moment from "moment";
 import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
 import serverApi from "../../../serverAPI";
-import QRModal from "../../Traceability/Reports/Picklist/QRModal";
+import KittingQRModel from "../../Traceability/Reports/Picklist/KittingQRModel";
 import store from "store";
 import { toast } from "react-toastify";
 
@@ -170,6 +170,8 @@ const ConsigneeDetailsCard = ({
   const[subAssemblyKittingList ,setSubAssemblyKittingList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [qrModal, setQrModal] = useState(false);
+  const [selectedObject, setSelectedObject] = useState(null);
 
   
   const getCurrentDate = () => moment();
@@ -270,6 +272,7 @@ const subAssemblyColumns = [
               opacity: val === "1" ? 0.5 : 1,
               cursor: val === "1" ? "not-allowed" : "pointer",
             }}
+            onClick={() => handleSubAssemplyPrint(record)}
           >
             Print
           </Button>
@@ -282,6 +285,7 @@ const subAssemblyColumns = [
               opacity: val === "0" ? 0.5 : 1,
               cursor: val === "0" ? "not-allowed" : "pointer",
             }}
+          onClick={()=>handleSubAssemplyRePrint(record)}  
           >
             Reprint
           </Button>
@@ -291,6 +295,70 @@ const subAssemblyColumns = [
   }
   
 ];
+
+const getItemById = (id) => {
+  return subAssemblyKittingList.find(item => item.id === id);
+};
+
+
+
+const updatePrintStatus = (id, newStatus) => {
+  setSubAssemblyKittingList((prevList) =>
+    prevList.map((item) =>
+      item.id === id ? { ...item, printSts: newStatus } : item
+    )
+  );
+};
+
+const handleSubAssemplyPrint = async (record) => {
+  try {
+    console.log("PRINT clicked row:", record);
+
+    const response = await serverApi.post("updateLabelSts", {
+      tenantId: tenantId,
+      branchCode: branchCode,
+      exeId: record.id,
+      sts:"1",
+    });
+         const res = response.data;
+      if (res.responseCode === "200") {
+        //update new printStatus
+        console.log("setQrModal",qrModal)
+       
+        toast.success("Printed successfully!");
+        updatePrintStatus(record.id,"1");
+        
+        // Example usage
+        const itemObject = getItemById(record.id);
+        setSelectedObject(itemObject);
+        setQrModal(true);
+       
+       
+
+      }else{
+        toast.error("Printed Failure!");
+      }
+
+  
+  } catch (err) {
+    message.error("Print failed");
+  }
+};
+
+const handleSubAssemplyRePrint = async (record) => {
+  try {
+  
+        const itemObject = getItemById(record.id);
+        setSelectedObject(itemObject);
+        setQrModal(true);
+        toast.success("RePrinted successfully!");
+  } catch (err) {
+    message.error("RePrint failed");
+  }
+};
+
+
+
 
 
 //search
@@ -653,6 +721,11 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
     </Card>
 
     )}
+     <KittingQRModel
+        qrModalVisible={qrModal}
+        setQrModalVisible={setQrModal}
+        selectedQrData={selectedObject}
+      />
     </>
   );
 };
@@ -685,7 +758,7 @@ const Kitting = () => {
   const fetchPlans = async () => {
     setLoadingPlans(true);
     try {
-      const response = await PicklistWODropdown(tenantId, branchCode);
+      const response = await PicklistWODropdown(tenantId, branchCode,selectedDate);
       const data = Array.isArray(response.data) ? response.data : response;
       setPlanOptions(data.map((item) => ({ code: item.plsCode })));
     } catch (err) {
@@ -698,7 +771,7 @@ const Kitting = () => {
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+  }, [tenantId, branchCode,selectedDate]);
 
   const fetchKittingPartDetails = async (planCode) => {
     setLoadingParts(true);
@@ -945,7 +1018,11 @@ const Kitting = () => {
                   name="date"
                   rules={[{ required: true, message: "Please select date" }]}
                 >
-                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD"
+                   onChange={(date) =>
+                    setSelectedDate(date ? date.format("YYYY-MM-DD") : null)
+                  }
+                   />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -1052,11 +1129,11 @@ const Kitting = () => {
         </div>
       )}
 
-      <QRModal
+      {/* <QRModal
         qrModalVisible={qrModalVisible}
         setQrModalVisible={setQrModalVisible}
         selectedQrData={selectedQrData}
-      />
+      /> */}
     </>
   );
 };
