@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import bwipjs from "bwip-js";
 
-const PDF417Barcode = ({ value, width = 10, height = 10 }) => {
+const PDF417Barcode = ({ value, width = 3, height = 10 }) => {
   const canvasRef = useRef();
 
   useEffect(() => {

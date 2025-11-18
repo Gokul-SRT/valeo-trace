@@ -3,35 +3,41 @@ import { Modal } from "antd";
 import Barcode from "react-barcode";
 import PDF417Barcode from "./PDF417Barcode";
 
-const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData }) => {
+const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData , setIsOverAllPrinting }) => {
+  console.log("Selected QR Data in Modal:", selectedQrData);
   const data = {
     consignee: "Amalgamations Valeo Clutch Pvt - Chennai",
     unloadingPoint: "CH35 - -",
-    deliveryNoteNo: "TEST",
-    itemNo: "PKKT0002",
-    deliveryDate: `D${selectedQrData?.deliveryDate.replaceAll("-", "")}`,
-    manufactureDate:`P${selectedQrData?.manufacturingDate.replaceAll("-", "")}`,
+    deliveryNoteNo: `${selectedQrData?.deliveryNoteNo}`,
+    itemNo: `${selectedQrData?.customerSno}`,
+    deliveryDate: `${selectedQrData?.deliveryDate?.replaceAll("-", "")}`,
+    manufactureDate:`${selectedQrData?.manufacturingDate?.replaceAll("-", "")}`,
     expirationDate: "",
     description: selectedQrData?.childPartDesc,
     quantityFilled: selectedQrData?.binCountQty,
-    packageRefNo:  `PKPL${selectedQrData?.packageNo}`,
+    packageRefNo:  `-`,
     supplierNo: selectedQrData?.supplierCode,
     pkgNo: selectedQrData?.packageNo,
-    batchNo: "123456",
-    traceability: selectedQrData?.childPartDesc || "QR123"
+    batchNo: selectedQrData?.batchNo || 'N/A',
+    traceability: `${selectedQrData?.deliveryNoteNo} - ${selectedQrData?.customerSno} - ${selectedQrData?.deliveryDate} - ${selectedQrData?.manufacturingDate} ${selectedQrData?.childPartDesc} 
+    ${selectedQrData?.binCountQty} - ${selectedQrData?.childPartDesc} - ${selectedQrData?.packageNo}`,
   };
 
   return (
  <Modal
   title="Label Preview"
   open={qrModalVisible}
-  onCancel={() => setQrModalVisible(false)}
+onCancel={() => {
+  setQrModalVisible(false);
+  setIsOverAllPrinting(false);
+}}
   footer={null}
   width={1100}
   centered
   bodyStyle={{ padding: "20px" }}
 >
   <div
+    id="qr-label-area"
     style={{
       border: "2px solid #000",
       fontFamily: "Arial, sans-serif",
@@ -131,7 +137,7 @@ const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData }) => {
       {/* Right section (Traceability spanning 3 rows) */}
       <div
         style={{
-          width: "150px",
+          width: "170px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -143,7 +149,7 @@ const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData }) => {
         <div style={{ fontSize: "12px", marginBottom: "6px", textAlign: "center" }}>
           (17) Traceability (H)
         </div>
-        <PDF417Barcode value={data.traceability} width={30} height={10} />
+        <PDF417Barcode value={data.traceability} width={10} height={10} />
       </div>
     </div>
   </div>

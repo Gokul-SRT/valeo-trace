@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect ,forwardRef, useImperativeHandle  } from "react";
 import { Card, Form, Row, Col, Select, Input, Button, Table, DatePicker } from "antd";
 import moment from "moment";
 import { toast } from "react-toastify";
@@ -9,7 +9,7 @@ import store from "store";
 
 const { Option } = Select;
 
-const PrintPage = ({
+const PrintPage = forwardRef(({
   selectType,
   selectedPrintPart,
   qrData,
@@ -22,7 +22,9 @@ const PrintPage = ({
   printB2Data,
   setPrintB2Data,
   handleViewQR,
-}) => {
+  handlePrintAll
+}, ref) => {
+
   const [addQty, setAddQty] = useState(0);
   const [binCount, setBinCount] = useState(0);
   const [picklistOptions, setPicklistOptions] = useState([]); // ✅ store API response here
@@ -38,21 +40,22 @@ const PrintPage = ({
   const [noOfLabels, setNoOfLabels] = useState(0);
   const [printform] = Form.useForm()
 
-  const handleAddQtyChange = (e) => {
-    const value = Number(e.target.value);
-    const standardQty = Number(printform.getFieldValue("pickedQty") || 0);
-    const binQty = Number(printform.getFieldValue("binQty") || 0);
-    const label = value > 0 ? Math.floor(value / binQty) : 0;
-    if (value <= standardQty) {
-      printform.setFieldsValue({
-        addQty: value,
-      })
-      setNoOfLabels(label);
-    } else {
-      printform.resetFields(["addQty"]);
-      toast.warning(`Add Quantity cannot exceed ${standardQty}`);
-    }
-  };
+const handleAddQtyChange = (e) => {
+  if (selectType === "B2") return; // Ignore for B2
+
+  const value = Number(e.target.value);
+  const binQty = Number(printform.getFieldValue("binQty") || 0);
+  const remainingQty = Number(printform.getFieldValue("remainingQty") || 0);
+
+  if (value <= remainingQty) {
+    printform.setFieldsValue({ addQty: value });
+    setNoOfLabels(Math.floor(value / binQty));
+  } else {
+    printform.resetFields(["addQty"]);
+    toast.warning(`Add Quantity cannot exceed ${remainingQty}`);
+  }
+};
+
 
 
   const handlePicklistCodetoChildParts = (picklistCode) => {
@@ -60,23 +63,45 @@ const PrintPage = ({
     fetchPlscodetoChildPartDetails(picklistCode);
   }
 
-  useEffect(() => {
-    if (qrData) {
-      printform.setFieldsValue({
-        custName: qrData.customerSno,
-        supCode: qrData.supplierCode,
-        packageNo: qrData.packageNo,
-        deliveryDate: qrData.deliveryDate ? moment(qrData.deliveryDate, "YYYY-MM-DD") : null,
-        manufacturingDate: qrData.manufactureDate ? moment(qrData.manufactureDate, "YYYY-MM-DD") : null,
-        scanQty: qrData.quantity,
-      });
-    }
-    fetchPicklistPLSDetails();
-  }, [qrData, addQty, binCount, printform]);
+useEffect(() => {
+  if (qrData) {
+    printform.setFieldsValue({
+      custName: qrData.customerSno,
+      supCode: qrData.supplierCode,
+      packageNo: qrData.packageNo,
+      deliveryDate: qrData.deliveryDate ? moment(qrData.deliveryDate, "YYYY-MM-DD") : null,
+      manufacturingDate: qrData.manufactureDate ? moment(qrData.manufactureDate, "YYYY-MM-DD") : null,
+      scanQty: qrData.quantity,
+    });
 
-  const handleSubmitData = async () => {
+    if (selectType === "B2") {
+      const scanQty = Number(qrData.quantity);
+      const binQty = Number(printform.getFieldValue("binQty") || 0);
+      const planQty = Number(printform.getFieldValue("planQty") || 0);
+
+      // Ensure we do not exceed planQty
+      const effectiveQty = Math.min(scanQty, planQty);
+      if (binQty > 0) {   
+        setNoOfLabels(Math.floor(effectiveQty / binQty));
+        printform.setFieldsValue({ addQty: effectiveQty }); // optional
+      }
+    }
+  }
+
+  fetchPicklistPLSDetails();
+}, [qrData, selectType]);
+
+
+
+  const handleSubmitData = async (empty) => {
     const formValues = printform.getFieldsValue()
     const part = childPartOptions.find(item => item.childPartDesc === formValues.childPart) || {};
+    
+    // Validate required fields
+    if (!formValues.pickListCode || !formValues.childPart) {
+      console.log("Missing required fields for handleSubmitData");
+      return;
+    }
     try {
       const response = await backendService({
         requestPath: 'insertAndUpdatePrintPage',
@@ -85,20 +110,25 @@ const PrintPage = ({
           childPartCode: part.childPartCode,
           planQuantity: formValues.planQty,
           scanQrCode: formValues.qrCode,
-          itemType: 'A2',
+          itemType:selectType,
           customerSno: formValues.custName,
           supplierCode: formValues.supCode,
           packageNo: formValues.packageNo,
           deliveryDate: formValues.deliveryDate.format("YYYY-MM-DD"),
           manufacturingDate: formValues.manufacturingDate.format("YYYY-MM-DD"),
           scannedQuantity: formValues.scanQty,
-          inputQuantity: formValues.addQty,
+         inputQuantity: empty === "empty" ? "" : selectType === "A2" 
+  ? Number(formValues.addQty || 0)
+  : Number(formValues.scanQty || 0),
           binQuantity: formValues.binQty,
-          BinCountQuantity: formValues.binQty,
+          BinCountQuantity: selectType === "A2"
+                    ? formValues.binQty
+                    : formValues.binQty, // same for B2
           binCount: noOfLabels,
           tenantId,
           branchCode,
           createdBy: empId,
+          pickedQty: Number(printform.getFieldValue("pickedQty") || 0)
         }
       })
       if (response) {
@@ -110,7 +140,12 @@ const PrintPage = ({
             }));
             console.log(updatedData, "updatedData--------")
             setPrintB2Data(updatedData)
+            fetchPickedAndStandardQty(part.childPartCode)
           }
+        }else{
+          toast.error(response.responseMessage)
+          setShowPrintDetails(false)
+          setPrintB2Data([])
         }
       }
     } catch (err) {
@@ -124,7 +159,7 @@ const PrintPage = ({
         tenantId,
         branchCode,
         plsCode: printform.getFieldValue("pickListCode"),
-        itemType: "A2",
+        itemType: selectType,
         childPartCode: childCode
       });
 
@@ -135,7 +170,8 @@ const PrintPage = ({
         const firstItem = res.responseData[0] || {};
         printform.setFieldsValue({
           binQty: firstItem.standardQuantity || "",
-          pickedQty: firstItem.pickedQuantity || ""
+          pickedQty: firstItem.pickedQuantity || "",
+          remainingQty: firstItem.remainingQuantity || ""
         });
       } else {
         setStandPickQty([]);
@@ -175,7 +211,7 @@ const PrintPage = ({
         tenantId,
         branchCode,
         plsCode: plsCode,
-        itemType: "A2",
+        itemType: selectType,
         childPartCode: ""
       });
 
@@ -201,8 +237,15 @@ const PrintPage = ({
   }
 
   const handleCancel = () => {
-    printform.resetFields()
+    printform.resetFields();
+    setNoOfLabels(0)
   }
+
+   // Expose handleSubmitData to parent
+  useImperativeHandle(ref, () => ({
+    handleSubmitData,
+    fetchPickedAndStandardQty
+  }));
 
   return (
     <>
@@ -306,6 +349,7 @@ const PrintPage = ({
                     <Input
                       type="number"
                       placeholder="Enter Quantity"
+                      disabled={selectType === "B2"}   // <-- disable
                       onChange={handleAddQtyChange}
                     />
                   </Form.Item>
@@ -349,6 +393,9 @@ const PrintPage = ({
           title={`Print Page - ${selectType}`}
           style={{ marginTop: "20px" }}
         >
+          <div style={{ textAlign: "right" }}>
+          <Button type="primary" onClick={handlePrintAll}>Print All</Button>
+        </div>
           <Table
             columns={printB2Columns}
             dataSource={printB2Data}
@@ -359,6 +406,6 @@ const PrintPage = ({
       )}
     </>
   );
-};
+});
 
 export default PrintPage;
