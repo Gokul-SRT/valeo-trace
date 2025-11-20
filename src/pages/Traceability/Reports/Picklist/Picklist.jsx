@@ -36,6 +36,8 @@ const [pickListCodeVerrify, setPickListCodeVerrify] = useState("");
 const [scanValue, setScanValue] = useState("");
 const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = useState([]);
 
+const [plksCode,setPlksCode]=useState("")
+
 
   // const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   // const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -226,8 +228,9 @@ const onCancel = () => {
 
 
 
-const handlePicklistClick = async (picklistCode) => {
+const handlePicklistClick = async (picklistCode,plseCode) => {
   setPickListCodeVerrify(picklistCode);
+  setPlksCode(plseCode);
   try {
     const response = await serverApi.post("getRetrievePickdetails", {
       tenantId:tenantId,
@@ -266,7 +269,7 @@ const partiallyCompletedColumns = [
      render: (text, record) => (
     <Button
     type="link"
-    onClick={() => handlePicklistClick(record.plsId)}
+    onClick={() => handlePicklistClick(record.plsId,record.plsCode)}
     style={{ padding: 0 }}
   >
     {text}
@@ -632,27 +635,25 @@ const inputRef = useRef(null);
             type="link"
             icon={<PrinterOutlined />}
             onClick={() => {
-              setSelectedType(record.itemType);
-              setSelectedPrintPart(record.childPartCode);
-              setCurrentPage("printPage");
-              setShowPrintDetails(false);
-            }}
-          >
-            Print
-          </Button>
-        ) : record.itemType === "C" ? (
-          <Button
-            type="link"
-            icon={<PrinterOutlined />}
-            onClick={() => {
-              setSelectedType(record.itemType);
-              navigate("/Kittingprocessscreen");
+              // setSelectedType(record.itemType);
+              // setSelectedPrintPart(record.childPartCode);
+              // setCurrentPage("printPage");
+              // setShowPrintDetails(false);
 
+             navigate("/picklistprint",{
+              state:{
+                pickListCode:plksCode,
+                childPartCode:record.childPartCode,
+                planQty:record.picklistQty,
+                itemType:record.itemType,
+              }
+             })
+              
             }}
           >
             Print
           </Button>
-        ) : null,
+        ) :null,
     }
 
   ];
@@ -669,7 +670,7 @@ const inputRef = useRef(null);
 
         <Button
         type="link"
-        onClick={() => handlePicklistClick(record.plsId)}
+        onClick={() => handlePicklistClick(record.plsId,record.plsCode)}
         style={{ padding: 0 }}
       >
         {text}

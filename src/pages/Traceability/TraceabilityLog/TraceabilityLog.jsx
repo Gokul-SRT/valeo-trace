@@ -314,6 +314,7 @@ const TraceabilityLog = () => {
         toast.success("Scan processed successfully!");
         // Call your second API here
         const scannedItem = {
+          plsId:pickListCodeVerrify,
           itemNo: matchedChildPart.childPartCode,
           lineQty: lineQt,
           lotNumber: batchNumber.trim(),

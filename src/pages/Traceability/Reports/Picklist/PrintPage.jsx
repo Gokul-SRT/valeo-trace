@@ -6,6 +6,7 @@ import serverApi from "../../../../serverAPI";
 import { Label } from "recharts";
 import { backendService } from "../../../../service/ToolServerApi";
 import store from "store";
+import { useNavigate } from "react-router-dom";
 
 const { Option } = Select;
 
@@ -22,7 +23,10 @@ const PrintPage = forwardRef(({
   printB2Data,
   setPrintB2Data,
   handleViewQR,
-  handlePrintAll
+  handlePrintAll,
+  pickListCode,
+  childPartCode,
+  pickListQty,
 }, ref) => {
 
   const [addQty, setAddQty] = useState(0);
@@ -40,14 +44,16 @@ const PrintPage = forwardRef(({
   const [noOfLabels, setNoOfLabels] = useState(0);
   const [printform] = Form.useForm()
 
+  const navigate = useNavigate();
+
 const handleAddQtyChange = (e) => {
   if (selectType === "B2") return; // Ignore for B2
-
+  const formValues = printform.getFieldsValue()
   const value = Number(e.target.value);
   const binQty = Number(printform.getFieldValue("binQty") || 0);
   const remainingQty = Number(printform.getFieldValue("remainingQty") || 0);
 
-  if (value <= remainingQty) {
+  if (value <= formValues.planQty) {
     printform.setFieldsValue({ addQty: value });
     setNoOfLabels(Math.floor(value / binQty));
   } else {
@@ -90,6 +96,56 @@ useEffect(() => {
 
   fetchPicklistPLSDetails();
 }, [qrData, selectType]);
+
+
+useEffect(() => {
+  if (pickListCode) {
+    setSelectedPicklist(pickListCode);
+    printform.setFieldsValue({ pickListCode });
+
+    // Load child part list
+    handlePicklistCodetoChildParts(pickListCode);
+  }
+}, [pickListCode]);
+
+useEffect(() => {
+  if (childPartOptions.length > 0 && childPartCode) {
+
+    // 1. Find the record
+    const selected = childPartOptions.find(
+      item => item.childPartCode === childPartCode
+    );
+
+    if (selected) {
+      // 2. Set dropdown
+      setSelectedChildPart(selected.childPartDesc);
+
+      // 3. Set form field
+      printform.setFieldsValue({
+        childPart: selected.childPartDesc,
+        planQty: selected.planQty,
+      });
+
+      // 4. Fetch pickedQty / standardQty
+      fetchPickedAndStandardQty(childPartCode);
+    }
+  }
+}, [childPartOptions]);
+
+
+useEffect(() => {
+  if (pickListQty) {
+    printform.setFieldsValue({ planQty: pickListQty });
+  }
+}, [pickListQty]);
+
+
+const handleBack = () => {
+ 
+  printform.resetFields();
+
+  navigate("/picklist");
+};
 
 
 
@@ -382,9 +438,14 @@ useEffect(() => {
           </div>
         </Form>
 
-        <div style={{ textAlign: "center", marginTop: "15px" }}>
+        {/* <div style={{ textAlign: "center", marginTop: "15px" }}>
           <Button onClick={() => setCurrentPage("main")}>Back</Button>
+        </div> */}
+        {  pickListCode && childPartCode && pickListQty && (
+        <div style={{ textAlign: "center", marginTop: "15px" }}>
+          <Button onClick={() => handleBack()}>Back</Button>
         </div>
+         )}
       </Card>
 
       {showPrintDetails && (

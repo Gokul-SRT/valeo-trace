@@ -7,11 +7,20 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { CheckCircleTwoTone } from "@ant-design/icons";
 import store from "store";
+import { useLocation } from "react-router-dom";
 
 const PickListPrintMain = () => {
   // Ref to call handleSubmitData from PrintPage
+  const location = useLocation();
+ // const { pickListCode, childPartCode, planQty } = location.state || {};
+
+  const [pickListCode, setPickListCode] = useState(location.state?.pickListCode || "");
+  const [childPartCode, setChildPartCode] = useState(location.state?.childPartCode || "");
+  const [planQty, setPlanQty] = useState(location.state?.planQty || "");
+  const [itemType, setItemType] = useState(location.state?.itemType || "");
+ 
   const printPageRef = useRef();
-  const [selectType] = useState("B2");
+  const [selectType,setSelectType] = useState(itemType || "B2");
   const [selectedPrintPart, setSelectedPrintPart] = useState("");
   const [qrData, setQrData] = useState(null);
   const [printB2Data, setPrintB2Data] = useState([]);
@@ -19,12 +28,17 @@ const PickListPrintMain = () => {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [isOverAllPrinting, setIsOverAllPrinting] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState("");
+
+  const [labelCode,SetLabelCode]= useState("");
   const [qrValue, setQrValue] = useState("");
     const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
 
+
   // Example table data and columns
 
+
+  //console.log("hi",pickListCode,childPartCode,planQty)
 
 const printB2Columns = [
   { title: "S.No", dataIndex: "sno", key: "sno" },
@@ -68,11 +82,26 @@ const printB2Columns = [
 
 
   const handleViewQR = async (qrValue) => {
+  const binCountQty=qrValue.binCountQty; 
+       const label=labelCode;
+       const start = 42;  
+      const end = 50;   
+
+      const newValue = qrValue.binCountQty.toString();  // whatever dynamic value
+      const paddedValue = newValue.padEnd(8, " ");
+
+      const updatedLabelCode = label.substring(0, start) + paddedValue + label.substring(end);
+      
+       
+       
+  //printB2Data
+    
     console.log("qrValue",qrValue);
 const updatedQrValue = {
   ...qrValue,
   deliveryNoteNo,
-  batchNo
+  batchNo,
+  updatedLabelCode
 };
 setSelectedQrData(updatedQrValue);
     setQrModalVisible(true);
@@ -283,6 +312,8 @@ const [batchNo, setBatchNo] = useState("");
 
 const handleQrBlur = (e) => {
   const val = e.target.value.trim();
+
+  SetLabelCode(val);
   if (!val) return;
 
   const qr = val; // full scanned QR string
@@ -303,6 +334,23 @@ const handleQrBlur = (e) => {
                           : "";
   setDeliveryNoteNo(deliveryNoteNo);
   setBatchNo(batchNo);
+
+console.log("childPartCodes",childPartCode,customerSno)
+
+const vals = customerSno.includes(childPartCode);
+console.log("childPartis there or not there",vals)
+ const childPartCodeValidation=childPartCode;
+ if (!childPartCodeValidation || !customerSno) {
+  toast.error("ChildPartCode cannot be empty");
+   return;
+}
+
+if (!customerSno.includes(childPartCodeValidation)) {
+  toast.error("Invalid ChildPartCode");
+   return
+}
+
+
 
   const extractedData = {
     prefix,
@@ -340,6 +388,10 @@ const handleQrBlur = (e) => {
         handleViewQR={handleViewQR}
         handlePrintAll={handlePrintAll}
         handleUpdateLabel={handleUpdateLabel}
+        pickListCode={pickListCode}
+        childPartCode={childPartCode}
+        pickListQty={planQty}
+
       />
 
       <QRModal

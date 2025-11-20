@@ -53,18 +53,18 @@ const KittingQRModel = ({ qrModalVisible, setQrModalVisible, selectedQrData }) =
   const data = {
     consignee: "Amalgamations Valeo Clutch Pvt - Chennai",
     unloadingPoint: "CH35 - -",
-    deliveryNoteNo: "TEST",
-    itemNo: `PKKT${selectedQrData?.childPartCode}`,
+    deliveryNoteNo: invoiceNumber || "",
+    itemNo: `${selectedQrData?.childPartCode}`,
     deliveryDate: `D${deliveryDate?.replaceAll("-", "")}`,
     manufactureDate:`P${productionDate?.replaceAll("-", "")}`,
     expirationDate: `E${expirationDate?.replaceAll("-", "")}`,
     description: selectedQrData?.childPartDesc,
     quantityFilled: lineQt,
-    packageRefNo:  `PKPL${selectedQrData?.packageRefNo}`,
+    packageRefNo:  `${selectedQrData?.packageRefNo}`,
     supplierNo: vendorCode,
     pkgNo: selectedQrData?.pakageNo,
     batchNo: batchNumber,
-    traceability: selectedQrData?.childPartDesc || "QR123"
+    traceability: scannedValue || ""
   };
 /*
   const handleDownloadPDF = async () => {
@@ -234,7 +234,7 @@ footer={[
       {/* Right section (Traceability spanning 3 rows) */}
       <div
         style={{
-          width: "150px",
+          width: "160px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

@@ -19,8 +19,7 @@ const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData , setIsOver
     supplierNo: selectedQrData?.supplierCode,
     pkgNo: selectedQrData?.packageNo,
     batchNo: selectedQrData?.batchNo || 'N/A',
-    traceability: `${selectedQrData?.deliveryNoteNo} - ${selectedQrData?.customerSno} - ${selectedQrData?.deliveryDate} - ${selectedQrData?.manufacturingDate} ${selectedQrData?.childPartDesc} 
-    ${selectedQrData?.binCountQty} - ${selectedQrData?.childPartDesc} - ${selectedQrData?.packageNo}`,
+    traceability: `${selectedQrData?.updatedLabelCode}`,
   };
 
   return (
