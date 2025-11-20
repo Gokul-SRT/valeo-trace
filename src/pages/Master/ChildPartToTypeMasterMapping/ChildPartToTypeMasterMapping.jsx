@@ -12,6 +12,9 @@ import { Input, Button, Form, message } from "antd";
 import { toast } from "react-toastify";
 import store from "store";
 import serverApi from "../../../serverAPI";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import moment from "moment";
 ModuleRegistry.registerModules([
   SetFilterModule,
   DateFilterModule,
@@ -266,18 +269,131 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   //   }
   // };
 
-  const onExportExcel = (ref) => {
-    if (ref.current?.api) {
-      ref.current.api.exportDataAsExcel({
-        fileName: `ChildPartToTypeMaster.xlsx`,
+  
+
+
+ const onExportExcelChildPartToTypeMaster = async () => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("ChildPartToTypeMaster");
+
+    // === Row Height for Header ===
+    worksheet.getRow(1).height = 60;
+
+    // === Define Columns ===
+    worksheet.columns = [
+      { header: "Child Map ID", key: "childPacMapId", width: 20 },
+      { header: "Child Part Code", key: "childPartCode", width: 25 },
+      { header: "Type Code", key: "typeCode", width: 25 },
+    ];
+
+    // === Insert Left Logo (Optional) ===
+    try {
+      const imgResponse = await fetch("/pngwing.com.png");
+      const imgBlob = await imgResponse.blob();
+      const arrayBuffer = await imgBlob.arrayBuffer();
+      const imageId = workbook.addImage({
+        buffer: arrayBuffer,
+        extension: "png",
       });
-    } else {
-      alert("Grid is not ready!");
+      worksheet.addImage(imageId, {
+        tl: { col: 0, row: 0 },
+        br: { col: 1, row: 1 },
+        editAs: "oneCell",
+      });
+    } catch (err) {
+      console.warn("Logo image not found, skipping logo insert.");
     }
-  };
+
+    // === Title Cell ===
+    worksheet.mergeCells("B1:D2");
+    const titleCell = worksheet.getCell("B1");
+    titleCell.value = "Child Part To Type Master Report";
+    titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+
+    // === Date Cell (top right) ===
+    worksheet.mergeCells("E1:F2");
+    const dateCell = worksheet.getCell("E1");
+    dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+    dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+    dateCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+
+    // === Header Row ===
+    const headerRow = worksheet.addRow([
+      "Child Map ID",
+      "Child Part Code",
+      "Type Code",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
+      };
+      cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+    headerRow.height = 25;
+
+    // === AutoFilter ===
+    worksheet.autoFilter = {
+      from: { row: headerRow.number, column: 1 },
+      to: { row: headerRow.number, column: worksheet.columns.length },
+    };
+
+    // === Data Rows ===
+    masterList.forEach((row) => {
+      const newRow = worksheet.addRow({
+        childPacMapId: row.childPacMapId || "",
+        childPartCode: row.childPartCode || "",
+        typeCode: row.typeCode || "",
+      });
+
+      newRow.eachCell((cell) => {
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.font = { size: 10 };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+    });
+
+    // === Save Excel File ===
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], { type: "application/octet-stream" }),
+      `ChildPartToTypeMaster_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+    );
+  } catch (error) {
+    console.error("Excel export error:", error);
+    toast.error("Error exporting to Excel. Please try again.");
+  }
+};
+
+
+
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       {/* Second Card - Table */}
       {/* {masterList.length > 0 && ( */}
       <div className="card shadow" style={{ borderRadius: "6px" }}>
@@ -330,7 +446,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
           />
           <div className="text-center mt-4">
             <button
-              onClick={() => onExportExcel(gridRef)}
+              onClick={onExportExcelChildPartToTypeMaster}
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >

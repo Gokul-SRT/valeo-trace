@@ -11,9 +11,13 @@ import {
 } from "ag-grid-enterprise";
 import { Modal, Select, message } from "antd";
 import { toast } from "react-toastify";
-import { backendService, commonBackendService } from '../../../service/ToolServerApi'
-// import serverApi from "../../../serverAPI";
-// import CommonserverApi from "../../../CommonserverApi";
+import {
+  backendService,
+  commonBackendService,
+} from "../../../service/ToolServerApi";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import moment from "moment";
 
 ModuleRegistry.registerModules([
   SetFilterModule,
@@ -32,6 +36,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
   const [editingRow, setEditingRow] = useState(null);
   const [selectedOperations, setSelectedOperations] = useState([]);
   const gridRef = useRef(null);
+  const [currentFilter, setCurrentFilter] = useState("GetAll");
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -43,8 +48,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       try {
         const payload = { tenantId, branchCode };
         const response = await commonBackendService({
-          requestPath:"getProductGrpDropdown",
-          requestData:payload
+          requestPath: "getProductGrpDropdown",
+          requestData: payload,
         });
         const data = response?.responseData || [];
         setGroupDropdown(Array.isArray(data) ? data : []);
@@ -66,8 +71,11 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
           branchCode,
         };
 
-        const response = await backendService({requestPath:"getoperationMasterdtl", requestData: payload});
-        const data = response?.responseData  || [];
+        const response = await backendService({
+          requestPath: "getoperationMasterdtl",
+          requestData: payload,
+        });
+        const data = response?.responseData || [];
 
         const formatted = data.map((item) => ({
           value: item.operationId,
@@ -103,12 +111,14 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async () => {
     try {
-      const response = await backendService({requestPath:"getproductmasterdtl", 
-        requestData:{
-        isActive: "1",
-        tenantId,
-        branchCode,
-      }});
+      const response = await backendService({
+        requestPath: "getproductmasterdtl",
+        requestData: {
+          isActive: "1",
+          tenantId,
+          branchCode,
+        },
+      });
 
       if (!response || response.length === 0) {
         setMasterList([]);
@@ -398,7 +408,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
           isActive: item.isActive,
           updatedBy: employeeId,
           branchCode,
-          isInventory: "0",
+          isInventory: item.isInventory || "0",
         };
 
         return payload;
@@ -407,8 +417,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
       console.log("Sending data to API:", updatedList);
 
       const response = await backendService({
-        requestPath:"insertupdateproductmaster",
-        requestData:updatedList
+        requestPath: "insertupdateproductmaster",
+        requestData: updatedList,
       });
 
       if (response === "SUCCESS") {
@@ -438,9 +448,169 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     else setMasterList(originalList.filter((item) => item.isActive === "0"));
   };
 
-  const onExportExcel = (ref) => {
-    if (ref.current?.api)
-      ref.current.api.exportDataAsExcel({ fileName: "ProductMaster.xlsx" });
+  const onExportExcelProductMaster = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Product Master");
+
+      // === Column widths ===
+      worksheet.getColumn(1).width = 20; // Product Code
+      worksheet.getColumn(2).width = 30; // Product Description
+      worksheet.getColumn(3).width = 15; // UOM
+      worksheet.getColumn(4).width = 15; // Group Code
+      worksheet.getColumn(5).width = 40; // Operation Description
+      worksheet.getColumn(6).width = 12; // Is Active
+
+      worksheet.getRow(1).height = 65;
+
+      // === Valeo logo (left) ===
+      try {
+        const logo1 = await fetch("/pngwing.com.png");
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
+          extension: "png",
+        });
+        worksheet.addImage(imageId1, {
+          tl: { col: 0, row: 0 },
+          br: { col: 1, row: 1 },
+        });
+      } catch (error) {
+        console.warn("Left logo not found, continuing without it");
+      }
+
+      // === Title (center cell) ===
+      const titleCell = worksheet.getCell("C1");
+
+      // Filter data based on current selection from ORIGINAL LIST
+      const currentFilter = "GetAll"; // You might want to track this state like in the previous example
+      const dataToExport =
+        currentFilter === "GetAll"
+          ? originalList
+          : currentFilter === "1"
+          ? originalList.filter(
+              (item) => item.isActive === "1" || item.isActive === 1
+            )
+          : originalList.filter(
+              (item) => item.isActive === "0" || item.isActive === 0
+            );
+
+      const filterText =
+        currentFilter === "GetAll"
+          ? "All Records"
+          : currentFilter === "1"
+          ? "Active Records"
+          : "Inactive Records";
+
+      titleCell.value = `Product Master \n(${filterText})`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+      titleCell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+
+      // === SmartRun logo (right) ===
+      try {
+        const logo2 = await fetch("/smartrunLogo.png");
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
+          extension: "png",
+        });
+        worksheet.addImage(imageId2, {
+          tl: { col: 6, row: 0 },
+          br: { col: 7, row: 1 },
+        });
+      } catch (error) {
+        console.warn("Right logo not found, continuing without it");
+      }
+
+      // === Table Header ===
+      const startRow = 3;
+      const headers = [
+        "Product Code",
+        "Product Description",
+        "UOM",
+        "Group Code",
+        "Operation Description",
+        "Is Active",
+      ];
+
+      const headerRow = worksheet.getRow(startRow);
+      headers.forEach((header, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF305496" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      // === Add Data Rows ===
+      dataToExport.forEach((item, index) => {
+        const rowNumber = startRow + index + 1;
+        const row = worksheet.getRow(rowNumber);
+
+        row.getCell(1).value = item.productCode || "";
+        row.getCell(2).value = item.productDesc || "";
+        row.getCell(3).value = item.productUomCode || "";
+        row.getCell(4).value = item.groupCode || "";
+        row.getCell(5).value = item.operationDescription || "";
+        row.getCell(6).value =
+          item.isActive === 1 || item.isActive === "1" || item.isActive === true
+            ? "Active"
+            : "Inactive";
+
+        row.eachCell((cell) => {
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+
+      // === AutoFilter ===
+      if (dataToExport.length > 0) {
+        worksheet.autoFilter = {
+          from: { row: startRow, column: 1 },
+          to: { row: startRow + dataToExport.length, column: headers.length },
+        };
+      }
+
+      // === Save File ===
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Product_Master_${filterText.replace(/\s+/g, "_")}_${new Date()
+          .toISOString()
+          .replace(/[-T:.Z]/g, "")
+          .slice(0, 14)}.xlsx`
+      );
+    } catch (err) {
+      console.error("Excel export error:", err);
+      toast.error("Error exporting Product Master report. Please try again.");
+    }
   };
 
   const handlecellclicked = (params) => {
@@ -454,7 +624,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     console.log("selectedOperations", selectedOperations);
   }, [selectedOperations]);
   return (
-    <div className="container mt-1 p-0">
+    <div>
       <div className="card shadow" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -474,7 +644,11 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
               <label className="form-label fw-bold">Search Filter</label>
               <select
                 className="form-select"
-                onChange={(e) => handleFilterChange(e.target.value)}
+                value={currentFilter}
+                onChange={(e) => {
+                  setCurrentFilter(e.target.value);
+                  handleFilterChange(e.target.value);
+                }}
               >
                 <option value="GetAll">Get All</option>
                 <option value="1">Active</option>
@@ -506,7 +680,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
 
           <div className="text-center mt-4">
             <button
-              onClick={() => onExportExcel(gridRef)}
+              onClick={onExportExcelProductMaster}
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d" }}
             >

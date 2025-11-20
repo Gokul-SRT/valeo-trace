@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState,forwardRef  } from "react";
+import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -7,11 +7,18 @@ import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
 import { ExcelExportModule } from "ag-grid-enterprise";
+
 import { Input, Button, Form, message,Select } from "antd";
 import { backendService } from "../../../service/ToolServerApi";
 import { toast } from "react-toastify";
 import store from "store";
 // import serverApi from "../../../serverAPI";
+
+import serverApi from "../../../serverAPI";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import moment from "moment";
+
 ModuleRegistry.registerModules([
   SetFilterModule,
   DateFilterModule,
@@ -54,17 +61,19 @@ const MultiSelectEditor = forwardRef((props, ref) => {
       style={{ width: "100%" }}
       onChange={handleChange}
       placeholder="Select Product Codes"
-      options={props.values.map((item) => ({ label: item.value, value: item.key }))}
+      options={props.values.map((item) => ({
+        label: item.value,
+        value: item.key,
+      }))}
     />
   );
 });
-
 
 const LineMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
-  const [productData, setProductData] = useState([])
+  const [productData, setProductData] = useState([]);
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
   const gridRef = useRef(null);
 
@@ -85,7 +94,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
-      getProductDropDownData()
+      getProductDropDownData();
     }
   }, [selectedModule, selectedScreen]);
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
@@ -134,30 +143,40 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         // branchCode,
         isActive: "1",
+
       }
       const response = await backendService({requestPath:"getProductDropdown", requestData:payload});
 
-      let returnData = []; 
+     
+      
+
+
+      let returnData = [];
+
 
       if (response?.responseCode === '200' && response.responseData) {
+
+     
+
         // toast.success(response.data.responseMessage);
         returnData = response.responseData;
       } else {
+
         toast.error(response.responseMessage || "Failed to load Child Parts.");
+
       }
-      const options = returnData.map(item => ({
+      const options = returnData.map((item) => ({
         key: item.productCode || "",
-        value: item.productCode || ""
+        value: item.productCode || "",
       }));
       setProductData(options);
       return returnData;
-
     } catch (error) {
-      console.error('Error fetching child part dropdown data:', error);
-      toast.error('Error fetching data. Please try again later.');
+      console.error("Error fetching child part dropdown data:", error);
+      toast.error("Error fetching data. Please try again later.");
       return [];
     }
-  }
+  };
 
   const columnDefs = [
     {
@@ -171,7 +190,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
     },
-   /* {
+    /* {
       headerName: "Product Code",
       field: "productCode",
       filter: "agTextColumnFilter",
@@ -186,8 +205,6 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       return option ? option.value : params.value; // Display the value or the original code if not found
     },
     },*/
-    
-
 
     {
       headerName: "Product Code",
@@ -198,7 +215,10 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       cellEditorParams: { values: productData },
       valueFormatter: (params) => {
         if (!params.value) return "";
-        const keys = typeof params.value === "string" ? params.value.split(",") : params.value;
+        const keys =
+          typeof params.value === "string"
+            ? params.value.split(",")
+            : params.value;
         return keys
           .map((k) => {
             const option = productData.find((item) => item.key === k);
@@ -258,22 +278,28 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         branchCode: branchCode,
       }));
 
-    const response = await backendService({requestPath:"insertupdatelinemaster", requestData:updatedList});
+
+      const response = await serverApi.post(
+        "insertupdatelinemaster",
+        updatedList
+      );
+
 
       if (response && response === "SUCCESS") {
         toast.success("Data saved successfully!");
         fetchData();
-      }  else if (response && response === "DUBLICATE") {
-        toast.success("Do Not Allow Dublicate LineCode!");
 
-      }  else {
+      }  else if (response && response === "DUBLICATE") {
+
+      } else if (response.data && response.data === "DUBLICATE") {
+
+        toast.success("Do Not Allow Dublicate LineCode!");
+      } else {
         toast.error("SaveOrUpdate failed.");
-        
       }
     } catch (error) {
       console.error("Error saving product data:", error);
-       toast.error("Error while saving data!");
-     
+      toast.error("Error while saving data!");
     }
   };
 
@@ -297,18 +323,132 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-  const onExportExcel = (ref) => {
-    if (ref.current?.api) {
-      ref.current.api.exportDataAsExcel({
-        fileName: `LineMaster.xlsx`,
+  // const onExportExcel = (ref) => {
+  //   if (ref.current?.api) {
+  //     ref.current.api.exportDataAsExcel({
+  //       fileName: `LineMaster.xlsx`,
+  //     });
+  //   } else {
+  //     alert("Grid is not ready!");
+  //   }
+  // };
+
+ const onExportExcel = async () => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Line Master");
+
+    // === Header Row Height ===
+    worksheet.getRow(1).height = 60;
+
+    // === Set Columns ===
+    worksheet.columns = [
+      { header: "Line Code", key: "lineMstCode", width: 20 },
+      { header: "Line Description", key: "lineMstDesc", width: 30 },
+      { header: "Product Code(s)", key: "productCode", width: 30 },
+      { header: "Status", key: "isActive", width: 15 },
+    ];
+
+    // === Insert Logo (Optional) ===
+    try {
+      const imgResponse = await fetch("/pngwing.com.png");
+      const imgBlob = await imgResponse.blob();
+      const arrayBuffer = await imgBlob.arrayBuffer();
+      const imageId = workbook.addImage({
+        buffer: arrayBuffer,
+        extension: "png",
       });
-    } else {
-      alert("Grid is not ready!");
+      worksheet.addImage(imageId, {
+        tl: { col: 0, row: 0 },
+        br: { col: 1, row: 1 },
+        editAs: "oneCell",
+      });
+    } catch (err) {
+      console.warn("Logo image not found, skipping logo insert.");
     }
-  };
+
+    // === Title Cell ===
+    worksheet.mergeCells("B1:D2");
+    const titleCell = worksheet.getCell("B1");
+    titleCell.value = "Line Master Report";
+    titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+
+    // === Date Cell (Top-Right) ===
+    worksheet.mergeCells("E1:F2");
+    const dateCell = worksheet.getCell("E1");
+    dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+    dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+    dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
+    // === Header Row ===
+    const headerRow = worksheet.addRow([
+      "Line Code",
+      "Line Description",
+      "Product Code(s)",
+      "Status",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
+      };
+      cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    headerRow.height = 25;
+
+    // === AutoFilter for Header ===
+    worksheet.autoFilter = {
+      from: { row: headerRow.number, column: 1 },
+      to: { row: headerRow.number, column: worksheet.columns.length },
+    };
+
+    // === Data Rows ===
+    masterList.forEach((row) => {
+      const newRow = worksheet.addRow({
+        lineMstCode: row.lineMstCode || "",
+        lineMstDesc: row.lineMstDesc || "",
+        productCode: row.productCode || "",
+        isActive: row.isActive === "1" ? "Active" : "Inactive",
+      });
+
+      newRow.eachCell((cell) => {
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.font = { size: 10 };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+    });
+
+    // === Save Excel File ===
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], { type: "application/octet-stream" }),
+      `Line_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+    );
+  } catch (error) {
+    console.error("Excel export error:", error);
+    toast.error("Error exporting to Excel. Please try again.");
+  }
+};
+
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       {/* Second Card - Table */}
       {/* {masterList.length > 0 && ( */}
       <div className="card shadow" style={{ borderRadius: "6px" }}>
@@ -361,7 +501,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
           />
           <div className="text-center mt-4">
             <button
-              onClick={() => onExportExcel(gridRef)}
+              onClick={onExportExcel}
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
