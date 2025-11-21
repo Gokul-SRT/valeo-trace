@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState,forwardRef } from "react";
+import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -6,7 +6,7 @@ import "ag-grid-enterprise";
 import { ModuleRegistry } from "ag-grid-community";
 import { SetFilterModule } from "ag-grid-enterprise";
 import { DateFilterModule } from "ag-grid-enterprise";
-import {Select} from "antd";
+import { Select } from "antd";
 import store from "store";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
@@ -18,63 +18,6 @@ ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
 const { Option } = Select;
 // 🔹 Custom MultiSelect Cell Editor
-/*const MultiSelectEditor = forwardRef((props, ref) => {
-  const [selectedValues, setSelectedValues] = useState([]);
-
-  
-  useEffect(() => {
-    if (props.data && props.colDef.field) {
-      const initial = props.data[props.colDef.field];
-      if (typeof initial === "string" && initial.length > 0) {
-        setSelectedValues(initial.split(",")); // string to array
-      } else if (Array.isArray(initial)) {
-        setSelectedValues(initial); // already array
-      } else {
-        setSelectedValues([]); // fallback empty
-      }
-    }
-  }, [props.data, props.colDef.field]);
-
-  // Expose value to ag-Grid when editing is done
-  React.useImperativeHandle(ref, () => ({
-    getValue() {
-      return selectedValues.join(",");
-    },
-  }));
-
-  
-
-  const handleChange = (values) => {
-    // Merge with current row value
-    const existing = props.data[props.colDef.field]
-      ? props.data[props.colDef.field].split(",")
-      : [];
-  
-    // Create a unique set of codes
-    const merged = Array.from(new Set([...existing, ...values]));
-  
-    setSelectedValues(merged);
-    props.node.setDataValue(props.colDef.field, merged.join(","));
-  };
-
-  return (
-    <Select
-      mode="multiple"
-      value={selectedValues}
-      style={{ width: "100%" }}
-      onChange={handleChange}
-      placeholder="Select Product Codes"
-      options={props.values.map((v) => ({
-        label: v.value,
-        value: v.key,
-      }))}
-    />
-  );
-});
-
-
-*/
-
 const MultiSelectEditor = forwardRef((props, ref) => {
   const field = props.colDef.field;
   const [selectedValues, setSelectedValues] = useState([]);
@@ -98,25 +41,25 @@ const MultiSelectEditor = forwardRef((props, ref) => {
     },
   }));
 
-  
-/*
+
+  /*
+    const handleChange = (values) => {
+      // Merge with current row value
+      const existing = props.data[props.colDef.field]
+        ? props.data[props.colDef.field].split(",")
+        : [];
+    
+      // Create a unique set of codes
+      const merged = Array.from(new Set([...existing, ...values]));
+    
+      setSelectedValues(merged);
+      props.node.setDataValue(props.colDef.field, merged.join(","));
+    };
+  */
   const handleChange = (values) => {
-    // Merge with current row value
-    const existing = props.data[props.colDef.field]
-      ? props.data[props.colDef.field].split(",")
-      : [];
-  
-    // Create a unique set of codes
-    const merged = Array.from(new Set([...existing, ...values]));
-  
-    setSelectedValues(merged);
-    props.node.setDataValue(props.colDef.field, merged.join(","));
+    setSelectedValues(values);                  // update local state
+    props.node.setDataValue(field, values.join(",")); // update AG Grid row
   };
-*/
-const handleChange = (values) => {
-  setSelectedValues(values);                  // update local state
-  props.node.setDataValue(field, values.join(",")); // update AG Grid row
-};
   return (
     <Select
       mode="multiple"
@@ -140,6 +83,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const [originalList, setOriginalList] = useState([]);
   const [productMastOptions, setProductMastOptions] = useState([]);
   const [childPartMastOptions, setChildPartMastOptions] = useState([]);
+  // const [mainList, setMainList] = useState([])
+  // const [pageSize, setPageSize] = useState(10);
   //const [lineMastOptions, setLineMastOptions] = useState([]);
   const gridRef = useRef(null);
 
@@ -168,101 +113,121 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   }, [selectedModule, selectedScreen]);
 
   const fetchData = async (e) => {
-      try {
-        const response = await serverApi.post("getoperationMasterdtl", {
-          isActive:"1",
-          tenantId,
-          branchCode,
-        });
-        if (response?.data?.responseCode === '200') {
-          console.log(response)
-          const updatedResponseData = response?.data?.responseData.map((item) => ({
-            ...item,
-            isUpdate: 1,
-          }));
-          setMasterList(updatedResponseData);
-          setOriginalList(updatedResponseData);
-        }else{
-          setMasterList([]);
-          setOriginalList([]);
-          toast.error(response.data.responseMessage)
-        }
-      } catch (error) {
-        
-        toast.error("Error fetching data. Please try again later.");
+    try {
+      const response = await serverApi.post("getoperationMasterdtl", {
+        isActive: "getAll",
+        tenantId,
+        branchCode,
+      });
+      if (response?.data?.responseCode === '200') {
+        console.log(response)
+        const updatedResponseData = response?.data?.responseData.map((item) => ({
+          ...item,
+          isUpdate: 1,
+        }));
+        setMasterList(updatedResponseData);
+        // setOriginalList(updatedResponseData);
+        setOriginalList(structuredClone(updatedResponseData));
+        // setMainList(updatedResponseData)
+      } else {
+        setMasterList([]);
+        setOriginalList([]);
+        // setMainList([])
+        toast.error(response.data.responseMessage)
       }
-    };
+    } catch (error) {
+
+      toast.error("Error fetching data. Please try again later.");
+    }
+  };
 
 
-    const productMastData = async () => {
-      try {
-        const response = await serverApi.post("getProductDropdown", {
-          tenantId,
-          branchCode,
-          isActive: "1",
-        });
-    
-        const res = response.data;
-        if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-          setProductMastOptions(res.responseData);
-        } else {
-          setProductMastOptions([]);
-        }
-      } catch (error) {
-        
-        toast.error("Error fetching productMastData. Please try again later.");
+  const productMastData = async () => {
+    try {
+      const response = await serverApi.post("getProductDropdown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setProductMastOptions(res.responseData);
+      } else {
+        setProductMastOptions([]);
       }
-    };
+    } catch (error) {
 
-    const childPartMastData = async () => {
-      try {
-        const response = await serverApi.post("getChildPartDropDown", {
-          tenantId,
-          branchCode,
-          isActive: "1",
-        });
-    
-        const res = response.data;
-        if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-          const options = res.responseData.map(item => ({
-            key: item.childPartId,    // send this to backend
-            value: item.childPartCode // display this in dropdown
-          }));
-          setChildPartMastOptions(options);
-        } else {
-          setChildPartMastOptions([]);
-        }
-      } catch (error) {
-        
-        toast.error("Error fetching ChildPartMastData. Please try again later.");
+      toast.error("Error fetching productMastData. Please try again later.");
+    }
+  };
+
+  const childPartMastData = async () => {
+    try {
+      const response = await serverApi.post("getChildPartDropDown", {
+        tenantId,
+        branchCode,
+        isActive: "1",
+      });
+
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        const options = res.responseData.map(item => ({
+          key: item.childPartId,    // send this to backend
+          value: item.childPartCode // display this in dropdown
+        }));
+        setChildPartMastOptions(options);
+      } else {
+        setChildPartMastOptions([]);
       }
-    };
+    } catch (error) {
+
+      toast.error("Error fetching ChildPartMastData. Please try again later.");
+    }
+  };
 
 
-   /* const lineMastData = async () => {
-      try {
-        const response = await serverApi.post("getLineDropdown", {
-          tenantId,
-          branchCode,
-          isActive: "1",
-        });
-    
-        const res = response.data;
-       if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-          setLineMastOptions(res.responseData);
-        } else {
-          setLineMastOptions([]);
-        }
-      } catch (error) {
-        
-        toast.error("Error fetching lineMastData. Please try again later.");
-      }
-    };
+  /* const lineMastData = async () => {
+     try {
+       const response = await serverApi.post("getLineDropdown", {
+         tenantId,
+         branchCode,
+         isActive: "1",
+       });
+   
+       const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+         setLineMastOptions(res.responseData);
+       } else {
+         setLineMastOptions([]);
+       }
+     } catch (error) {
+       
+       toast.error("Error fetching lineMastData. Please try again later.");
+     }
+   };
 
 */
+  const normalizeList = (list) => {
+    return list.map(item => ({
+      ...item,
+      isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
+    }));
+  };
 
-    const createorUpdate = async () => {
+  const hasChanges = () => {
+    const normMaster = normalizeList(masterList);
+    const normOriginal = normalizeList(originalList);
+    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  };
+  const createorUpdate = async () => {
     try {
+
+      if (!hasChanges()) {
+        toast.error("Change any one field before saving.");
+        return;
+      }
+
       const updatedList = masterList.map(item => ({
         isUpdate: item.isUpdate,
         isActive: item.isActive,
@@ -273,19 +238,24 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         updatedBy: employeeId,
         branchCode,
-        childPartCode:item.childPartId,
+        childPartCode: item.childPartId,
         //productCode:item.productCode,
-       // lineCode:item.lineMstCode,
+        // lineCode:item.lineMstCode,
       }));
+      const emptyRowss = masterList.filter((item) => !item.operationId && !item.operationUniquecode);
+      if (emptyRowss && emptyRowss?.length === 0) {
+        const response = await serverApi.post("insertupdateoperationmaster", updatedList);
 
-      const response = await serverApi.post("insertupdateoperationmaster", updatedList);
-
-      if (response?.data?.responseCode === '200') {
-        toast.success(response.data.responseMessage)
+        if (response?.data?.responseCode === '200') {
+          toast.success(response.data.responseMessage)
+        } else {
+          toast.error(response.data.responseMessage)
+        }
         fetchData();
       } else {
-        toast.error(response.data.responseMessage)
+       toast.error("Please enter the mandatory fields.");
       }
+
     } catch (error) {
       console.error("Error saving data:", error);
       toast.error("Error while saving data!");
@@ -299,180 +269,190 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   };
 
   const columnDefs = [
-     {
+    {
       headerName: "Operation Id",
       field: "operationId",
       filter: "agTextColumnFilter",
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
+      headerComponent: () => (
+        <span>
+          Operation Id <span style={{ color: "red" }}>*</span>
+        </span>
+      ),
     },
     {
       headerName: "Operation Code",
       field: "operationUniquecode",
       filter: "agTextColumnFilter",
+      // headerComponent: () => (
+      //   <span>
+      //     Operation Code <span style={{ color: "red" }}>*</span>
+      //   </span>
+      // ),
       //editable: (params) => !params.data || !params.data.operationCode, 
-     // editable: (params) => (params.data.isUpdate === 0 ? true : false),
+      // editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Operation Description",
       field: "operationDesc",
       filter: "agTextColumnFilter",
     },
-   /*  {
-      headerName: "Production Parameter Count",
-      field: "productionParameterCount",
-      filter: "agTextColumnFilter",
-    },
-*/
-   /* {
+    /*  {
+       headerName: "Production Parameter Count",
+       field: "productionParameterCount",
+       filter: "agTextColumnFilter",
+     },
+ */
+    /* {
+       headerName: "Product Code",
+       field: "productCode",
+       editable: true,
+       cellEditor: "agSelectCellEditor",
+       cellEditorParams: (params) => ({
+         values: productMastOptions.map((p) => p.productCode), // show part IDs in dropdown
+       }),
+       valueFormatter: (params) => {
+         const found = productMastOptions.find((p) => p.productCode === params.value);
+         return found ? `${found.productDesc}` : params.value; // display description in grid
+       },
+       filter: "agTextColumnFilter",
+       filterValueGetter: (params) => {
+         const found = productMastOptions.find((p) => p.productCode === params.data.productCode);
+         return found ? found.productDesc : ""; // search/filter by description
+       },
+     },
+ */
+    /*{
       headerName: "Product Code",
       field: "productCode",
       editable: true,
-      cellEditor: "agSelectCellEditor",
+      cellEditor: MultiSelectEditor,
+    
       cellEditorParams: (params) => ({
-        values: productMastOptions.map((p) => p.productCode), // show part IDs in dropdown
+        // ✅ Proper structure for custom editor
+        values: productMastOptions.map((p) => ({
+          key: p.productCode,
+          value: `${p.productCode} - ${p.productDesc}`
+        })),
       }),
+    
       valueFormatter: (params) => {
-        const found = productMastOptions.find((p) => p.productCode === params.value);
-        return found ? `${found.productDesc}` : params.value; // display description in grid
+        if (!params.value) return "";
+        const codes = typeof params.value === "string"
+          ? params.value.split(",")
+          : params.value;
+    
+        return codes
+          .map((code) => {
+            const cleanCode = code.trim();
+            const option = productMastOptions.find(
+              (p) => p.productCode === cleanCode
+            );
+            return option
+              ? `${option.productCode} - ${option.productDesc}`
+              : cleanCode;
+          })
+          .join(", ");
       },
+    
       filter: "agTextColumnFilter",
       filterValueGetter: (params) => {
-        const found = productMastOptions.find((p) => p.productCode === params.data.productCode);
-        return found ? found.productDesc : ""; // search/filter by description
-      },
-    },
-*/
-/*{
-  headerName: "Product Code",
-  field: "productCode",
-  editable: true,
-  cellEditor: MultiSelectEditor,
-
-  cellEditorParams: (params) => ({
-    // ✅ Proper structure for custom editor
-    values: productMastOptions.map((p) => ({
-      key: p.productCode,
-      value: `${p.productCode} - ${p.productDesc}`
-    })),
-  }),
-
-  valueFormatter: (params) => {
-    if (!params.value) return "";
-    const codes = typeof params.value === "string"
-      ? params.value.split(",")
-      : params.value;
-
-    return codes
-      .map((code) => {
-        const cleanCode = code.trim();
         const option = productMastOptions.find(
-          (p) => p.productCode === cleanCode
+          (p) => p.productCode === params.data.productCode
         );
         return option
           ? `${option.productCode} - ${option.productDesc}`
-          : cleanCode;
-      })
-      .join(", ");
-  },
-
-  filter: "agTextColumnFilter",
-  filterValueGetter: (params) => {
-    const option = productMastOptions.find(
-      (p) => p.productCode === params.data.productCode
-    );
-    return option
-      ? `${option.productCode} - ${option.productDesc}`
-      : "";
-  },
-},*/
-
-/*{
-  headerName: "ChildPart Code",
-  field: "childPartCode",
-  editable: true,
-  cellEditor: MultiSelectEditor,
-
-  cellEditorParams: (params) => ({
-    // ✅ Proper structure for custom editor
-    values: childPartMastOptions.map((p) => ({
-      key: p.childPartId,
-      value: `${p.childPartCode} - ${p.childPartDesc}`
-    })),
-  }),
-
-  valueFormatter: (params) => {
-    if (!params.value) return "";
-    const codes = typeof params.value === "string"
-      ? params.value.split(",")
-      : params.value;
-
-    return codes
-      .map((code) => {
-        const cleanCode = code.trim();
-        const option = childPartMastOptions.find(
-          (p) => p.childPartId === cleanCode
-        );
-        return option
-          ? `${option.childPartId} - ${option.childPartDesc}`
-          : cleanCode;
-      })
-      .join(", ");
-  },
-
-  filter: "agTextColumnFilter",
-  filterValueGetter: (params) => {
-    const option = childPartMastOptions.find(
-      (p) => p.childPartId === params.data.childPartCode
-    );
-    return option
-      ? `${option.childPartCode} - ${option.childPartDesc}`
-      : "";
-  },
-},
-
-*/
-{
-  headerName: "ChildPart Code",
-  field: "childPartId", // holds childPartId(s) as string
-  filter: "agTextColumnFilter",
-  editable: true,
-  cellEditor: MultiSelectEditor,
-  cellEditorParams: { values: childPartMastOptions || [] }, // pass API data
-  valueFormatter: (params) => {
-    if (!params.value) return "";
-    const ids = typeof params.value === "string" ? params.value.split(",") : params.value;
-    return ids
-      .map((id) => {
-        const option = (childPartMastOptions || []).find((item) => item.key === id);
-        return option ? option.value : id; // display childPartCode
-      })
-      .join(", ");
-  },
-},
-
-
-
-
-
-   /* {
-      headerName: "Line Code",
-      field: "lineMstCode",
-      editable: true,
-      cellEditor: "agSelectCellEditor",
-      cellEditorParams: (params) => ({
-        values: lineMastOptions.map((p) => p.lineMstCode), // show part IDs in dropdown
-      }),
-      valueFormatter: (params) => {
-        const found = lineMastOptions.find((p) => p.lineMstCode === params.value);
-        return found ? `${found.lineMstDesc}` : params.value; // display description in grid
+          : "";
       },
+    },*/
+
+    /*{
+      headerName: "ChildPart Code",
+      field: "childPartCode",
+      editable: true,
+      cellEditor: MultiSelectEditor,
+    
+      cellEditorParams: (params) => ({
+        // ✅ Proper structure for custom editor
+        values: childPartMastOptions.map((p) => ({
+          key: p.childPartId,
+          value: `${p.childPartCode} - ${p.childPartDesc}`
+        })),
+      }),
+    
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const codes = typeof params.value === "string"
+          ? params.value.split(",")
+          : params.value;
+    
+        return codes
+          .map((code) => {
+            const cleanCode = code.trim();
+            const option = childPartMastOptions.find(
+              (p) => p.childPartId === cleanCode
+            );
+            return option
+              ? `${option.childPartId} - ${option.childPartDesc}`
+              : cleanCode;
+          })
+          .join(", ");
+      },
+    
       filter: "agTextColumnFilter",
       filterValueGetter: (params) => {
-        const found = lineMastOptions.find((p) => p.lineMstCode === params.data.lineMstCode);
-        return found ? found.lineMstDesc : ""; // search/filter by description
+        const option = childPartMastOptions.find(
+          (p) => p.childPartId === params.data.childPartCode
+        );
+        return option
+          ? `${option.childPartCode} - ${option.childPartDesc}`
+          : "";
       },
     },
-*/
+    
+    */
+    {
+      headerName: "ChildPart Code",
+      field: "childPartId", // holds childPartId(s) as string
+      filter: "agTextColumnFilter",
+      editable: true,
+      cellEditor: MultiSelectEditor,
+      cellEditorParams: { values: childPartMastOptions || [] }, // pass API data
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const ids = typeof params.value === "string" ? params.value.split(",") : params.value;
+        return ids
+          .map((id) => {
+            const option = (childPartMastOptions || []).find((item) => item.key === id);
+            return option ? option.value : id; // display childPartCode
+          })
+          .join(", ");
+      },
+    },
+
+
+
+
+
+    /* {
+       headerName: "Line Code",
+       field: "lineMstCode",
+       editable: true,
+       cellEditor: "agSelectCellEditor",
+       cellEditorParams: (params) => ({
+         values: lineMastOptions.map((p) => p.lineMstCode), // show part IDs in dropdown
+       }),
+       valueFormatter: (params) => {
+         const found = lineMastOptions.find((p) => p.lineMstCode === params.value);
+         return found ? `${found.lineMstDesc}` : params.value; // display description in grid
+       },
+       filter: "agTextColumnFilter",
+       filterValueGetter: (params) => {
+         const found = lineMastOptions.find((p) => p.lineMstCode === params.data.lineMstCode);
+         return found ? found.lineMstDesc : ""; // search/filter by description
+       },
+     },
+ */
 
     {
       headerName: "Status",
@@ -492,19 +472,30 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
 
   // Add new empty row
   const handleAddRow = () => {
-     const emptyRow = {
-            isUpdate:0
-          };
-          const emptyRowss = masterList.filter((item)=> !item.operationId && !item.operationUniquecode);
-      
-            if(emptyRowss && emptyRowss?.length === 0){
-              const updated = [...masterList, emptyRow];
-              setMasterList(updated);
-              setOriginalList(updated);
-            }else{
-            // ("Please enter the empty rows.");
-            toast.error("Please enter the empty rows.");
-            } 
+    const emptyRow = {
+      operationId: "",
+      operationUniquecode: "",
+      isUpdate: 0,
+      isActive: 1,
+    };
+    const emptyRowss = masterList.filter((item) => !item.operationId && !item.operationUniquecode);
+
+    if (emptyRowss && emptyRowss?.length === 0) {
+      const updated = [...masterList, emptyRow];
+      setMasterList(updated);
+      // setOriginalList(updated);
+
+      setTimeout(() => {
+        const api = gridRef?.current?.api;
+        if (api && api.paginationGetTotalPages) {
+          const totalPages = api.paginationGetTotalPages();
+          api.paginationGoToPage(Math.max(0, totalPages - 1));
+        }
+      }, 0);
+    } else {
+      // ("Please enter the empty rows.");
+      toast.error("Please enter the empty rows.");
+    }
   };
 
   // Cancel
@@ -526,121 +517,93 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-  
+
 
 
   const onExportExcel = async () => {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Operation Master Report");
-
-    // === Row Height for header ===
-    worksheet.getRow(1).height = 60;
-
-    // === Define Columns ===
-    worksheet.columns = [
-      { header: "Operation ID", key: "operationId", width: 20 },
-      { header: "Operation Code", key: "operationUniquecode", width: 25 },
-      { header: "Operation Description", key: "operationDesc", width: 35 },
-      { header: "ChildPart Code", key: "childPartId", width: 25 },
-      { header: "Status", key: "isActive", width: 15 },
-    ];
-
-    // === Insert Left Logo (Valeo) ===
     try {
-      const imgResponse = await fetch("/pngwing.com.png");
-      const imgBlob = await imgResponse.blob();
-      const arrayBuffer = await imgBlob.arrayBuffer();
-      const imageId = workbook.addImage({
-        buffer: arrayBuffer,
-        extension: "png",
-      });
-      worksheet.addImage(imageId, {
-        tl: { col: 0, row: 0 },
-        br: { col: 1, row: 1 },
-        editAs: "oneCell",
-      });
-    } catch {
-      console.warn("Logo not found — skipping image insert.");
-    }
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Operation Master Report");
 
-    // === Title Cell ===
-    worksheet.mergeCells("B1:D2");
-    const titleCell = worksheet.getCell("B1");
-    titleCell.value = "Operation Master Report";
-    titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
-    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      // === Row Height for header ===
+      worksheet.getRow(1).height = 60;
 
-    // === Date (top right) ===
-    worksheet.mergeCells("E1:F2");
-    const dateCell = worksheet.getCell("E1");
-    dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
-    dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
-    dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      // === Define Columns ===
+      worksheet.columns = [
+        { header: "Operation ID", key: "operationId", width: 20 },
+        { header: "Operation Code", key: "operationUniquecode", width: 25 },
+        { header: "Operation Description", key: "operationDesc", width: 35 },
+        { header: "ChildPart Code", key: "childPartId", width: 25 },
+        { header: "Status", key: "isActive", width: 15 },
+      ];
 
-    // === Insert Right Logo (SmartRun) ===
-    try {
-      const secondImgResponse = await fetch("/smartrunLogo.png");
-      const secondImgBlob = await secondImgResponse.blob();
-      const secondArrayBuffer = await secondImgBlob.arrayBuffer();
-      const secondImageId = workbook.addImage({
-        buffer: secondArrayBuffer,
-        extension: "png",
-      });
-      worksheet.mergeCells("G1:H2");
-      worksheet.addImage(secondImageId, {
-        tl: { col: 6, row: 0 },
-        br: { col: 8, row: 2 },
-        editAs: "oneCell",
-      });
-    } catch {
-      console.warn("SmartRun logo not found — skipping right logo insert.");
-    }
+      // === Insert Left Logo (Valeo) ===
+      try {
+        const imgResponse = await fetch("/pngwing.com.png");
+        const imgBlob = await imgResponse.blob();
+        const arrayBuffer = await imgBlob.arrayBuffer();
+        const imageId = workbook.addImage({
+          buffer: arrayBuffer,
+          extension: "png",
+        });
+        worksheet.addImage(imageId, {
+          tl: { col: 0, row: 0 },
+          br: { col: 1, row: 1 },
+          editAs: "oneCell",
+        });
+      } catch {
+        console.warn("Logo not found — skipping image insert.");
+      }
 
-    // === Header Row ===
-    const headerRow = worksheet.addRow([
-      "Operation ID",
-      "Operation Code",
-      "Operation Description",
-      "ChildPart Code",
-      "Status",
-    ]);
-    headerRow.eachCell((cell) => {
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
-      };
-      cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
-      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-    headerRow.height = 25;
+      // === Title Cell ===
+      worksheet.mergeCells("B1:D2");
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = "Operation Master Report";
+      titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
 
-    // === AutoFilter ===
-    worksheet.autoFilter = {
-      from: { row: headerRow.number, column: 1 },
-      to: { row: headerRow.number, column: worksheet.columns.length },
-    };
+      // === Date (top right) ===
+      worksheet.mergeCells("E1:F2");
+      const dateCell = worksheet.getCell("E1");
+      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+      dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+      dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
-    // === Data Rows ===
-    masterList.forEach((item) => {
-      const newRow = worksheet.addRow({
-        operationId: item.operationId || "",
-        operationUniquecode: item.operationUniquecode || "",
-        operationDesc: item.operationDesc || "",
-        childPartId: item.childPartId || "",
-        isActive: item.isActive === "1" ? "Active" : "Inactive",
-      });
+      // === Insert Right Logo (SmartRun) ===
+      try {
+        const secondImgResponse = await fetch("/smartrunLogo.png");
+        const secondImgBlob = await secondImgResponse.blob();
+        const secondArrayBuffer = await secondImgBlob.arrayBuffer();
+        const secondImageId = workbook.addImage({
+          buffer: secondArrayBuffer,
+          extension: "png",
+        });
+        worksheet.mergeCells("G1:H2");
+        worksheet.addImage(secondImageId, {
+          tl: { col: 6, row: 0 },
+          br: { col: 8, row: 2 },
+          editAs: "oneCell",
+        });
+      } catch {
+        console.warn("SmartRun logo not found — skipping right logo insert.");
+      }
 
-      newRow.eachCell((cell) => {
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.font = { size: 10 };
+      // === Header Row ===
+      const headerRow = worksheet.addRow([
+        "Operation ID",
+        "Operation Code",
+        "Operation Description",
+        "ChildPart Code",
+        "Status",
+      ]);
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
+        cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -648,103 +611,133 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
           right: { style: "thin" },
         };
       });
-    });
+      headerRow.height = 25;
 
-    // === Save File ===
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-      new Blob([buffer], { type: "application/octet-stream" }),
-      `Operation_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-    );
-  } catch (error) {
-    console.error("Excel export error:", error);
-    toast.error("Error exporting to Excel. Please try again.");
-  }
-};
+      // === AutoFilter ===
+      worksheet.autoFilter = {
+        from: { row: headerRow.number, column: 1 },
+        to: { row: headerRow.number, column: worksheet.columns.length },
+      };
+
+      // === Data Rows ===
+      masterList.forEach((item) => {
+        const newRow = worksheet.addRow({
+          operationId: item.operationId || "",
+          operationUniquecode: item.operationUniquecode || "",
+          operationDesc: item.operationDesc || "",
+          childPartId: item.childPartId || "",
+          isActive: item.isActive === "1" ? "Active" : "Inactive",
+        });
+
+        newRow.eachCell((cell) => {
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.font = { size: 10 };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+
+      // === Save File ===
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Operation_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Error exporting to Excel. Please try again.");
+    }
+  };
 
 
 
   return (
     <div>
       {/* {masterList.length > 0 && ( */}
+      <div
+        className="card shadow mt-4"
+        style={{ borderRadius: "6px" }}
+      >
         <div
-          className="card shadow mt-4"
-          style={{ borderRadius: "6px" }}
+          className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
+          style={{ backgroundColor: "#00264d" }}
         >
-          <div
-            className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
-            style={{ backgroundColor: "#00264d" }}
-          >
-            {selectedScreen} Details
-            <PlusOutlined
-              style={{ fontSize: "20px", cursor: "pointer", color: "white" }}
-              onClick={handleAddRow}
-              title="Add Row"
-            />
-          </div>
+          {selectedScreen} Details
+          <PlusOutlined
+            style={{ fontSize: "20px", cursor: "pointer", color: "white" }}
+            onClick={handleAddRow}
+            title="Add Row"
+          />
+        </div>
 
-          {/* Filter Dropdown */}
-          <div className="p-3">
-            <div className="row">
-              <div className="col-md-3">
-                <label className="form-label fw-bold">Search Filter</label>
-                <select
-                  className="form-select"
-                  onChange={(e) => handleFilterChange(e.target.value)}
-                >
-                  <option value="GetAll">Get All</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="card-body p-3">
-            <AgGridReact
-              ref={gridRef}
-              rowData={masterList}
-              columnDefs={columnDefs}
-              defaultColDef={defaultColDef}
-              paginationPageSize={100}
-              pagination={true}
-              domLayout="autoHeight"
-              singleClickEdit={true}
-              onFirstDataRendered={autoSizeAllColumns}
-              onCellValueChanged={(params) => {
-                const updatedList = [...masterList];
-                updatedList[params.rowIndex] = params.data;
-                setMasterList(updatedList);
-                setOriginalList(updatedList);
-              }}
-            />
-            <div className="text-center mt-4">
-              <button
-                onClick={onExportExcel}
-                className="btn text-white me-2"
-                style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+        {/* Filter Dropdown */}
+        <div className="p-3">
+          <div className="row">
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
               >
-                Excel
-              </button>
-              <button
-                type="submit"
-                className="btn text-white me-2"
-                style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-                onClick={createorUpdate}
-              >
-                Update
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="btn text-white"
-                style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-              >
-                Cancel
-              </button>
+                <option value="GetAll">Get All</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
             </div>
           </div>
         </div>
+
+        <div className="card-body p-3">
+          <AgGridReact
+            ref={gridRef}
+            rowData={masterList}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 20, 50, 100]}
+            pagination={true}
+            domLayout="autoHeight"
+            singleClickEdit={true}
+            onFirstDataRendered={autoSizeAllColumns}
+            onCellValueChanged={(params) => {
+              const updatedList = [...masterList];
+              updatedList[params.rowIndex] = structuredClone(params.data);
+              // updatedList[params.rowIndex] = params.data;
+              setMasterList(updatedList);
+              // setOriginalList(updatedList);
+            }}
+          />
+          <div className="text-center mt-4">
+            <button
+              onClick={onExportExcel}
+              className="btn text-white me-2"
+              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+            >
+              Excel
+            </button>
+            <button
+              type="submit"
+              className="btn text-white me-2"
+              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+              onClick={createorUpdate}
+            >
+              Update
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="btn text-white"
+              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
       {/* )} */}
     </div>
   );
