@@ -70,15 +70,16 @@ const NextProcessTraceabilityLog = () => {
     if (!scannedValue) return;
 
     // Regex: ignore anything before the 18-digit prefix
-    const match = scannedValue.match(/\d{18}([A-Z0-9]+)\s+(\d+)/i);
+  //  const match = scannedValue.match(/\d{18}([A-Z0-9]+)\s+(\d+)/i);
 
-    if (!match) {
-      toast.error("Invalid barcode format");
+    // if (!match) {
+    //   toast.error("Invalid barcode format");
 
-      return;
-    }
+    //   return;
+    // }
 
-    const toolNo = match[1]; // e.g., 157042 or CF72760
+    //const toolNo = match[1]; // e.g., 157042 or CF72760
+    const toolNo = scannedValue;
     console.log(toolNo, "toolNo");
 
     const row = toolMonitorDetails.find((item) => item.toolNo === toolNo);

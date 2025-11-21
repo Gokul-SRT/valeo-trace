@@ -588,9 +588,9 @@ const inputRef = useRef(null);
 
   const lineFeederColumns = [
     { title: "S.No", key: "sno",render:(text,record,index)=>index+1 },
-
     { title: "Child Part Code", dataIndex: "childPartCode", key: "childPartCode" },
     { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
+    { title: "Item Type", dataIndex: "itemType", key: "itemType" },
     { title: "Picklist Qty(Nos)", dataIndex: "picklistQty", key: "picklistQty", align: "right", },
     { title: "Picked Qty(Nos)", dataIndex: "pickedQty", key: "pickedQty", align: "right", },
     
@@ -623,8 +623,6 @@ const inputRef = useRef(null);
         );
       },
     },
-    
-  
     {
       title: "Action",
       dataIndex: "itemType",
@@ -655,6 +653,50 @@ const inputRef = useRef(null);
           </Button>
         ) :null,
     }
+
+  /*
+    {
+      title: "Action",
+      dataIndex: "itemType",
+      key: "itemType",
+      render: (_, record) =>
+        record.itemType === "A2" || record.itemType === "B2"? (
+          <Button
+            type="link"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              // setSelectedType(record.itemType);
+              // setSelectedPrintPart(record.childPartCode);
+              // setCurrentPage("printPage");
+              // setShowPrintDetails(false);
+
+             navigate("/picklistprint",{
+              state:{
+                pickListCode:plksCode,
+                childPartCode:record.childPartCode,
+                planQty:record.picklistQty,
+                itemType:record.itemType,
+              }
+             })
+              
+            }}
+          >
+            Print
+          </Button>
+        ) : record.itemType === "C" ? (
+          <Button
+            type="link"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              setSelectedType(record.itemType);
+              navigate("/Kittingprocessscreen");
+            }}
+            >
+                Print
+            </Button>
+        ):null,
+    }
+*/
 
   ];
 
