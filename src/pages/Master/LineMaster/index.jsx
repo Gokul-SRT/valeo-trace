@@ -243,6 +243,9 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         return true;
       },
       cellStyle: { textAlign: "center" },
+      minWidth: 120,
+      maxWidth: 160,
+      flex: 1,   // dynamic resizing
     },
   ];
 
@@ -253,7 +256,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     };
 
     const linecodeempty = masterList.filter((item) => !item.lineMstCode);
-    console.log(linecodeempty);
+    console.log(linecodeempty,"linecodeempty");
     if (linecodeempty && linecodeempty?.length === 0) {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
@@ -266,6 +269,31 @@ const LineMaster = ({ modulesprop, screensprop }) => {
 
   const createorUpdate = async () => {
     try {
+
+  // Check EMPTY line codes
+  const hasEmptyLineCode = masterList.some(
+    (item) => !item.lineMstCode || item.lineMstCode.trim() === ""
+  );
+
+  if (hasEmptyLineCode) {
+    toast.error("Please fill Line Code for all rows!");
+    return;
+  }
+
+
+   // Check DUPLICATE line codes
+   const lineCodes = masterList.map((item) => item.lineMstCode.trim());
+   const duplicateCodes = lineCodes.filter(
+     (code, index) => lineCodes.indexOf(code) !== index
+   );
+
+   if (duplicateCodes.length > 0) {
+     toast.error(`Duplicate Line Code found: ${duplicateCodes[0]}`);
+     return;
+   }
+
+
+
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
         lineMasterCode: item.lineMstCode,
@@ -285,28 +313,28 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       );
 
 
-      if (response && response === "SUCCESS") {
+      if (response && response.data === "SUCCESS") {
         toast.success("Data saved successfully!");
         fetchData();
-
-      }  else if (response && response === "DUBLICATE") {
 
       } else if (response.data && response.data === "DUBLICATE") {
 
         toast.success("Do Not Allow Dublicate LineCode!");
       } else {
-        toast.error("SaveOrUpdate failed.");
+        toast.error("Unable to save data. Please try again later.");
+        fetchData();
       }
     } catch (error) {
       console.error("Error saving product data:", error);
       toast.error("Error while saving data!");
+      fetchData();
     }
   };
 
   // ✅ Cancel
   const handleCancel = () => {
     setSelectedModule("");
-    setSelectedScreen("");
+   // setSelectedScreen("");
     setMasterList([]);
     setOriginalList([]);
     fetchData();
