@@ -3,7 +3,6 @@ import serverApi from "../../../CommonserverApi";
 
 const LineMstdropdown = async () => {
   try {
-    // 🔹 Fetch tenantId dynamically from localStorage
     const tenantId = JSON.parse(localStorage.getItem("tenantId"));
     const branchCode = JSON.parse(localStorage.getItem("branchCode"));
 
@@ -19,9 +18,10 @@ const LineMstdropdown = async () => {
       },
     });
 
-    const lineInfo = response.data;
+    // Extract actual array
+    const lineInfo = response.data?.responseData;
 
-    if (lineInfo && lineInfo.length > 0) {
+    if (Array.isArray(lineInfo) && lineInfo.length > 0) {
       return lineInfo;
     } else {
       console.warn("No line master data found.");
