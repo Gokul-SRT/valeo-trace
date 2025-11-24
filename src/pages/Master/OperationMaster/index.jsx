@@ -58,7 +58,8 @@ const MultiSelectEditor = forwardRef((props, ref) => {
   */
   const handleChange = (values) => {
     setSelectedValues(values);                  // update local state
-    props.node.setDataValue(field, values.join(",")); // update AG Grid row
+    props.data[props.colDef.field] = values.join(",");
+    // props.node.setDataValue(field, values.join(",")); // update AG Grid row
   };
   return (
     <Select
@@ -66,7 +67,7 @@ const MultiSelectEditor = forwardRef((props, ref) => {
       value={selectedValues}
       style={{ width: "100%" }}
       onChange={handleChange}
-      placeholder="Select ChildPart Codes"
+      placeholder="Select Child Part Codes"
       options={(props.values || []).map((item) => ({
         label: item.value,  // display childPartCode
         value: item.key,    // send childPartId to backend
@@ -412,7 +413,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     
     */
     {
-      headerName: "ChildPart Code",
+      headerName: "Child Part Code",
       field: "childPartId", // holds childPartId(s) as string
       filter: "agTextColumnFilter",
       editable: true,
@@ -483,7 +484,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     if (emptyRowss && emptyRowss?.length === 0) {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
-      // setOriginalList(updated);
+      setOriginalList(updated);
 
       setTimeout(() => {
         const api = gridRef?.current?.api;
@@ -533,7 +534,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         { header: "Operation ID", key: "operationId", width: 20 },
         { header: "Operation Code", key: "operationUniquecode", width: 25 },
         { header: "Operation Description", key: "operationDesc", width: 35 },
-        { header: "ChildPart Code", key: "childPartId", width: 25 },
+        { header: "Child Part Code", key: "childPartId", width: 25 },
         { header: "Status", key: "isActive", width: 15 },
       ];
 
@@ -593,7 +594,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         "Operation ID",
         "Operation Code",
         "Operation Description",
-        "ChildPart Code",
+        "Child Part Code",
         "Status",
       ]);
       headerRow.eachCell((cell) => {

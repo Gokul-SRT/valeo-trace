@@ -10,6 +10,9 @@ import { toast } from "react-toastify";
 import serverApi from '../../../serverAPI';
 import { gettypeMasterdtl } from "../../../services/ChildPartMasterService"
 import store from "store";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import moment from "moment";
 
 ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
@@ -121,41 +124,17 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   };
 
   const columnDefs = [
-    // { headerName: "Id", field: "id", filter: "agNumberColumnFilter", editable: false },
-    { headerName: "Child Part Code", field: "childPartCode", filter: "agTextColumnFilter" },
+    { 
+      headerName: "Child Part Code", 
+      field: "childPartCode", 
+      filter: "agTextColumnFilter",
+      headerComponent: () => (
+        <span>
+          Child Part Code <span style={{ color: "red" }}>*</span>
+        </span>
+      ),
+    },
     { headerName: "Child Part Desc", field: "childPartDesc", filter: "agTextColumnFilter" },
-    // {
-    //   headerName: "Type",
-    //   field: "type",
-    //   filter: "agTextColumnFilter",
-    //   editable: true,
-    //   cellEditor: "agSelectCellEditor",
-    //   cellEditorParams: {
-    //   values: typeListResp.map(item => item.typeId.toString()), // Ag-Grid typically expects an array of keys for 'values'
-    // },
-    // valueFormatter: (params) => {
-    //   // Find the corresponding display value (item.value) based on the stored key (params.value)
-    //   const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
-    //   return match ? match.typeDescription : "Select Type";
-    // },
-    // },
- 
-    // {
-    //   headerName: "Type",
-    //   field: "typeId",
-    //   filter: "agTextColumnFilter",
-    //   editable: true,
-    //   cellEditor: "agSelectCellEditor",
-    //   cellEditorParams: (params) => ({
-    //     values: typeListResp.map((t) => t.typeId.toString()), // ensure string
-    //   }),
-    //   valueFormatter: (params) => {
-    //     const match = typeListResp.find((t) => t.typeId.toString() === params.value?.toString());
-    //     return match ? match.typeDescription : "Select Type";
-    //   },
-
-    // },
-    // { headerName: "Line", field: "line", filter: "agTextColumnFilter" },
     {
       headerName: "Status",
       field: "status",
@@ -171,26 +150,14 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       },
       cellStyle: { textAlign: "center" },
     },
-    // {
-    //   headerName: "Action",
-    //   editable: false,
-    //   sortable: false,
-    //   filter: false,
-    //   suppressMovable: true,
-    //   cellRenderer: (params) => (
-    //     <button
-    //       onClick={() => handleUpdateRow(params.data)}
-    //     >
-    //       update
-    //     </button>
-    //   ),
-    // },
   ];
 
   // Add new empty row
   const handleAddRow = () => {
     const emptyRow = {
-      isUpdate: 0
+      isUpdate: 0,
+      status: 1,
+      
     };
     const childPartCodeEmpty = masterList.filter((item) => !item.childPartCode && !item.product);
 
@@ -198,6 +165,13 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
       setOriginalList(updated);
+       setTimeout(() => {
+        const api = gridRef?.current?.api;
+        if (api && api.paginationGetTotalPages) {
+          const totalPages = api.paginationGetTotalPages();
+          api.paginationGoToPage(Math.max(0, totalPages - 1));
+        }
+      }, 0);
     } else {
       // ("Please enter the empty rows.");
       toast.error("Please enter the empty rows.");
@@ -224,14 +198,131 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-  const onExportExcel = (ref) => {
-    if (ref.current?.api) {
-      ref.current.api.exportDataAsExcel({
-        fileName: `ChildPartMaster.xlsx`,
-      });
-    } else {
-      alert("Grid is not ready!");
-    }
+  const onExportExcel = async (ref) => {
+     try {
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet("Operation Master Report");
+    
+          // === Row Height for header ===
+          worksheet.getRow(1).height = 60;
+    
+          // === Define Columns ===
+          worksheet.columns = [
+            { header: "Child Part Code", key: "childPartCode", width: 20 },
+            { header: "Child Part Desc", key: "childPartDesc", width: 25 },
+            { header: "Status", key: "status", width: 15 },
+          ];
+    
+          // === Insert Left Logo (Valeo) ===
+          try {
+            const imgResponse = await fetch("/pngwing.com.png");
+            const imgBlob = await imgResponse.blob();
+            const arrayBuffer = await imgBlob.arrayBuffer();
+            const imageId = workbook.addImage({
+              buffer: arrayBuffer,
+              extension: "png",
+            });
+            worksheet.addImage(imageId, {
+              tl: { col: 0, row: 0 },
+              br: { col: 1, row: 1 },
+              editAs: "oneCell",
+            });
+          } catch {
+            console.warn("Logo not found — skipping image insert.");
+          }
+    
+          // === Title Cell ===
+          worksheet.mergeCells("B1:D2");
+          const titleCell = worksheet.getCell("B1");
+          titleCell.value = "Operation Master Report";
+          titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+          titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    
+          // === Date (top right) ===
+          worksheet.mergeCells("E1:F2");
+          const dateCell = worksheet.getCell("E1");
+          dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+          dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+          dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    
+          // === Insert Right Logo (SmartRun) ===
+          try {
+            const secondImgResponse = await fetch("/smartrunLogo.png");
+            const secondImgBlob = await secondImgResponse.blob();
+            const secondArrayBuffer = await secondImgBlob.arrayBuffer();
+            const secondImageId = workbook.addImage({
+              buffer: secondArrayBuffer,
+              extension: "png",
+            });
+            worksheet.mergeCells("G1:H2");
+            worksheet.addImage(secondImageId, {
+              tl: { col: 6, row: 0 },
+              br: { col: 8, row: 2 },
+              editAs: "oneCell",
+            });
+          } catch {
+            console.warn("SmartRun logo not found — skipping right logo insert.");
+          }
+    
+          // === Header Row ===
+          const headerRow = worksheet.addRow([
+            "Child Part Code",
+            "Child Part Desc",
+            "Status",
+          ]);
+          headerRow.eachCell((cell) => {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FF4472C4" },
+            };
+            cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+            cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+            cell.border = {
+              top: { style: "thin" },
+              left: { style: "thin" },
+              bottom: { style: "thin" },
+              right: { style: "thin" },
+            };
+          });
+          headerRow.height = 25;
+    
+          // === AutoFilter ===
+          worksheet.autoFilter = {
+            from: { row: headerRow.number, column: 1 },
+            to: { row: headerRow.number, column: worksheet.columns.length },
+          };
+    
+          // === Data Rows ===
+          masterList.forEach((item) => {
+            const newRow = worksheet.addRow({
+              childPartCode: item.childPartCode || "",
+              childPartDesc: item.childPartDesc || "",
+              status: item.status === "1" ? "Active" : "Inactive",
+            });
+    
+            newRow.eachCell((cell) => {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+              cell.font = { size: 10 };
+              cell.border = {
+                top: { style: "thin" },
+                left: { style: "thin" },
+                bottom: { style: "thin" },
+                right: { style: "thin" },
+              };
+            });
+          });
+    
+          // === Save File ===
+          const buffer = await workbook.xlsx.writeBuffer();
+          saveAs(
+            new Blob([buffer], { type: "application/octet-stream" }),
+            `Operation_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+          );
+        } catch (error) {
+          console.error("Excel export error:", error);
+          toast.error("Error exporting to Excel. Please try again.");
+        }
   };
 
   return (
@@ -253,7 +344,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold">Status</label>
               <select className="form-select" onChange={(e) => handleFilterChange(e.target.value)}>
                 <option value="GetAll">Get All</option>
                 <option value="Active">Active</option>
@@ -269,7 +360,8 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
             rowData={masterList}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={100}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 20, 50, 100]}
             pagination={true}
             domLayout="autoHeight"
             singleClickEdit={true}
