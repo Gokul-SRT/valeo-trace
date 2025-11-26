@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import ProductMaster from '../ProductMaster/index'
-import LineMaster from '../LineMaster/index'
+import ProductMaster from "../ProductMaster/index";
+import LineMaster from "../LineMaster/index";
 import ChildPartMaster from "../ChildPartMaster";
 import OperationMaster from "../OperationMaster";
 import ChildPartOperationMap from "../ChildPartToOperationMaster";
@@ -9,30 +9,54 @@ import PacketQtyMaster from "../PacketQtyMaster/PacketQtyMaster";
 import TypeMaster from "../TypeMaster/TypeMaster";
 import ChildPartToTypeMasterMapping from "../ChildPartToTypeMasterMapping/ChildPartToTypeMasterMapping";
 import ProductChildPartGrid from "../ProductToChildpartMap";
-import CycleTimeMaster from '../CycleTimeMaster/CycleTimeMaster';
+import CycleTimeMaster from "../CycleTimeMaster/CycleTimeMaster";
 import GatewayMaster from "../../Master/GatewayMaster";
+import { Select } from "antd";
 
 const Traceability = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [submittedScreen, setSubmittedScreen] = useState("");
 
-  const moduleScreens = {
-    "Traceability": [
-      { id: 1, name: "Product Master", value: ProductMaster },
-      { id: 2, name: "Line Master", value: LineMaster },
-      { id: 3, name: "Program Master", value: null },
-      { id: 4, name: "Child Part Master", value: ChildPartMaster },
-      { id: 5, name: "Operation Master", value: OperationMaster },
-      { id: 6, name: "Operation Master To Child Master Mapping", value: ChildPartOperationMap },
-      { id: 7, name: "Packet Qty Master", value: PacketQtyMaster },
-      { id: 8, name: "Type Master", value: TypeMaster },
-      { id: 9, name: "Child Part To Type Master Mapping", value: ChildPartToTypeMasterMapping },
-      { id: 9, name: "Product To Child Part Mapping", value: ProductChildPartGrid },
-      { id: 10, name: "Cycle Time Master ", value: CycleTimeMaster },
-      { id: 11, name: "Gateway Master", value: GatewayMaster },
-    ],
+  function getCookie(name) {
+    const match = document.cookie.match(
+      new RegExp("(^| )" + name + "=([^;]+)")
+    );
+    if (!match) return null;
+
+    const value = decodeURIComponent(match[2]);
+
+    try {
+      return JSON.parse(value);
+    } catch (err) {
+      return value;
+    }
+  }
+
+  const traceabilityMaster = getCookie("traceabilityMaster");
+
+  const screenComponentMap = {
+    ProductMaster,
+    LineMaster,
+    ChildPartMaster,
+    OperationMaster,
+    ChildPartOperationMap,
+    PacketQtyMaster,
+    TypeMaster,
+    ChildPartToTypeMasterMapping,
+    ProductChildPartGrid,
+    CycleTimeMaster,
+    GatewayMaster,
   };
 
+  const moduleScreens = Array.isArray(traceabilityMaster)
+    ? [...traceabilityMaster]
+        .sort((a, b) => a.s - b.s)
+        .map((item) => ({
+          id: item.s,
+          name: item.d,
+          value: screenComponentMap[item.l] || null,
+        }))
+    : [];
   const getComponentByScreenName = (screenName) => {
     const allScreens = Object.values(moduleScreens).flat();
     const screenItem = allScreens.find((item) => item.name === screenName);
@@ -80,13 +104,13 @@ const Traceability = () => {
                 <label className="form-label fw-bold">
                   <span className="text-danger">*</span> Screens
                 </label>
-                <select
-                  className="form-select"
-                  value={selectedScreen}
-                  onChange={(e) => setSelectedScreen(e.target.value)}
-                  required
+                <Select
+                  placeholder="Select Masters"
+                  value={selectedScreen || undefined}
+                  onChange={setSelectedScreen}
+                  style={{ width: "100%" }}
+                  size="large"
                 >
-                  <option value="">Select</option>
                   {Object.values(moduleScreens)
                     .flat()
                     .map((item) => (
@@ -94,7 +118,7 @@ const Traceability = () => {
                         {item.name}
                       </option>
                     ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -121,9 +145,9 @@ const Traceability = () => {
 
       {SelectedComponent && submittedScreen && (
         <div className="mt-4">
-          <SelectedComponent 
+          <SelectedComponent
             modulesprop="Traceability"
-            screensprop={submittedScreen} 
+            screensprop={submittedScreen}
           />
         </div>
       )}
