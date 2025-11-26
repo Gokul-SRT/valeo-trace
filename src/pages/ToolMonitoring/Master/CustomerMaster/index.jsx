@@ -6,6 +6,7 @@ import "ag-grid-enterprise";
 import store from "store";
 import { backendService } from "../../../../service/ToolServerApi";
 import { toast } from "react-toastify";
+import Loader from "../../../.././Utills/Loader";
 
 const CustomerMaster = ({ modulesprop, screensprop }) => {
 
@@ -13,6 +14,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState(screensprop);
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const gridRef = useRef(null);
 
   const tenantId = store.get("tenantId")
@@ -33,6 +35,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   }, [modulesprop, screensprop]);
 
   const fetchData = async (e) => {
+    setIsLoading(true);
     try {
       const response = await backendService({
         requestPath: "getCustmasterdtl",
@@ -53,20 +56,34 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       } else {
         setMasterList([]);
         setOriginalList([]);
-        toast.error(response.data.responseMessage)
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
-      toast.error("Error fetching data. Please try again later.");
+      toast.error("No data available");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const createorUpdate = async () => {
     try {
+      // Stop any active editing to capture current cell values
+      if (gridRef.current?.api) {
+        gridRef.current.api.stopEditing();
+      }
+
       const CustNoEmpty = masterList.filter((item) => !item.custId);
       if (CustNoEmpty && CustNoEmpty?.length === 0) {
-        const updatedList = masterList.map((item) => ({
+        // Check for changes
+        const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
+        const rowsToUpdate = masterList.filter(row => row.changed === true);
 
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("No data available");
+          return;
+        }
+
+        const updatedList = masterList.map((item) => ({
           isUpdate: item.isUpdate,
           custId: item.custId,
           custName: item.custName,
@@ -78,17 +95,17 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
           requestData: updatedList});
 
         if (response?.responseCode === '200') {
-          toast.success(response.responseMessage);
+          toast.success("Add/Update successful");
         } else {
-          toast.error(response.responseMessage);
+          toast.error("Add/Update failed");
         }
         fetchData();
       } else {
-        toast.error("Please enter the Tool No for all the rows.");
+        toast.error("Please fill all mandatory fields");
       }
     } catch (error) {
       console.error("Error saving data:", error);
-      toast.error("Error while saving data!");
+      toast.error("Add/Update failed");
     }
   }
 
@@ -119,17 +136,29 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     );
   };
 
+  const MandatoryHeaderComponent = (props) => {
+    return (
+      <div>
+        {props.displayName} <span style={{color: 'red'}}>*</span>
+      </div>
+    );
+  };
+
   const columnDefs = [
     {
-      headerName: "Customer ID",
+      headerName: "Customer No.",
       field: "custId",
       filter: "agTextColumnFilter",
-      editable: (params) => (params.data.isUpdate === "0" ? true : false)
+      editable: (params) => (params.data.isUpdate === "0" ? true : false),
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Customer No." }
     },
     {
       headerName: "Customer Name",
       field: "custName",
       filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Customer Name" }
     },
     // {
     //   headerName: "Status",
@@ -145,7 +174,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     //   cellStyle: { textAlign: "center" },
     // },
     {
-      headerName: "Is Active",
+      headerName: "Status",
       field: "status",
       filter: true,
       editable: true,
@@ -154,6 +183,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
       valueSetter: (params) => {
         params.data.status = params.newValue ? "1" : "0";
+        console.log("Status updated:", params.newValue, "-> Set to:", params.data.status);
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -175,7 +205,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       setMasterList(updated);
       setOriginalList(updated);
     } else {
-      toast.error("Please enter the Customer Id for all the rows.");
+      toast.error("Please fill all mandatory fields");
     }
   };
 
@@ -188,14 +218,47 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   };
 
   const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-      console.log(originalList, 'originalList-------------')
-    } else if (value === "1") {
-      setMasterList(originalList.filter((item) => item.status === "1"));
-    } else if (value === "0") {
-      setMasterList(originalList.filter((item) => item.status === "0"));
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      if (!value || value === "GetAll") {
+        setMasterList(originalList);
+        console.log(originalList, 'originalList-------------')
+      } else if (value === "1") {
+        setMasterList(originalList.filter((item) => item.status === "1"));
+      } else if (value === "0") {
+        setMasterList(originalList.filter((item) => item.status === "0"));
+      }
+      setIsLoading(false);
+    }, 100);
+  };
+
+  const onCellValueChanged = (params) => {
+    const { colDef, newValue, oldValue, data } = params;
+    const field = colDef.field;
+
+    if ((newValue ?? "") === (oldValue ?? "")) return;
+
+    // Check for duplicate customer ID
+    if (field === "custId" && newValue) {
+      const isDuplicate = masterList.some(item => 
+        item.custId === newValue && item.isUpdate != '0'
+      );
+      
+      if (isDuplicate) {
+        toast.error("Duplicate entry");
+        params.node.setDataValue(field, "");
+        return;
+      }
     }
+
+    // Mark row as changed
+    data.changed = true;
+
+    const updatedList = [...masterList];
+    updatedList[params.rowIndex] = params.data;
+    setMasterList(updatedList);
+    setOriginalList(updatedList);
   };
 
   const onExportExcel = (ref) => {
@@ -209,7 +272,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       {/* Match size and alignment with Tool Monitoring Master */}
       <div className="row justify-content-center">
         <div className="col-md-12">
@@ -238,77 +301,94 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
             {/* Card Body */}
             <div className="card-body p-3">
-              {/* Filter Dropdown */}
-              <div className="row mb-3">
-                <div className="col-md-3">
-                  <label className="form-label fw-bold">Status</label>
-                  <select
-                    className="form-select"
-                    onChange={(e) => handleFilterChange(e.target.value)}
-                  >
-                    <option value="GetAll">Get All</option>
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
-                  </select>
-                </div>
-              </div>
+              {masterList.length > 0 ? (
+                <>
+                  {/* Filter Dropdown */}
+                  <div className="row mb-3">
+                    <div className="col-md-3">
+                      <label className="form-label fw-bold">Status</label>
+                      <select
+                        className="form-select"
+                        onChange={(e) => handleFilterChange(e.target.value)}
+                      >
+                        <option value="GetAll">Get All</option>
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
 
-              {/* Grid */}
-              {/* {masterList.length > 0 && ( */}
-              <AgGridReact
-                ref={gridRef}
-                rowData={masterList}
-                columnDefs={columnDefs}
-                defaultColDef={defaultColDef}
-                paginationPageSize={100}
-                pagination={true}
-                domLayout="autoHeight"
-                singleClickEdit={true}
-                onFirstDataRendered={autoSizeAllColumns}
-                onCellValueChanged={(params) => {
-                  const updatedList = [...masterList];
-                  updatedList[params.rowIndex] = params.data;
-                  setMasterList(updatedList);
-                  setOriginalList(updatedList);
-                }}
-              />
-              {/* )} */}
+                  {/* Grid */}
+                  <div style={{ position: "relative" }}>
+                    {isLoading && (
+                      <div
+                        className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                        style={{
+                          backgroundColor: "rgba(255,255,255,0.6)",
+                          zIndex: 2,
+                          borderRadius: "8px",
+                        }}
+                      >
+                        <Loader />
+                      </div>
+                    )}
+                    <AgGridReact
+                    ref={gridRef}
+                    rowData={masterList}
+                    columnDefs={columnDefs}
+                    defaultColDef={defaultColDef}
+                    paginationPageSize={100}
+                    pagination={true}
+                    domLayout="autoHeight"
+                    singleClickEdit={true}
+                    onFirstDataRendered={autoSizeAllColumns}
+                    onCellValueChanged={onCellValueChanged}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="text-center p-4">
+                  <p className="text-muted">No data available</p>
+                </div>
+              )}
 
               {/* Buttons */}
-              <div className="text-center mt-4">
-                <button
-                  onClick={() => onExportExcel(gridRef)}
-                  className="btn text-white me-2"
-                  style={{
-                    backgroundColor: "#00264d",
-                    minWidth: "90px",
-                  }}
-                >
-                  Excel
-                </button>
-                <button
-                  type="submit"
-                  className="btn text-white me-2"
-                  style={{
-                    backgroundColor: "#00264d",
-                    minWidth: "90px",
-                  }}
-                  onClick={createorUpdate}
-                >
-                  Update
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="btn text-white"
-                  style={{
-                    backgroundColor: "#00264d",
-                    minWidth: "90px",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+              {masterList.length > 0 && (
+                <div className="text-center mt-4">
+                  <button
+                    onClick={() => onExportExcel(gridRef)}
+                    className="btn text-white me-2"
+                    style={{
+                      backgroundColor: "#00264d",
+                      minWidth: "90px",
+                    }}
+                  >
+                    Excel Export
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn text-white me-2"
+                    style={{
+                      backgroundColor: "#00264d",
+                      minWidth: "90px",
+                    }}
+                    onClick={createorUpdate}
+                  >
+                    Update
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="btn text-white"
+                    style={{
+                      backgroundColor: "#00264d",
+                      minWidth: "90px",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

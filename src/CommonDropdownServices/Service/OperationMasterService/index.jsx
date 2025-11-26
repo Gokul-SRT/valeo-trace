@@ -11,15 +11,16 @@ const OperationMasterDropdown = async () => {
       tenantId,
       isActive: "1",
       branchCode,
+      isTool:"1"
     };
 
     const response = await serverApi.post("getOperationMst", payload, {
       headers: { "Content-Type": "application/json" },
     });
 
-    const data = response.data;
+    const data = response?.data;
 
-    if (data && data.length > 0) {
+    if (data) {
       return data;
     } else {
       console.warn("No operation master data found.");

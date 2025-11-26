@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback , forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
@@ -10,6 +10,10 @@ import { backendService, commonBackendService } from "../../../../service/ToolSe
 // import commonApi from "../../../../CommonserverApi";
 import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/OperationMasterService";
+import { Select as AntdSelect } from "antd";
+import ReactDOM from "react-dom/client";
+import Loader from "../../../.././Utills/Loader";
+
 const ToolMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState(modulesprop);
   const [selectedScreen, setSelectedScreen] = useState(screensprop);
@@ -26,6 +30,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   const [editingField, setEditingField] = useState(null);
   const [selectedLineCode, setSelectedLineCode] = useState("getAll");
   const [selectedStatus, setSelectedStatus] = useState("GetAll");
+   const [isLoading, setIsLoading] = useState(false);
   const gridRef = useRef(null);
 
   const tenantId = store.get("tenantId")
@@ -46,7 +51,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       console.log(response)
       let returnData = [];
       if (response) {
-        returnData = response;
+        returnData = response?.responseData;
         const options = returnData.map(item => ({
           key: item.lineMstCode || "",
           value: item.lineMstDesc || "",
@@ -70,7 +75,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       console.log(response)
       let returnData = [];
       if (response) {
-        returnData = response;
+        returnData = response?.responseData;
         const options = returnData.map(item => ({
           key: item.operationUniqueCode || item.operationId || "",
           value: item.operationDescription || "",
@@ -95,6 +100,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   }, [modulesprop, screensprop, getLineDropDownData]);
 
   const fetchData = async (e) => {
+    setIsLoading(true);
     try {
       const response = await backendService({requestPath:"gettoolmasterdtl", 
         requestData: {
@@ -117,11 +123,11 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       } else {
         setMasterList([]);
         setOriginalList([]);
-        toast.error(response.responseMessage)
       }
+      setIsLoading(false);
     } catch (error) {
       console.error("Error fetching master data:", error);
-      toast.error("Error fetching data. Please try again later.");
+      toast.error("No data available");
     }
   };
 
@@ -189,13 +195,61 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   const createorUpdate = async () => {
     try {
-      const ToolNoEmpty = masterList.filter((item) => !item.toolNo);
-      if (ToolNoEmpty && ToolNoEmpty?.length === 0) {
-        const updatedList = masterList.map(item => {
+      // Stop any active editing to capture current cell values
+      if (gridRef.current?.api) {
+        gridRef.current.api.stopEditing();
+      }
+
+      // Validation checks
+      const ToolNoEmpty = masterList.filter((item) => !item.toolNo || item.toolNo.trim() === "");
+      const LineEmpty = masterList.filter((item) => !item.line || item.line.trim() === "");
+      const InvalidToolNo = masterList.filter((item) => item.toolNo && item.toolNo.length > 20);
+      const InvalidMaxShots = masterList.filter((item) => item.maxShots && (isNaN(item.maxShots) || item.maxShots < 0 || item.maxShots.toString().length > 10000000));
+      
+      if (ToolNoEmpty && ToolNoEmpty?.length > 0) {
+        toast.error("Please fill all mandatory fields");
+        return;
+      }
+      
+      if (LineEmpty && LineEmpty?.length > 0) {
+        toast.error("Please fill all mandatory fields");
+        return;
+      }
+      
+      if (InvalidToolNo && InvalidToolNo?.length > 0) {
+        toast.error("Tool No cannot exceed 20 characters.");
+        return;
+      }
+      
+      if (InvalidMaxShots && InvalidMaxShots?.length > 0) {
+        toast.error("Maximum Shot Count must be a valid positive number with maximum 1000000 characters.");
+        return;
+      }
+      
+      if (ToolNoEmpty?.length === 0 && LineEmpty?.length === 0 && InvalidToolNo?.length === 0 && InvalidMaxShots?.length === 0) {
+        // Check for changes
+        const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
+        const rowsToUpdate = masterList.filter(row => row.changed === true);
+
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("No data available");
+          return;
+        }
+
+        // If there are changes, send all records
+        const payloadRows = masterList;
+
+
+
+        const formattedRows = payloadRows.map(item => {
           const formatIds = (ids) => {
-            return Array.isArray(ids)
-              ? ids.join(',')
-              : ids || '';
+            if (Array.isArray(ids)) {
+              return ids.filter(v => v !== undefined && v !== null && v !== '').join(',');
+            }
+            if (typeof ids === 'string') {
+              return ids;
+            }
+            return '';
           };
           return {
             isUpdate: item.isUpdate,
@@ -206,27 +260,25 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
             operation: item.operation,
             customerId: formatIds(item.customerId),
             modelId: formatIds(item.modelId),
-            status: item.status,
+            status: item.status == "1"  ? "1" : "0",
             tenantId,
             updatedBy: employeeId,
             branchCode,
           };
         });
 
-        const response = await backendService({requestPath:"saveOrUpdate", requestData:updatedList});
+        const response = await backendService({requestPath:"saveOrUpdate", requestData:formattedRows});
 
         if (response?.responseCode === '200') {
-          toast.success(response.responseMessage);    
+          toast.success("Add/Update successful");
         } else {
-          toast.error(response.responseMessage);
+          toast.error("Add/Update failed");
         }
         fetchData();
-      }else {
-        toast.error("Please enter the Tool No for all the rows.");
       }
     } catch (error) {
       console.error("Error saving data:", error);
-      toast.error("Error while saving data!");
+      toast.error("Add/Update failed");
     }
   }
 
@@ -289,18 +341,83 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
 
+  const MultiSelectEditor = forwardRef((props, ref) => {
+    const [selectedValues, setSelectedValues] = useState([]);
+  
+    useEffect(() => {
+      if (props.data && props.colDef.field) {
+        const initial = props.data[props.colDef.field];
+        if (typeof initial === "string" && initial.length > 0) {
+          setSelectedValues(initial.split(",")); // string to array
+        } else if (Array.isArray(initial)) {
+          setSelectedValues(initial); // already array
+        } else {
+          setSelectedValues([]); // fallback empty
+        }
+      }
+    }, [props.data, props.colDef.field]);
+  
+    React.useImperativeHandle(ref, () => ({
+      getValue() {
+        return selectedValues.join(","); // always string
+      },
+    }));
+  
+    const handleChange = (values) => {
+      setSelectedValues(values);
+      props.data[props.colDef.field] = values.join(","); // update row data as string
+    };
+  
+    return (
+      <Select
+        mode="multiple"
+        value={selectedValues}
+        style={{ width: "100%" }}
+        onChange={handleChange}
+        placeholder="Select Product Codes"
+        options={props.values.map((item) => ({
+          label: item.value,
+          value: item.key,
+        }))}
+      />
+    );
+  });
+
   const gridContext = {
     handleCellClick: handleCellClick,
     customerData: customerData,
   };
 
+  const MandatoryHeaderComponent = (props) => {
+    return (
+      <div>
+        {props.displayName} <span style={{color: 'red'}}>*</span>
+      </div>
+    );
+  };
+
   const columnDefs = [
-    { headerName: "Tool Id", field: "toolNo", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === "0" ? true : false), },
-    { headerName: "Tool Desc", field: "toolDesc", filter: "agTextColumnFilter" },
+    { 
+      headerName: "Tool No.", 
+      field: "toolNo", 
+      filter: "agTextColumnFilter", 
+      editable: (params) => (params.data.isUpdate === "0" ? true : false),
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Tool No." }
+    },
+    { 
+      headerName: "Tool Description", 
+      field: "toolDesc", 
+      filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Tool Description" }
+    },
     {
       headerName: "Maximum Shot Count (Nos.)",
       field: "maxShots",
       filter: "agNumberColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Maximum Shot Count (Nos.)" }
     },
     {
       headerName: "Line",
@@ -308,6 +425,8 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       editable: true,
       cellEditor: "agSelectCellEditor",
       filter: "agSetColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Line" },
       cellEditorParams: {
         values: lineData.map(item => item.key), // These are the Line Codes
       },
@@ -322,6 +441,8 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       editable: true,
       cellEditor: "agSelectCellEditor",
       filter: "agSetColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Operation" },
       cellEditorParams: {
         values: operationData.map(item => item.key),
       },
@@ -330,37 +451,47 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         return option ? option.value : params.value;
       },
     },
-    {
-      headerName: "Customer",
-      field: "customerId",
-      editable: false,
-      cellEditor: "agSelectCellEditor",
-      suppressNavigable: true,
-      // cellEditorParams: { values: customerOptions },
-      filter: "agSetColumnFilter",
-      cellRenderer: ModelIdCellRenderer,
-      //   valueGetter: (params) => {
-      //     const customerId = params.data.customerId;
-      //     const customer = customerData.find(item => item.key === customerId);
-      //     return customer ? customer.label : customerId;
-      // },
-    },
-    {
-      headerName: "Model Id",
+    // {
+    //   headerName: "Customer",
+    //   field: "customerId",
+    //   editable: false,
+    //   cellEditor: "agSelectCellEditor",
+    //   suppressNavigable: true,
+    //   // cellEditorParams: { values: customerOptions },
+    //   filter: "agSetColumnFilter",
+    //   cellRenderer: ModelIdCellRenderer,
+    //   //   valueGetter: (params) => {
+    //   //     const customerId = params.data.customerId;
+    //   //     const customer = customerData.find(item => item.key === customerId);
+    //   //     return customer ? customer.label : customerId;
+    //   //   },
+    // },
+
+      {
+      headerName: "Product Code",
       field: "modelId",
       filter: "agTextColumnFilter",
-      editable: false,
-      suppressNavigable: true,
-      cellRenderer: ModelIdCellRenderer,
+      editable: true,
+      cellEditor: MultiSelectEditor,
+      cellEditorParams: { values: productData },
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Product Code" },
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const keys =
+          typeof params.value === "string"
+            ? params.value.split(",")
+            : params.value;
+        return keys
+          .map((k) => {
+            const option = productData.find((item) => item.key === k);
+            return option ? option.value : k;
+          })
+          .join(", ");
+      },
     },
-    // {
-    //   headerName: "Status",
-    //   field: "status",
-    //   filter: "agTextColumnFilter",
-    //   editable: false,
-    // },
     {
-      headerName: "Is Active",
+      headerName: "Status",
       field: "status",
       filter: true,
       editable: true,
@@ -369,7 +500,8 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
       valueSetter: (params) => {
         params.data.status = params.newValue ? "1" : "0";
-        // params.data.status = params.newValue ? "Active" : "Inactive";
+        params.data.changed = true;
+        console.log("Status updated:", params.newValue, "-> Set to:", params.data.status);
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -387,16 +519,46 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       modelId: [],
       status: "1",
       isUpdate: "0",
+      changed: true, // <-- mark as changed
       localId: Date.now().toString(),
     };
 
-    const ToolNoEmpty = masterList.filter((item) => !item.toolNo);
-    if (ToolNoEmpty && ToolNoEmpty?.length === 0) {
-      const updated = [...masterList, emptyRow];
-      setMasterList(updated);
-      setOriginalList(updated);
-    } else {
-      toast.error("Please enter the Tool No for all the rows.");
+    // Validation before adding new row
+    const ToolNoEmpty = masterList.filter((item) => !item.toolNo || item.toolNo.trim() === "");
+    const LineEmpty = masterList.filter((item) => !item.line || item.line.trim() === "");
+    const InvalidMaxShots = masterList.filter((item) => item.maxShots && (isNaN(item.maxShots) || item.maxShots < 0 || item.maxShots.toString().length > 1000000));
+    
+    if (ToolNoEmpty && ToolNoEmpty?.length > 0) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
+    
+    if (LineEmpty && LineEmpty?.length > 0) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
+    
+    if (InvalidMaxShots && InvalidMaxShots?.length > 0) {
+      toast.error("Please enter valid Maximum Shot Count for all existing rows before adding a new row.");
+      return;
+    }
+    
+    if (ToolNoEmpty?.length === 0 && LineEmpty?.length === 0 && InvalidMaxShots?.length === 0) {
+      setMasterList((prev) => {
+        const updated = [...prev, emptyRow];
+        setOriginalList(updated);
+        setTimeout(() => {
+          const api = gridRef.current?.api;
+          if (api) {
+            const totalRows = updated.length;
+            const pageSize = api.paginationGetPageSize();
+            const lastPage = Math.floor((totalRows - 1) / pageSize);
+            api.paginationGoToPage(lastPage);
+            api.ensureIndexVisible(totalRows - 1, "bottom");
+          }
+        }, 100);
+        return updated;
+      });
     }
   };
 
@@ -409,35 +571,51 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
   const handleFilterChange = (type, value) => {
-    let newSelectedLineCode = selectedLineCode;
-    let newSelectedStatus = selectedStatus;
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      let newSelectedLineCode = selectedLineCode;
+      let newSelectedStatus = selectedStatus;
 
-    if (type === 'line') {
-      newSelectedLineCode = value;
-      setSelectedLineCode(newSelectedLineCode);
-    } else if (type === 'status') {
-      newSelectedStatus = value;
-      setSelectedStatus(newSelectedStatus);
-    }
+      if (type === 'line') {
+        newSelectedLineCode = value;
+        setSelectedLineCode(newSelectedLineCode);
+      } else if (type === 'status') {
+        newSelectedStatus = value;
+        setSelectedStatus(newSelectedStatus);
+      }
 
-    let filteredList = originalList;
+      let filteredList = originalList;
 
-    // 1. Apply Line Filter
-    if (newSelectedLineCode !== "getAll") {
-      filteredList = filteredList.filter((item) => item.line === newSelectedLineCode);
-    }
+      // 1. Apply Line Filter
+      if (newSelectedLineCode !== "getAll") {
+        filteredList = filteredList.filter((item) => item.line === newSelectedLineCode);
+      }
 
-    // 2. Apply Status Filter (on the line-filtered list or the full list)
-    if (newSelectedStatus === "Active") {
-      filteredList = filteredList.filter((item) => item.status === "1");
-    } else if (newSelectedStatus === "Inactive") {
-      filteredList = filteredList.filter((item) => item.status === "0");
-    }
+      // 2. Apply Status Filter (on the line-filtered list or the full list)
+      if (newSelectedStatus === "Active") {
+        filteredList = filteredList.filter((item) => String(item.status) === "1");
+      } else if (newSelectedStatus === "Inactive") {
+        filteredList = filteredList.filter((item) => String(item.status) === "0");
+      }
 
-    setMasterList(filteredList);
+      setMasterList(filteredList);
+      setIsLoading(false);
+    }, 100);
   };
 
   const handleModelModalSave = () => {
+    // Validation for modal save
+    if (editingField === 'modelId' && (!selectedModelIds || selectedModelIds.length === 0)) {
+      toast.error("Please select at least one Model ID.");
+      return;
+    }
+    
+    if (editingField === 'customerId' && (!selectedCustomerIds || selectedCustomerIds.length === 0)) {
+      toast.error("Please select at least one Customer ID.");
+      return;
+    }
+    
     if (editingToolData) {
       const updatedMasterList = masterList.map(item => {
         const isTargetRow = (item.toolNo && item.toolNo === editingToolData.toolNo) ||
@@ -503,8 +681,100 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     ? setSelectedCustomerIds
     : setSelectedModelIds;
 
+
+
+  const onCellValueChanged = (params) => {
+    const { colDef, newValue, oldValue, data } = params;
+    const field = colDef.field;
+
+    if ((newValue ?? "") === (oldValue ?? "")) return;
+
+    // Validation for tool number
+    if (field === "toolNo") {
+      if (!newValue || newValue.trim() === "") {
+        toast.error("Tool No cannot be empty.");
+        params.node.setDataValue(field, "");
+        return;
+      }
+      
+      if (newValue.length > 20) {
+        toast.error("Tool No cannot exceed 20 characters.");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+      
+      // Check for duplicate tool number
+      const isDuplicate = masterList.some(item => 
+        item.toolNo === newValue && item.isUpdate != '0'
+      );
+      
+      if (isDuplicate) {
+        toast.error("Duplicate entry");
+        params.node.setDataValue(field, "");
+        return;
+      }
+    }
+
+    // Validation for tool description
+    if (field === "toolDesc") {
+      if (newValue && newValue.length > 100) {
+        toast.error("Tool Description cannot exceed 100 characters.");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+    }
+
+    // Validation for max shots
+    if (field === "maxShots") {
+      if (newValue && (isNaN(newValue) || newValue < 0 || newValue.toString().length > 10000000)) {
+        toast.error("Maximum Shot Count must be a valid positive number with maximum 1000000 characters.");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+    }
+
+    // Validation for line
+    if (field === "line") {
+      if (!newValue || newValue.trim() === "") {
+        toast.error("Line is required.");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+    }
+
+    // Mark row as changed and update the masterList state
+    data.changed = true;
+    
+    setMasterList((prev) =>
+      prev.map((row) => {
+        const isTargetRow = (row.toolNo && row.toolNo === data.toolNo) ||
+          (row.localId && row.localId === data.localId);
+        
+        if (!isTargetRow) return row;
+        
+        const updated = { 
+          ...row, 
+          changed: true,
+          isUpdate: row.isUpdate === '0' ? '0' : 1
+        };
+        
+        if (field === "modelId") {
+          updated.modelId = Array.isArray(newValue) ? newValue : (newValue ? String(newValue).split(",") : []);
+        } else if (field === "customerId") {
+          updated.customerId = Array.isArray(newValue) ? newValue : (newValue ? String(newValue).split(",") : []);
+        } else if (field === "status") {
+          updated[field] = newValue ? "1" : "0";
+        } else {
+          updated[field] = newValue;
+        }
+        
+        return updated;
+      })
+    );
+  };
+
   return (
-    <div className="container mt-1" style={{ padding: "0px" }}>
+    <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -553,6 +823,19 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
         <div className="card-body p-3">
           {/* {masterList.length > 0 && ( */}
+          <div style={{ position: "relative" }}>
+                      {isLoading && (
+                        <div
+                          className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                          style={{
+                            backgroundColor: "rgba(255,255,255,0.6)",
+                            zIndex: 2,
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <Loader />
+                        </div>
+                      )}
           <AgGridReact
             ref={gridRef}
             rowData={masterList}
@@ -564,7 +847,9 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
             // singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
             context={gridContext}
+            onCellValueChanged={onCellValueChanged}
           />
+          </div>
           {/* )} */}
 
           <div className="text-center mt-4">
@@ -573,7 +858,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
-              Excel
+              Excel Export
             </button>
             <button
               type="submit"

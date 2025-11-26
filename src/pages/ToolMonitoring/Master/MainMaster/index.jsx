@@ -4,8 +4,8 @@ import ToolMaster from "../ToolMaster";
 import SparepartsMaster from "../SparepartsMaster";
 import PMChecklistMaster from "../PMchecklistMaster";
 import CustomerMaster from "../CustomerMaster";
-//import SupplierMaster from "../SupplierMaster";
-//import LocationMaster from "../LocationMaster";
+import ToolOperationMaster from "../OperationMaster";
+import CustomerProductMapping from "../CustomerProductMapping";
 
 const ToolMonitoring = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
@@ -14,11 +14,11 @@ const ToolMonitoring = () => {
   const moduleScreens = {
     "ToolMonitoring": [
       { id: 1, name: "Tool Master", value: ToolMaster },
-      { id: 2, name: "Spare Master", value: SparepartsMaster },
+      { id: 2, name: "Critical Spare Master", value: SparepartsMaster },
       { id: 3, name: "PM Checklist Master", value: PMChecklistMaster },
       { id: 4, name: "Customer Master", value: CustomerMaster },
-      // { id: 5, name: "Supplier Master", value: SupplierMaster },
-      // { id: 6, name: "Location Master", value: LocationMaster },
+      { id: 5, name: "Tool Operation Master", value: ToolOperationMaster },
+      { id: 6, name: "Customer Product Mapping", value: CustomerProductMapping },
     ],
   };
 
@@ -53,7 +53,7 @@ const ToolMonitoring = () => {
   };
 
   return (
-    <div className="container mt-1">
+    <div>
       <div className="card shadow" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"

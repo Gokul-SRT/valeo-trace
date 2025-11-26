@@ -1,8 +1,7 @@
 import serverApi from "../serverAPI";
 import commonApi from "../CommonserverApi"
 const headers = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
+  'Content-Type': 'application/json'
 }
 
 const backendService = async function({ requestPath, requestData }) {

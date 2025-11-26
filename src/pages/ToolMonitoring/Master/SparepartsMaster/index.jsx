@@ -10,8 +10,11 @@ import {
   ExcelExportModule,
 } from "ag-grid-enterprise";
 import { toast } from "react-toastify";
+import Loader from "../../../.././Utills/Loader";
 import axios from "axios";
 import CommonserverApi from "../../../../CommonserverApi";
+import { backendService } from "../../../../service/ToolServerApi";
+import store from 'store'
 
 ModuleRegistry.registerModules([
   SetFilterModule,
@@ -31,10 +34,11 @@ const CriticalSpareMaster = () => {
   const [lineOptions, setLineOptions] = useState([]);
   const [operationOptions, setOperationOptions] = useState([]);
   const [sparePartMstId, setSparePartMstId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("employeeId"));
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
+  const employeeId = store.get("employeeId");
 
   // load used IDs from localStorage to avoid reusing IDs across reloads
   const loadUsedIds = () => {
@@ -71,50 +75,135 @@ const CriticalSpareMaster = () => {
         : res?.data?.responseData || [];
       setLineOptions(data);
     } catch {
-      toast.error("Failed to load Line dropdown");
+      toast.error("No data available");
     }
   };
 
   // Fetch operation dropdown
-  const fetchOperationDropdown = async () => {
+  const fetchOperationDropdown = async (line) => {
     try {
-      const payload = { isActive: "1", tenantId, branchCode };
-      const res = await CommonserverApi.post("getOperationDropdown", payload);
-      setOperationOptions(res?.data?.responseData || []);
+      const payload = { tenantId, branchCode , lineCode:line || selectedLine };
+
+      const res = await backendService({
+        requestPath: "getOperationByLineCode",
+        requestData: payload,
+      });
+      
+      setOperationOptions(res?.responseData || []);
     } catch {
-      toast.error("Failed to load Operation dropdown");
+      toast.error("No data available");
     }
   };
 
   useEffect(() => {
     fetchLineDropdown();
-    fetchOperationDropdown();
+    // fetchOperationDropdown();
   }, []);
+
+  // Fetch critical spare details based on line, operation, and status
+  const fetchCriticalSpareDetails = async (line, operation, status) => {
+    if (!line || !operation || status === "") {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const payload = {
+        lineCode: line,
+        operation: operation,
+        status: status,
+        tenantId:tenantId,
+        branchCode:branchCode,
+      };
+
+      const res = await backendService({
+        requestPath: "getcriticalsparedetails",
+        requestData: payload,
+      });
+
+      console.log("res", res);
+
+      if (Array.isArray(res) && res.length > 0) {
+        const formattedRows = res.map((row , index) => ({
+          ...row,
+          isUpdate: "1",
+          id:index+1,
+          sparePartId: String(row.sparePartId),
+          minimumThresholdQuantity:
+            row.minimumThresholdQuantity != null
+              ? String(row.minimumThresholdQuantity)
+              : "",
+          criticalSpareName: row.criticalSpareName || "",
+          status: String(row.status ?? "1"),
+          isChecked: String(row.status ?? "1") === "1",
+        }));
+
+        // Sort by sparePartId
+        formattedRows.sort(
+          (a, b) => (Number(a.sparePartId) || 0) - (Number(b.sparePartId) || 0)
+        );
+
+        // Update usedIds
+        const newUsed = new Set(usedIds);
+        formattedRows.forEach((r) => {
+          if (r.sparePartId) newUsed.add(String(r.sparePartId));
+        });
+        setUsedIds(newUsed);
+        saveUsedIds(newUsed);
+
+        setMasterList(formattedRows);
+        
+        // Set sparePartMstId if available in response
+        if (res[0]?.sparePartMstId) {
+          setSparePartMstId(res.data[0].sparePartMstId);
+        }
+        
+      } else {
+        setMasterList([]);
+        setSparePartMstId("");
+      }
+    } catch (err) {
+      console.error("fetchCriticalSpareDetails error", err);
+      toast.error("No data available");
+      setMasterList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Effect to fetch data whenever line, operation, or status changes
+  useEffect(() => {
+    if (selectedLine && selectedOperation && selectedStatus !== "") {
+      fetchCriticalSpareDetails(selectedLine, selectedOperation, selectedStatus);
+    } else {
+      setMasterList([]);
+    }
+  }, [selectedLine, selectedOperation, selectedStatus]);
+
+  // Check if table should be displayed
+  const shouldShowTable = selectedLine && selectedOperation && selectedStatus;
 
   // Fetch details for a single sparePartId
   const fetchCriticalSpareDetailById = async (mstId) => {
     try {
-      const payload = { sparePartId: String(mstId) }; // single sparePartId retrieval
-      const res = await axios.post(
-        "http://localhost:8091/tool/getcriticalsparedetails",
-        payload
-      );
+      const payload = { sparePartId: String(mstId) };
+      const res = await backendService({
+        requestPath: "getcriticalsparedetails",
+        requestData: payload,
+      });
+
       if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data.map((row) => {
-          // mark as update (already in DB). Convert fields to strings where appropriate.
-          return {
-            ...row,
-            isUpdate: "1",
-            sparePartId: String(row.sparePartId),
-            // Keep minimumThresholdQuantity as string or empty string — we do not coerce to 0/null
-            minimumThresholdQuantity:
-              row.minimumThresholdQuantity != null
-                ? String(row.minimumThresholdQuantity)
-                : "",
-            criticalSpareName: row.criticalSpareName || "",
-            status: String(row.status ?? "1"),
-          };
-        });
+        return res.data.map((row) => ({
+          ...row,
+          isUpdate: "1",
+          sparePartId: String(row.sparePartId),
+          minimumThresholdQuantity:
+            row.minimumThresholdQuantity != null
+              ? String(row.minimumThresholdQuantity)
+              : "",
+          criticalSpareName: row.criticalSpareName || "",
+          status: String(row.status ?? "1"),
+        }));
       } else {
         return [];
       }
@@ -136,12 +225,10 @@ const CriticalSpareMaster = () => {
         }
       }
       if (allRows.length > 0) {
-        // sort by sparePartId ascending numeric where possible
         allRows.sort(
           (a, b) => (Number(a.sparePartId) || 0) - (Number(b.sparePartId) || 0)
         );
 
-        // update usedIds with these persistent IDs
         const newUsed = new Set(usedIds);
         allRows.forEach((r) => {
           if (r.sparePartId) newUsed.add(String(r.sparePartId));
@@ -151,7 +238,6 @@ const CriticalSpareMaster = () => {
 
         setMasterList(allRows);
       } else {
-        // keep existing masterList intact (do not clear) but inform user
         toast.info("No spare details found");
       }
     } catch (err) {
@@ -161,84 +247,66 @@ const CriticalSpareMaster = () => {
   };
 
   // Columns
+  const MandatoryHeaderComponent = (props) => {
+    return (
+      <div>
+        {props.displayName} <span style={{color: 'red'}}>*</span>
+      </div>
+    );
+  };
+
   const columnDefs = [
     {
-      headerName: "Spare Part No",
-      field: "sparePartId",
-      editable: false, // AUTO GENERATED – NO MANUAL EDIT
+      headerName: "S.No",
+      field: "id",
+      editable: false,
       cellStyle: { textAlign: "center" },
+      valueGetter: (params) => params.node.rowIndex + 1,
     },
     {
-      headerName: "Description",
+      headerName: "Spare Description",
       field: "criticalSpareName",
       editable: true,
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Spare Description" }
     },
     {
-      headerName: "Min Qty",
+      headerName: "Spare Min. Qty.",
       field: "minimumThresholdQuantity",
       editable: true,
       cellEditor: "agTextCellEditor",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Spare Min. Qty." },
       valueParser: (params) => {
         let v = params.newValue;
-
-        // Convert to string always (AG Grid sometimes sends number)
         v = v === null || v === undefined ? "" : String(v).trim();
-
-        // If user typed nothing → empty string
         if (v === "") return "";
-
-        // If user typed a valid number → ACCEPT IT
         if (/^\d+$/.test(v)) return v;
-
-        // Otherwise reject and keep old value
         return params.oldValue;
       },
-
       cellStyle: { textAlign: "center" },
     },
     {
       headerName: "Status",
       field: "status",
-      editable: false,
-      cellRendererFramework: (params) => {
-        // Determine checked state: use isChecked if available, else fallback to status
-        const checked =
-          params.data.isChecked !== undefined
-            ? params.data.isChecked
-            : params.data.status === "1";
-
-        const handleChange = (e) => {
-          const newChecked = e.target.checked;
-          params.node.setDataValue("status", newChecked ? "1" : "0");
-          params.node.setDataValue("isChecked", newChecked); // update isChecked for rendering
-        };
-
-        return (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              height: "100%",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={handleChange}
-              style={{ transform: "scale(1.2)" }}
-            />
-          </div>
-        );
+      filter: true,
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
+      valueSetter: (params) => {
+        params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        return true;
       },
       cellStyle: { textAlign: "center" },
-    },
+    }
   ];
 
   const defaultColDef = { sortable: true, resizable: true, flex: 1 };
 
-  // Auto-generate Spare Part No (avoids duplicates and avoids reuse of any used id stored in usedIds)
+  // Auto-generate Spare Part No
   const generateSparePartNo = () => {
-    // Collect numeric candidate base from masterList and usedIds
     const numericFromList = masterList.map((a) => {
       const n = Number(a.sparePartId);
       return Number.isNaN(n) ? 0 : n;
@@ -255,14 +323,13 @@ const CriticalSpareMaster = () => {
       : 0;
     let candidate = Math.max(maxFromList, maxFromUsed, 0) + 1;
 
-    // ensure not colliding with masterList or usedIds
     while (
       masterList.some((r) => String(r.sparePartId) === String(candidate)) ||
       usedIds.has(String(candidate))
     ) {
       candidate += 1;
     }
-    // persist candidate immediately to usedIds so it won't be regenerated on reload
+    
     const newUsed = new Set(usedIds);
     newUsed.add(String(candidate));
     setUsedIds(newUsed);
@@ -272,48 +339,57 @@ const CriticalSpareMaster = () => {
   };
 
   // Add new row
-  // Add new row
   const handleAddRow = () => {
     if (!selectedLine || !selectedOperation || selectedStatus === "") {
-      toast.warning("Select Line, Operation, and Status first");
+      toast.error("Please fill all mandatory fields");
       return;
     }
 
     const newId = generateSparePartNo();
-    const isActive = selectedStatus === "1"; // Active = checked
+    const isActive = selectedStatus === "1";
 
     const newRow = {
-      isUpdate: "0", // new row
+      isUpdate: "0",
       sparePartId: newId,
       criticalSpareName: "",
       minimumThresholdQuantity: "",
-      status: isActive ? "1" : "0", // payload
-      isChecked: isActive, // important for checkbox rendering
+      status: "1",
+      isChecked: true,
     };
 
-    setMasterList((prev) => [...prev, newRow]);
-
-    setTimeout(() => {
-      gridRef.current?.api?.ensureIndexVisible(masterList.length, "bottom");
-    }, 50);
+    setMasterList((prev) => {
+      const updated = [...prev, newRow];
+      // After state update, go to last page and scroll to last row
+      setTimeout(() => {
+        const api = gridRef.current?.api;
+        if (api) {
+          const totalRows = updated.length;
+          const pageSize = api.paginationGetPageSize();
+          const lastPage = Math.floor((totalRows - 1) / pageSize);
+          api.paginationGoToPage(lastPage);
+          api.ensureIndexVisible(totalRows - 1, "bottom");
+        }
+      }, 100);
+      return updated;
+    });
   };
 
-  // onCellValueChanged: update state immutably and ensure isUpdate toggles to "1" when user edits a DB row
+  // onCellValueChanged
   const onCellValueChanged = (params) => {
     const { colDef, newValue, oldValue, data } = params;
     const field = colDef.field;
 
-    // If unchanged, do nothing
     if ((newValue ?? "") === (oldValue ?? "")) return;
+
+    // Mark row as changed
+    data.changed = true;
 
     setMasterList((prev) =>
       prev.map((row) => {
-        // Identify exact edited row using sparePartId (NOT rowIndex)
         if (String(row.sparePartId) !== String(data.sparePartId)) return row;
 
         const updated = { ...row };
 
-        // Update the edited field
         if (field === "criticalSpareName") {
           updated.criticalSpareName = String(newValue || "").trim();
         }
@@ -323,12 +399,18 @@ const CriticalSpareMaster = () => {
           updated.minimumThresholdQuantity = cleaned;
         }
 
-        // Mark only THIS row as updated if it already existed in DB
+        if (field === "status") {
+          updated.status = newValue ? "1" : "0";
+        }
+
         if (row.isUpdate === "1") {
           updated.isUpdate = "1";
         } else if (row.isUpdate === "0") {
-          updated.isUpdate = "0"; // new rows remain isUpdate = 0
+          updated.isUpdate = "0";
         }
+
+        // Mark as changed
+        updated.changed = true;
 
         return updated;
       })
@@ -337,32 +419,41 @@ const CriticalSpareMaster = () => {
 
   // Prepare and send payload for insert/update
   const handleUpdate = async () => {
+    // Stop any active editing to capture current cell values
+    if (gridRef.current?.api) {
+      gridRef.current.api.stopEditing();
+    }
+
     const isUpdateMaster = sparePartMstId ? "1" : "0";
 
-    // Build payload: include only rows that are either new (isUpdate === "0") or edited DB rows (isUpdate === "1")
-    // This ensures we only send changed/new rows.
+    // Check for changes
+    const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
+    const rowsToUpdate = masterList.filter(row => row.changed === true);
+
+    if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+      toast.info("No data available");
+      return;
+    }
+
     const rowsToSend = masterList.filter(
       (row) => row.isUpdate === "1" || row.isUpdate === "0"
     );
 
     if (rowsToSend.length === 0) {
-      toast.info("Nothing to save.");
+      toast.info("No data available");
       return;
     }
 
-    const spareDetailsPayload = rowsToSend.map((row) => {
-      return {
-        isUpdate: row.isUpdate,
-        sparePartId: row.sparePartId,
-        criticalSpareName: row.criticalSpareName || "",
-        // ALWAYS send string typed by user – NEVER convert to number
-        minimumThresholdQuantity:
-          row.minimumThresholdQuantity === ""
-            ? ""
-            : row.minimumThresholdQuantity,
-        status: Number(row.status),
-      };
-    });
+    const spareDetailsPayload = rowsToSend.map((row) => ({
+      isUpdate: row.isUpdate,
+      sparePartId: row.sparePartId,
+      criticalSpareName: row.criticalSpareName || "",
+      minimumThresholdQuantity:
+        row.minimumThresholdQuantity === ""
+          ? ""
+          : row.minimumThresholdQuantity,
+      status: Number(row.status),
+    }));
 
     const payload =
       isUpdateMaster === "0"
@@ -381,28 +472,18 @@ const CriticalSpareMaster = () => {
     console.log("FINAL PAYLOAD:", payload);
 
     try {
-      const res = await axios.post(
-        "http://localhost:8091/tool/insertupdatecriticalsparemaster",
-        payload
-      );
+      const res = await backendService({
+        requestPath: "insertupdatecriticalsparemaster",
+        requestData: payload,
+      });
 
-      toast.success(
-        isUpdateMaster === "1"
-          ? "Updated successfully!"
-          : "Inserted successfully!"
-      );
+      toast.success("Add/Update successful");
 
-      // After a successful save, refresh each spare part's data from backend and replace rows for those ids
-      const idsToFetch = rowsToSend
-        .map((r) => (r.sparePartId ? String(r.sparePartId) : null))
-        .filter((v) => v);
-
-      if (idsToFetch.length > 0) {
-        await fetchAllDetailsAndSet(idsToFetch);
-      }
+      // Always reload table data after update/insert
+      await fetchCriticalSpareDetails(selectedLine, selectedOperation, selectedStatus);
     } catch (e) {
       console.error("Save error:", e);
-      toast.error("Error saving");
+      toast.error("Add/Update failed");
     }
   };
 
@@ -412,51 +493,26 @@ const CriticalSpareMaster = () => {
     });
 
   const handleCancel = () => {
-    // As requested: do not clear retrieved table data on Cancel.
-    // Only clear selections (line/operation/status) and sparePartMstId.
     setSelectedLine("");
     setSelectedOperation("");
     setSelectedStatus("");
     setSparePartMstId("");
-    toast.info("Selections cleared. Table contents retained.");
+    setMasterList([]);
+
   };
 
-  // Optional helper: load details for a specific sparePartId into grid (used where user may want to fetch manually)
-  const loadDetailsBySparePartId = async (id) => {
-    try {
-      const rows = await fetchCriticalSpareDetailById(id);
-      if (rows.length > 0) {
-        // merge fetched rows with existing masterList but ensure we don't duplicate
-        const existingMap = new Map(
-          masterList.map((r) => [String(r.sparePartId), r])
-        );
-        rows.forEach((r) => {
-          existingMap.set(String(r.sparePartId), r);
-        });
-        const merged = Array.from(existingMap.values()).sort(
-          (a, b) => (Number(a.sparePartId) || 0) - (Number(b.sparePartId) || 0)
-        );
 
-        // update usedIds
-        const newUsed = new Set(usedIds);
-        merged.forEach((r) => {
-          if (r.sparePartId) newUsed.add(String(r.sparePartId));
-        });
-        setUsedIds(newUsed);
-        saveUsedIds(newUsed);
+  const handleLineOnChange = (e) => {
+    setSelectedLine(e.target.value);
+    setSelectedOperation("");
+    setMasterList([]);
 
-        setMasterList(merged);
-      } else {
-        toast.info("No spare details found for id: " + id);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch details");
-    }
-  };
+    fetchOperationDropdown(e.target.value)
+
+  }
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -471,89 +527,118 @@ const CriticalSpareMaster = () => {
 
         <div className="card-body p-3">
           <div className="row mb-3">
-            <div className="col-md-4">
-              <label className="form-label fw-semibold">Line</label>
+            <div className="col-md-3">
+              <label className="form-label fw-semibold">Line <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
                 value={selectedLine}
-                onChange={(e) => setSelectedLine(e.target.value)}
+                onChange={(e) => handleLineOnChange(e)}
+                disabled={isLoading}
               >
                 <option value="">Select Line</option>
                 {lineOptions.map((line) => (
                   <option key={line.lineMstCode} value={line.lineMstCode}>
-                    {line.lineMstCode}
+                    {line.lineMstDesc}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="col-md-4">
-              <label className="form-label fw-semibold">Operation</label>
+            <div className="col-md-3">
+              <label className="form-label fw-semibold">Operation <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
                 value={selectedOperation}
                 onChange={(e) => setSelectedOperation(e.target.value)}
+                disabled={isLoading}
               >
                 <option value="">Select Operation</option>
                 {operationOptions.map((op) => (
-                  <option key={op.operationId} value={op.operationUniquecode}>
-                    {op.operationUniquecode}
+                  <option key={op.operationId} value={op.operationId}>
+                    {op.operationDesc}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="col-md-4">
+            <div className="col-md-3">
               <label className="form-label fw-semibold">Status</label>
               <select
                 className="form-select"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
+                disabled={isLoading}
               >
                 <option value="">Select Status</option>
+                <option value="getAll">Get All</option>
                 <option value="1">Active</option>
                 <option value="0">Inactive</option>
               </select>
             </div>
           </div>
 
-          <AgGridReact
-            ref={gridRef}
-            rowData={masterList}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            pagination
-            paginationPageSize={10}
-            domLayout="autoHeight"
-            onCellValueChanged={onCellValueChanged}
-            rowSelection="single"
-            suppressClickEdit={false}
-            stopEditingWhenCellsLoseFocus={true}
-          />
 
-          <div className="text-center mt-4">
-            <button
-              className="btn text-white me-2"
-              onClick={onExportExcel}
-              style={{ backgroundColor: "#00264d" }}
-            >
-              Excel
-            </button>
-            <button
-              className="btn text-white me-2"
-              onClick={handleUpdate}
-              style={{ backgroundColor: "#00264d" }}
-            >
-              Update
-            </button>
-            <button
-              className="btn text-white"
-              onClick={handleCancel}
-              style={{ backgroundColor: "#00264d" }}
-            >
-              Cancel
-            </button>
-          </div>
+          {shouldShowTable ? (
+            <>
+              <div style={{ position: "relative" }}>
+                {isLoading && (
+                  <div
+                    className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.6)",
+                      zIndex: 2,
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <Loader />
+                  </div>
+                )}
+                <AgGridReact
+                  ref={gridRef}
+                  rowData={masterList}
+                  columnDefs={columnDefs}
+                  defaultColDef={defaultColDef}
+                  pagination
+                  paginationPageSize={10}
+                  domLayout="autoHeight"
+                  onCellValueChanged={onCellValueChanged}
+                  rowSelection="single"
+                  suppressClickEdit={false}
+                  stopEditingWhenCellsLoseFocus={true}
+                />
+              </div>
+              <div className="text-center mt-4">
+                <button
+                  className="btn text-white me-2"
+                  onClick={onExportExcel}
+                  style={{ backgroundColor: "#00264d" }}
+                  disabled={isLoading}
+                >
+                  Excel Export
+                </button>
+                <button
+                  className="btn text-white me-2"
+                  onClick={handleUpdate}
+                  style={{ backgroundColor: "#00264d" }}
+                  disabled={isLoading}
+                >
+                  Update
+                </button>
+                <button
+                  className="btn text-white"
+                  onClick={handleCancel}
+                  style={{ backgroundColor: "#00264d" }}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center p-4">
+              <p className="text-muted">No data available</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

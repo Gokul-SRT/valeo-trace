@@ -8,6 +8,7 @@ import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/
 import { backendService } from "../../../../service/ToolServerApi";
 import store from "store";
 import { toast } from "react-toastify";
+import Loader from "../../../.././Utills/Loader";
 
 const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
@@ -21,10 +22,11 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   const [lineData, setLineData] = useState([])
   const [operationData, setOpeartionData] = useState([])
   const [toolData, setToolData] = useState([])
-  const [selectedLine, setSelectedLine] = useState('getall')
-  const [selectedTool, setSelectedTool] = useState('getall')
-  const [selectedOperat, setSelectedOperat] = useState('getall')
+  const [selectedLine, setSelectedLine] = useState('')
+  const [selectedTool, setSelectedTool] = useState('')
+  const [selectedOperat, setSelectedOperat] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('getall')
+  const [isLoading, setIsLoading] = useState(false);
   const gridRef = useRef(null);
 
   const autoSizeAllColumns = (params) => {
@@ -41,13 +43,14 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       console.log(response)
       let returnData = [];
       if (response) {
-        returnData = response;
+        returnData = response?.responseData;
         const options = returnData.map(item => ({
           key: item.lineMstCode || "",
           value: item.lineMstDesc || "",
           // label: item.productCode || ""
         }));
         setLineData(options);
+        console.log("options" , options);
         return returnData;
       } else {
         console.warn("LineMstdropdown returned no data.");
@@ -59,29 +62,52 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
     }
   }, []);
 
-  const getOperationDropDownData = useCallback(async () => {
-    try {
-      const response = await OperationMasterDropdown();
-      console.log(response)
-      let returnData = [];
-      if (response) {
-        returnData = response;
-        const options = returnData.map(item => ({
-          key: item.operationUniqueCode || item.operationId || "",
-          value: item.operationDescription || "",
+
+    const getOperationDropDownData = async (tool) => {
+      try {
+        const payload = { tenantId, branchCode , lineCode: selectedLine , toolNo: tool };
+  
+        const res = await backendService({
+          requestPath: "getOperationByLineCode",
+          requestData: payload,
+        });
+         const options = res.responseData?.map(item => ({
+          key: item.operationId || "",
+          value: item.operationDesc || "",
           // label: item.productCode || ""
         }));
+        
         setOpeartionData(options);
-        return returnData;
-      } else {
-        console.warn("OperationMstdropdown returned no data.");
-        return [];
+      } catch {
+        toast.error("No data available");
+        setOpeartionData([]);
       }
-    } catch (error) {
-      console.error("Error fetching operation dropdown data:", error);
-      setOpeartionData([]);
-    }
-  }, []);
+    };
+
+
+  // const getOperationDropDownData = useCallback(async () => {
+  //   try {
+  //     const response = await OperationMasterDropdown();
+  //     console.log(response)
+  //     let returnData = [];
+  //     if (response) {
+  //       returnData = response?.responseData;
+  //       const options = returnData.map(item => ({
+  //         key: item.operationUniqueCode || item.operationId || "",
+  //         value: item.operationDescription || "",
+  //         // label: item.productCode || ""
+  //       }));
+  //       setOpeartionData(options);
+  //       return returnData;
+  //     } else {
+  //       console.warn("OperationMstdropdown returned no data.");
+  //       return [];
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching operation dropdown data:", error);
+  //     setOpeartionData([]);
+  //   }
+  // }, []);
 
 
   const toolDropDownData = async (e) => {
@@ -107,40 +133,49 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   useEffect(() => {
     if (selectedModule && selectedScreen) {
-      // Sample data for PM Checklist Master
       getLineDropDownData()
-      getOperationDropDownData()
-      toolDropDownData()
-      fetchData()
     }
   }, [modulesprop, screensprop]);
 
   const fetchData = async (type, e) => {
+    const currentLine = type === 'line' ? e : selectedLine;
+    const currentTool = type === 'tool' ? e : selectedTool;
+    const currentOperation = type === 'operation' ? e : selectedOperat;
+    
+    if (!currentLine || !currentTool || !currentOperation) {
+      setMasterList([]);
+      setOriginalList([]);
+      return;
+    }
+    
+    setIsLoading(true);
     try {
       const response = await backendService({requestPath:"getPmCheckListDtl",
         requestData:{
         status: type === 'status' ? e : selectedStatus,
-        lineCode: type === 'line' ? e : selectedLine,
+        lineCode: currentLine,
         operationCode: type === 'operation' ? e : selectedOperat,
-        toolNo: type === 'tool' ? e : selectedTool,
+        toolNo: currentTool,
         tenantId,
         branchCode,
       }});
       if (response?.responseCode === '200') {
-        const updatedResponseData = response?.responseData.map((item) => ({
+        const updatedResponseData = response?.responseData.map((item , index) => ({
           ...item,
-          isUpdate: 1,
+          id: index + 1,
+          isUpdate: "1",
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
       } else {
         setMasterList([]);
         setOriginalList([]);
-        toast.error(response.data.responseMessage)
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
-      toast.error("Error fetching data. Please try again later.");
+      toast.error("No data available");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -179,51 +214,77 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   // }
 
   const createorUpdate = async () => {
-  try {
-    const newRows = masterList.filter(item => item.isUpdate === "0");
-    const hasNewRows = newRows.length > 0;
-    const missingNames = newRows.some(item => !item.characteristicName);
+    try {
+      // Stop any active editing to capture current cell values
+      if (gridRef.current?.api) {
+        gridRef.current.api.stopEditing();
+      }
 
-    // If there are new rows, validate dropdowns
-    if (hasNewRows) {
-      if (!selectedLine || !selectedTool || !selectedOperat === 'getall') {
-        toast.error("Please select any one Line, Tool, and Operation.");
+      // Check for changes
+      const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
+      const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate === "1");
+
+      if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+        toast.info("No data available");
         return;
       }
-      if (missingNames) {
-        toast.error("Please enter all characteristic names for the added rows.");
-        return;
+
+      // Validation for new rows
+      const missingNames = rowsToInsert.some(item => !item.characteristicName);
+      if (rowsToInsert.length > 0) {
+        if (!selectedLine || !selectedTool || !selectedOperat) {
+          toast.error("Please fill all mandatory fields");
+          return;
+        }
+        if (missingNames) {
+          toast.error("Please fill all mandatory fields");
+          return;
+        }
       }
+
+      // Only send changed rows (new + modified)
+      const changedRows = [...rowsToInsert, ...rowsToUpdate];
+      
+      const formattedRows = changedRows.map(item => ({
+        isUpdate: item.isUpdate,
+        characteristicId: item.characteristicId,
+        characteristicName: item.characteristicName,
+        specUnit: item.specUnit,
+        mesurementType: item.mesurementType,
+        seqNo: item.seqNo,
+        status: item.status,
+        tenantId,
+        branchCode,
+      }));
+
+      const updatedList = [{
+        line: selectedLine,
+        toolNo: selectedTool,
+        operation: selectedOperat,
+        status: "1",
+        tenantId,
+        branchCode,
+        dtlList: formattedRows,
+      }];
+
+      const response = await backendService({
+        requestPath: "pmCheckListMstsaveOrUpdate",
+        requestData: updatedList,
+      });
+
+      if (response?.responseCode === '200') {
+        toast.success("Add/Update successful");
+      } else {
+        toast.error("Add/Update failed");
+      }
+
+      fetchData();
+
+    } catch (error) {
+      console.error("Error saving data:", error);
+      toast.error("Add/Update failed");
     }
-
-    const updatedList = [{
-      line: selectedLine,
-      toolNo: selectedTool,
-      operation: selectedOperat,
-      status: "1",
-      tenantId,
-      branchCode,
-      dtlList: masterList,
-    }];
-
-    const response = await backendService({
-      requestPath: "pmCheckListMstsaveOrUpdate",
-      requestData: updatedList,
-    });
-
-    if (response?.responseCode === '200') {
-      toast.success(response.responseMessage);
-    } else {
-      toast.error(response?.responseMessage || "Save failed");
-    }
-
-    fetchData();
-
-  } catch (error) {
-    console.error("Error saving data:", error);
-    toast.error("Error while saving data!");
-  }
-};
+  };
 
 
   const defaultColDef = {
@@ -233,30 +294,71 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+  const onCellValueChanged = (params) => {
+    params.data.changed = true;
+    // Update masterList state immediately
+    setMasterList(prevList => 
+      prevList.map(item => 
+        item === params.data ? { ...item, changed: true } : item
+      )
+    );
+  };
+
+  const onCellEditingStarted = (params) => {
+    // Mark as changed when editing starts
+    params.data.changed = true;
+  };
+
+  const onCellEditingStopped = (params) => {
+    // Ensure changes are captured when editing stops
+    params.data.changed = true;
+    setMasterList(prevList => 
+      prevList.map(item => 
+        item === params.data ? { ...item, changed: true } : item
+      )
+    );
+  };
+
+  const MandatoryHeaderComponent = (props) => {
+    return (
+      <div>
+        {props.displayName} <span style={{color: 'red'}}>*</span>
+      </div>
+    );
+  };
+
   const columnDefs = [
-    { headerName: "S.NO", field: "characteristicId", filter: "agNumberColumnFilter", editable: "false" },
+    { headerName: "S.NO", field: "id", filter: "agNumberColumnFilter", editable: false },
     {
       headerName: "Characteristic",
       field: "characteristicName",
       filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Characteristic" }
     },
     {
       headerName: "SPEC/UNIT",
       field: "specUnit",
       filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "SPEC/UNIT" }
     },
     {
       headerName: "Measurement Tools",
       field: "mesurementType",
       filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Measurement Tools" }
     },
     {
       headerName: "Sequence No",
       field: "seqNo",
       filter: "agTextColumnFilter",
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "Sequence No" }
     },
     {
-      headerName: "Is Active",
+      headerName: "Status",
       field: "status",
       filter: true,
       editable: true,
@@ -265,6 +367,12 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
       valueSetter: (params) => {
         params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        setMasterList(prevList => 
+          prevList.map(item => 
+            item === params.data ? { ...item, changed: true } : item
+          )
+        );
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -272,9 +380,14 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   ];
 
   const handleAddRow = () => {
+    if (!selectedLine || !selectedTool || !selectedOperat) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
     const emptyRow = {
       status: "1",
       isUpdate: "0",
+      changed: true,
     };
     const CustNoEmpty = masterList.filter((item) => !item.characteristicName);
     if (CustNoEmpty && CustNoEmpty?.length === 0) {
@@ -282,26 +395,43 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       setMasterList(updated);
       setOriginalList(updated);
     } else {
-      toast.error("Please enter the characteristic Name for the row.");
+      toast.error("Please fill all mandatory fields");
     }
   };
 
   const handleCancel = () => {
-    setSelectedModule("");
-    setSelectedScreen("");
+    setSelectedLine("");
+    setSelectedTool("");
+    setSelectedOperat("");
+    setSelectedStatus("getall");
     setMasterList([]);
     setOriginalList([]);
   };
 
   const handleFilterChange = (type, value) => {
-    const setters = {
-      line: setSelectedLine,
-      tool: setSelectedTool,
-      operation: setSelectedOperat,
-      status: setSelectedStatus,
-    };
-    setters[type]?.(value);
-    fetchData(type, value)
+    if(type === 'line'){
+      setSelectedLine(value);
+      setSelectedTool('');
+      setSelectedOperat('');
+      setToolData([]);
+      setOpeartionData([]);
+      if(value) {
+        toolDropDownData(value);
+      }
+    } else if(type === 'tool'){
+      setSelectedTool(value);
+      setSelectedOperat('');
+      setOpeartionData([]);
+      if(value) {
+        getOperationDropDownData(value);
+      }
+    } else if(type === 'operation'){
+      setSelectedOperat(value);
+    } else if(type === 'status'){
+      setSelectedStatus(value);
+    }
+    
+    fetchData(type, value);
   };
 
 
@@ -316,7 +446,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -334,13 +464,13 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Line</label>
+              <label className="form-label fw-bold">Line <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange('line', e.target.value)}
                 value={selectedLine}
               >
-                <option value="getAll">Get All</option>
+                <option value="">Select Line</option>
                 {lineData.map((line) => (
                   <option key={line.key} value={line.key}>
                     {line.value}
@@ -350,13 +480,13 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
             </div>
 
             <div className="col-md-3">
-              <label className="form-label fw-bold">Tool Desc</label>
+              <label className="form-label fw-bold">Tool Desc <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange('tool', e.target.value)}
                 value={selectedTool}
               >
-                <option value="getAll">Get All</option>
+                <option value="">Select Tool</option>
                 {toolData.map((tool) => (
                   <option key={tool.key} value={tool.key}>
                     {tool.value}
@@ -366,13 +496,13 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
             </div>
 
             <div className="col-md-3">
-              <label className="form-label fw-bold">Operation</label>
+              <label className="form-label fw-bold">Operation <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange('operation', e.target.value)}
                 value={selectedOperat}
               >
-                <option value="getAll">Get All</option>
+                <option value="">Select Operation</option>
                 {operationData.map((operat) => (
                   <option key={operat.key} value={operat.key}>
                     {operat.value}
@@ -397,8 +527,26 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         </div>
 
         <div className="card-body p-3">
-          {/* {masterList.length > 0 && ( */}
-          <AgGridReact
+          {!selectedLine || !selectedTool || !selectedOperat ? (
+            <div className="text-center p-4">
+              <p className="text-muted">No data available</p>
+            </div>
+          ) : masterList.length > 0 ? (
+            <>
+              <div style={{ position: "relative" }}>
+                {isLoading && (
+                  <div
+                    className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.6)",
+                      zIndex: 2,
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <Loader />
+                  </div>
+                )}
+                <AgGridReact
             ref={gridRef}
             rowData={masterList}
             columnDefs={columnDefs}
@@ -406,42 +554,43 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
             paginationPageSize={100}
             pagination={true}
             domLayout="autoHeight"
-            singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
-            onCellValueChanged={(params) => {
-              const updatedList = [...masterList];
-              updatedList[params.rowIndex] = params.data;
-              setMasterList(updatedList);
-              setOriginalList(updatedList);
-            }}
-          />
-          {/* )} */}
-
-          <div className="text-center mt-4">
-            <button
-              onClick={() => onExportExcel(gridRef)}
-              className="btn text-white me-2"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-            >
-              Excel
-            </button>
-            <button
-              type="submit"
-              className="btn text-white me-2"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-              onClick={createorUpdate}
-            >
-              Update
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="btn text-white"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
-            >
-              Cancel
-            </button>
-          </div>
+            onCellEditingStarted={onCellEditingStarted}
+            onCellEditingStopped={onCellEditingStopped}
+            onCellValueChanged={onCellValueChanged}
+                />
+              </div>
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => onExportExcel(gridRef)}
+                  className="btn text-white me-2"
+                  style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+                >
+                  Excel Export
+                </button>
+                <button
+                  type="submit"
+                  className="btn text-white me-2"
+                  style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+                  onClick={createorUpdate}
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="btn text-white"
+                  style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center p-4">
+              <p className="text-muted">No data available</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
