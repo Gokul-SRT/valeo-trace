@@ -10,7 +10,7 @@ function getCookie(name) {
 
 // Create axios instance
 const serverApi = axios.create({
-  baseURL: 'http://localhost:8093/commonservices/',
+  baseURL: 'http://localhost:8901/commonservices/',
   headers: {
     'Content-Type': 'application/json',
   },
