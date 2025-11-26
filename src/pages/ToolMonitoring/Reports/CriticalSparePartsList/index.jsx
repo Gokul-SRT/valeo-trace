@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import CommonserverApi from "../../../../CommonserverApi";
 import { backendService } from "../../../../service/ToolServerApi";
-import "./style.css";
+// import "./style.css";
 
 const { Option } = Select;
 
