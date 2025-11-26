@@ -7,6 +7,9 @@ import store from "store";
 import { toast } from "react-toastify";
 import { backendService, commonBackendService } from "../../../../service/ToolServerApi";
 import Loader from "../../../.././Utills/Loader";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import moment from "moment";
 
 const CustomerProductMapping = ({ modulesprop, screensprop }) => {
   const [mappingList, setMappingList] = useState([]);
@@ -364,13 +367,93 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
     );
   };
 
-  const onExportExcel = (ref) => {
-    if (ref.current?.api) {
-      ref.current.api.exportDataAsExcel({
-        fileName: `CustomerProductMapping.xlsx`,
+  const onExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Customer Product Mapping");
+
+      worksheet.getRow(1).height = 60;
+      worksheet.getColumn(1).width = 15;
+      worksheet.getColumn(2).width = 30;
+      worksheet.getColumn(3).width = 30;
+      worksheet.getColumn(4).width = 15;
+
+      const imgResponse = await fetch("/pngwing.com.png");
+      const imgBlob = await imgResponse.blob();
+      const arrayBuffer = await imgBlob.arrayBuffer();
+      const imageId = workbook.addImage({
+        buffer: arrayBuffer,
+        extension: "png",
       });
-    } else {
-      alert("Grid is not ready!");
+      worksheet.addImage(imageId, {
+        tl: { col: 0, row: 0 },
+        br: { col: 1, row: 1 },
+        editAs: "oneCell",
+      });
+
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = "Customer Product Mapping Report";
+      titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
+      worksheet.mergeCells("C1:D2");
+      const dateCell = worksheet.getCell("C1");
+      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+      dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+      dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
+      const img2 = await fetch("/smartrunLogo.png");
+      const blob2 = await img2.blob();
+      const buf2 = await blob2.arrayBuffer();
+      const imgId2 = workbook.addImage({ buffer: buf2, extension: "png" });
+      worksheet.mergeCells("E1:F2");
+      worksheet.addImage(imgId2, {
+        tl: { col: 4, row: 0 },
+        br: { col: 6, row: 2 },
+        editAs: "oneCell",
+      });
+
+      const headers = ["S.No.", "Customer", "Product Code", "Status"];
+      const headerRow = worksheet.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+        cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" }, left: { style: "thin" },
+          bottom: { style: "thin" }, right: { style: "thin" }
+        };
+      });
+      headerRow.height = 25;
+
+      mappingList.forEach((item, index) => {
+        const customer = customerData.find(c => c.customerId === item.customerId);
+        const product = productData.find(p => p.productCode === item.productId);
+        const row = worksheet.addRow([
+          index + 1,
+          customer?.customerName || item.customerId || "",
+          product?.productName || item.productId || "",
+          item.isActive === "1" ? "Active" : "Inactive"
+        ]);
+        row.eachCell((cell) => {
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.font = { size: 10 };
+          cell.border = {
+            top: { style: "thin" }, left: { style: "thin" },
+            bottom: { style: "thin" }, right: { style: "thin" }
+          };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `CustomerProductMapping_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+      toast.success("Excel exported successfully!");
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Error exporting Excel. Please try again.");
     }
   };
 
@@ -444,7 +527,7 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
 
           <div className="text-center mt-4">
             <button
-              onClick={() => onExportExcel(gridRef)}
+              onClick={onExportExcel}
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
               disabled={loading}
