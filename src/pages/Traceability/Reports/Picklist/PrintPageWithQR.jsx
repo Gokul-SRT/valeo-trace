@@ -8,6 +8,7 @@ import html2canvas from "html2canvas";
 import { CheckCircleTwoTone } from "@ant-design/icons";
 import store from "store";
 import { useLocation } from "react-router-dom";
+import {Button} from "antd";
 
 const PickListPrintMain = () => {
   // Ref to call handleSubmitData from PrintPage
@@ -31,6 +32,7 @@ const PickListPrintMain = () => {
 
   const [labelCode,SetLabelCode]= useState("");
   const [qrValue, setQrValue] = useState("");
+  const [resetQrField, setResetQrField] = useState(false);
     const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
 
@@ -66,6 +68,46 @@ const printB2Columns = [
       return "-";
     }
   },
+
+  {
+    title: "Action",
+    key: "action",
+    render: (_, record) => {
+      const val = record.isLabelPrinted;  // 0 or 1
+  
+      return (
+        <>
+          {/* PRINT BUTTON */}
+          <Button
+            type="primary"
+            disabled={val === 1}      // Disable when printSts = 1
+            style={{
+              marginRight: 8,
+              opacity: val === 1 ? 0.5 : 1,
+              cursor: val === 1 ? "not-allowed" : "pointer",
+            }}
+            onClick={() => handleViewQR(record)}
+          >
+            Print
+          </Button>
+  
+          {/* REPRINT BUTTON */}
+          <Button
+            type="default"
+            disabled={val === 0}      // Disable when printSts = 0
+            style={{
+              opacity: val === 0 ? 0.5 : 1,
+              cursor: val === 0 ? "not-allowed" : "pointer",
+            }}
+          onClick={()=>handleViewQR(record)}  
+          >
+            Reprint
+          </Button>
+        </>
+      );
+    },
+  },
+  /*
     {
     title: "Action",
     key: "action",
@@ -73,6 +115,7 @@ const printB2Columns = [
       <a onClick={() => handleViewQR(record)}>View QR</a>
     )
   },
+  */
 ];
 
   // const printB2Data = [
@@ -309,6 +352,7 @@ const downloadPDF = async () => {
 const [deliveryNoteNo, setDeliveryNoteNo] = useState("");
 const [batchNo, setBatchNo] = useState("");
 
+/*
 
 const handleQrBlur = (e) => {
   const val = e.target.value.trim();
@@ -346,7 +390,7 @@ console.log("childPartis there or not there",vals)
 }
 
 if (!customerSno.includes(childPartCodeValidation)) {
-  toast.error("Invalid ChildPartCode");
+  toast.error("Invalid ChildPartCode Scanned");
    return
 }
 
@@ -367,6 +411,94 @@ if (!customerSno.includes(childPartCodeValidation)) {
 
   setQrData(extractedData);
   setQrValue(val);
+};
+
+
+*/
+
+
+
+useEffect(() => {
+  if (resetQrField) {
+    setResetQrField(false);
+  }
+}, [resetQrField]);
+
+const inputRef = useRef(null);
+  const scanTimerRef = useRef(null);
+  
+const handleQrBlur = (e) => {
+  const fieldName = e.target.name;
+  clearTimeout(scanTimerRef.current);
+
+  // Wait 300ms after barcode typing completes
+  scanTimerRef.current = setTimeout(async () => {
+
+  const val = e.target.value.trim();
+
+  SetLabelCode(val);
+  if (!val){
+    setResetQrField(true);
+  inputRef.current?.focus();
+    return
+  } ;
+
+  const qr = val; // full scanned QR string
+  console.log("Scanned QR:", qr);
+
+  // Fixed-position extraction (based on your image)
+  const prefix = qr.substring(0, 1).trim();
+  const deliveryNoteNo = qr.substring(1, 17).trim();      // 16 digits
+  const customerSno = qr.substring(17, 35).trim();         // 18 digits
+  const supplierCode = qr.substring(35, 42).trim();        // 7 digits
+  const quantity = qr.substring(42, 50).trim();            // 8 digits
+  const packageNo = qr.substring(50, 68).trim();           // 18 digits
+  const batchNo = qr.substring(68, 80).trim();             // 12 digits
+  const deliveryDate = qr.substring(80, 88).trim();        // YYYYMMDD
+  const manufactureDate = qr.substring(88, 96).trim();     // YYYYMMDD
+  const expirationDate = qr.length >= 104 
+                          ? qr.substring(96, 104).trim()   // optional
+                          : "";
+  setDeliveryNoteNo(deliveryNoteNo);
+  setBatchNo(batchNo);
+
+console.log("childPartCodes",childPartCode,customerSno)
+
+const vals = customerSno.includes(childPartCode);
+console.log("childPartis there or not there",vals)
+ const childPartCodeValidation=childPartCode;
+ if (!childPartCodeValidation || !customerSno) {
+  toast.error("ChildPartCode cannot be empty");
+  setResetQrField(true);
+  inputRef.current?.focus();
+   return;
+}
+
+if (!customerSno.includes(childPartCodeValidation)) {
+  toast.error("Invalid ChildPartCode Scanned");
+  setResetQrField(true);
+  inputRef.current?.focus();
+   return
+}
+
+
+
+  const extractedData = {
+    prefix,
+    deliveryNoteNo,
+    customerSno,
+    supplierCode,
+    quantity,
+    packageNo,
+    batchNo,
+    deliveryDate,
+    manufactureDate,
+    expirationDate
+  };
+
+  setQrData(extractedData);
+  setQrValue(val);
+}, 300);
 };
 
 
@@ -391,6 +523,8 @@ if (!customerSno.includes(childPartCodeValidation)) {
         pickListCode={pickListCode}
         childPartCode={childPartCode}
         pickListQty={planQty}
+        inputRef={inputRef}
+        resetQrField={resetQrField}
 
       />
 

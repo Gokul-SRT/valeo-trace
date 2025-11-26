@@ -13,7 +13,7 @@ import store from "store";
 import serverApi from "../../../serverAPI";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import moment from "moment";
+import moment from "moment"; 
 ModuleRegistry.registerModules([
   SetFilterModule,
   DateFilterModule,
@@ -47,9 +47,13 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
       fetchData();
     }
   }, [selectedModule, selectedScreen]);
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("empID"));
+  // const tenantId = JSON.parse(localStorage.getItem("tenantId"));
+  // const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  // const employeeId = JSON.parse(localStorage.getItem("empID"));
+
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
+  const employeeId = store.get("employeeId")
 
   console.log("tenantId",tenantId);
 
@@ -103,6 +107,7 @@ const columnDefs = [
  // { headerName: "Type ID", field: "type_id", filter: "agTextColumnFilter",editable: (params) => (params.data.isUpdate === 0 ? true : false), },
   { headerName: "Type Code", field: "typeCode", filter: "agTextColumnFilter", editable: (params) => (params.data.isUpdate === 0 ? true : false), },
   { headerName: "Type Description", field: "typeDescription", filter: "agTextColumnFilter" },
+  { headerName: "Bin Quantity", field: "stantardQuantity", filter: "agTextColumnFilter",  cellStyle: { textAlign: "right" },  },
  // { headerName: "Tenant ID", field: "tenant_id", filter: "agTextColumnFilter" },
   // { headerName: "Created At", field: "created_at", filter: "agDateColumnFilter" },
   // { headerName: "Updated At", field: "updated_at", filter: "agDateColumnFilter" },
@@ -128,6 +133,31 @@ const columnDefs = [
 
   const createorUpdate = async () => {
     try {
+
+// Check EMPTY Type codes
+const hasEmptyTypeCode = masterList.some(
+  (item) => !item.typeCode || item.typeCode.trim() === ""
+);
+
+if (hasEmptyTypeCode) {
+  toast.error("Please fill Type Code for all rows!");
+  return;
+}
+
+
+ // Check DUPLICATE Type codes
+ const typeCodes = masterList.map((item) => item.typeCode.trim());
+ const duplicateCodes = typeCodes.filter(
+   (code, index) => typeCodes.indexOf(code) !== index
+ );
+
+ if (duplicateCodes.length > 0) {
+   toast.error(`Duplicate Type Code found: ${duplicateCodes[0]}`);
+   return;
+ }
+
+
+
       console.log('masterList',masterList)
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
@@ -136,6 +166,7 @@ const columnDefs = [
         tenantId: tenantId,
         updatedBy: employeeId,
         branchCode: branchCode,
+        standardQty:item.stantardQuantity,
       }));
 
       const response = await serverApi.post(

@@ -31,6 +31,7 @@ const ChildPartValidationCard = ({
   const [scannedValue, setScannedValue] = useState("");
   const [indicatorColor, setIndicatorColor] = useState("#d9d9d9");
   const [isVerified, setIsVerified] = useState(false);
+  
 
   const handleScanChange = async (e) => {
     const scanned = e.target.value.trim();
@@ -161,6 +162,8 @@ const ConsigneeDetailsCard = ({
   onPrint,
   onCancel,
   scanResultsTable,
+  listTotalCount,
+  childPartCountList,
 }) => {
   const [form] = Form.useForm();
   const [binQty, setBinQty] = useState(100);
@@ -172,7 +175,7 @@ const ConsigneeDetailsCard = ({
   const [searchText, setSearchText] = useState("");
   const [qrModal, setQrModal] = useState(false);
   const [selectedObject, setSelectedObject] = useState(null);
-
+  
   
   const getCurrentDate = () => moment();
 
@@ -192,6 +195,41 @@ const ConsigneeDetailsCard = ({
     setLabelCount(newLabelCount);
     form.setFieldsValue({ labelCount: newLabelCount });
   };
+
+useEffect(()=>{
+  fetchPickedAndStandardQty(childPartCode);
+},[childPartCode]);
+
+const fetchPickedAndStandardQty = async (childCode) => {
+  try {
+    const response = await serverApi.post("getPLSCodePickedQuantity", {
+      tenantId,
+      branchCode,
+      plsCode: plsCode,
+      itemType: "C",
+      childPartCode: childCode
+    });
+
+    const res = response.data;
+    if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+      console.log("Fetched PickedQty Details:", res.responseData);
+      const firstItem = res.responseData[0] || {};
+      form.setFieldsValue({
+        binQty: firstItem.standardQuantity || ""
+      });
+      setBinQty(firstItem.standardQuantity || "");
+    } else {
+      form.setFieldsValue({
+        binQty: "0"
+      });
+    }
+  } catch (error) {
+    toast.error("Error fetching picked quantity. Please try again later.");
+  }
+};
+
+
+
 /*
   const handleQuantityChange = (e) => {
     const value = e.target.value;
@@ -358,7 +396,30 @@ const handleSubAssemplyRePrint = async (record) => {
 };
 
 
+const updateScannedCountForSubChildPart = async (plsCode,formattedValues) => {
+  try {
 
+    const updatePayLoadList=childPartCountList.map((item)=>({
+      tenantId: tenantId,
+      branchCode: branchCode,
+      minimumCount: listTotalCount,
+      subChildParts: item.kittingChildPartCode,
+      plsCode: plsCode,
+      childPartCode: formattedValues.childPartCode,
+    }))
+
+    const response = await serverApi.post("updateScannedCountForKittingDtl",updatePayLoadList);
+         const res = response.data;
+      if (res.responseCode === "200") {
+        toast.success("ScannedCount updated successfully!");
+       
+      }else{
+        toast.error("ScannedCount updated Failure!");
+      }
+  } catch (err) {
+    message.error("ScannedCount updated failed");
+  }
+};
 
 
 //search
@@ -407,6 +468,9 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
       setSubAssemblyKittingList(res.responseData);
       console.log("setSubAssemblyKittingList",res.responseData)
       console.log("setSubAssemblyKittingList",res.responseData[0].labelCode)
+
+      updateScannedCountForSubChildPart(plsCode,formattedValues);
+      
     } else {
       setSubAssemblyKittingList([]);
       toast.error(res.responseMessage);
@@ -618,8 +682,19 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
                   form.setFieldsValue({ labelCount: 0 });
                   return;
                 }
+                if(quantityNum !== listTotalCount){
+                  toast.error("Quantity must be equal to totalCount minimum value!");
+                  setQuantity(""); // now clear after typing
+                  form.setFieldsValue({ quantity: "" });
+                  setLabelCount(0);
+                  form.setFieldsValue({ labelCount: 0 });
+                  return;
+
+                }
+
                 if (quantityNum % binQty !== 0) {
-                  toast.error(`Quantity must be a multiple of ${binQty}`);
+                  console.log("vvvvvbin",binQty)
+                  toast.error(`Quantity must be a multiple of bin Quantity`);
                   setQuantity("");
                   form.setFieldsValue({ quantity: "" });
                   setLabelCount(0);
@@ -648,7 +723,8 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
                 type="number"
                 style={{ width: "100%" }}
                 placeholder="Enter bin quantity"
-                defaultValue={100}
+                
+              //  defaultValue={100}
                 onChange={handleBinQtyChange}
                 min={1}
                 disabled
@@ -749,6 +825,8 @@ const Kitting = () => {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState(null);
   const [childPartCountList, setChildPartCountList] = useState([]);
+  const [listTotalCount,setListTotalCount] = useState("");
+  
 
   
   const tenantId = store.get("tenantId");
@@ -889,6 +967,16 @@ const Kitting = () => {
       if (rawData.length > 0) {
         console.log(rawData);
         setChildPartCountList(rawData);
+
+       const totalCount=Math.min(...rawData.map(item=>Number(item.totalCount)));
+       if (totalCount !== null && totalCount !== undefined) {
+        setListTotalCount(totalCount);
+       }else{
+        setListTotalCount(0);
+       }
+      
+      
+
       } else {
         setChildPartCountList([]);
         message.info("Error");
@@ -1125,6 +1213,8 @@ const Kitting = () => {
             onPrint={handleConsigneePrint}
             onCancel={handleConsigneeCardClose}
             scanResultsTable={scanResultsTable}
+            listTotalCount={listTotalCount}
+            childPartCountList={childPartCountList}
           />
         </div>
       )}

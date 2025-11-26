@@ -27,6 +27,8 @@ const PrintPage = forwardRef(({
   pickListCode,
   childPartCode,
   pickListQty,
+  inputRef,
+  resetQrField,
 }, ref) => {
 
   const [addQty, setAddQty] = useState(0);
@@ -47,7 +49,7 @@ const PrintPage = forwardRef(({
   const navigate = useNavigate();
 
 const handleAddQtyChange = (e) => {
-  if (selectType === "B2") return; // Ignore for B2
+ // if (selectType === "B2") return; // Ignore for B2
   const formValues = printform.getFieldsValue()
   const value = Number(e.target.value);
   const binQty = Number(printform.getFieldValue("binQty") || 0);
@@ -58,11 +60,16 @@ const handleAddQtyChange = (e) => {
     setNoOfLabels(Math.floor(value / binQty));
   } else {
     printform.resetFields(["addQty"]);
-    toast.warning(`Add Quantity cannot exceed ${remainingQty}`);
+    toast.warning(`Label Quantity cannot exceed ${formValues.planQty}`);
   }
 };
 
-
+useEffect(() => {
+  if (resetQrField) {
+    printform.resetFields(["qrCode"]); // reset only scan field
+    inputRef.current?.focus();       // focus again
+  }
+}, [resetQrField]);
 
   const handlePicklistCodetoChildParts = (picklistCode) => {
     setSelectedPicklist(picklistCode)
@@ -79,7 +86,7 @@ useEffect(() => {
       manufacturingDate: qrData.manufactureDate ? moment(qrData.manufactureDate, "YYYY-MM-DD") : null,
       scanQty: qrData.quantity,
     });
-
+/*
     if (selectType === "B2") {
       const scanQty = Number(qrData.quantity);
       const binQty = Number(printform.getFieldValue("binQty") || 0);
@@ -92,6 +99,7 @@ useEffect(() => {
         printform.setFieldsValue({ addQty: effectiveQty }); // optional
       }
     }
+    */
   }
 
   fetchPicklistPLSDetails();
@@ -110,6 +118,8 @@ useEffect(() => {
 
 useEffect(() => {
   if (childPartOptions.length > 0 && childPartCode) {
+
+    console.log("chiiiii",childPartCode)
 
     // 1. Find the record
     const selected = childPartOptions.find(
@@ -356,9 +366,16 @@ const handleBack = () => {
               </Form.Item>
             </Col>
 
-            <Col span={4}>
+            {/* <Col span={4}>
               <Form.Item name="qrCode" label="Scan QR">
                 <Input type="text" placeholder="Scan QR" onBlur={handleQrBlur} />
+              </Form.Item>
+            </Col> */}
+
+             <Col span={4}>
+              <Form.Item name="qrCode" label="Scan QR">
+                <Input type="text" placeholder="Scan QR" ref={inputRef} onKeyDown={handleQrBlur}
+                 autoFocus />
               </Form.Item>
             </Col>
 
@@ -401,11 +418,11 @@ const handleBack = () => {
                 </Col>
 
                 <Col span={4}>
-                  <Form.Item name="addQty" label="Add Quantity">
+                  <Form.Item name="addQty" label="Label Quantity">
                     <Input
                       type="number"
                       placeholder="Enter Quantity"
-                      disabled={selectType === "B2"}   // <-- disable
+                    //  disabled={selectType === "B2"}   // <-- disable
                       onChange={handleAddQtyChange}
                     />
                   </Form.Item>
