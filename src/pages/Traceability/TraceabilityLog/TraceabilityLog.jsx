@@ -105,16 +105,17 @@ const TraceabilityLog = () => {
     if (selectedProduct) {
       setSelectedWorkOrder(null);
       setWorkOrders([]);
-      fetchWorkOrders(selectedProduct);
+      fetchWorkOrders(selectedProduct,selectedLine);
     }
   }, [selectedProduct]);
 
-  const fetchWorkOrders = async (productId) => {
+  const fetchWorkOrders = async (productCode,lineCode) => {
     try {
       const response = await serverApi.post("getplsCodeByProduct", {
         tenantId: tenantId,
         branchCode: branchCode,
-        lineCode: productId,
+        productCode: productCode,
+        lineCode: lineCode,
       });
       if (response?.data?.responseCode === "200")
         setWorkOrders(response.data.responseData);
