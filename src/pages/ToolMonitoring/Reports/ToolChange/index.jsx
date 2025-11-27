@@ -58,6 +58,38 @@ const ToolChange = () => {
     }
   }, []);
 
+
+  
+
+
+   const getProductByTool = async () =>{
+     const formValues = form.getFieldsValue()
+     console.log(formValues,"formValues-------------")
+     try{
+          
+      const response = await backendService({
+        requestPath: 'getProductByTool',
+        requestData: [{
+          tenantId,
+          toolNo: formValues.toolNo,
+          enteredBy: empId,
+        }]
+      })
+      if (response) {
+        if (response.responseCode === '200') {
+          toast.success(response.responseMessage)
+        }else if (response.responseCode === '409'){
+          toast.warning(response.responseMessage)
+        }else{
+          toast.error(response.responseMessage)
+        }
+        form.resetFields()
+      }
+     }catch (err){
+       console.error(err)
+     }
+  }
+
   const createorUpdate = async () =>{
      const formValues = form.getFieldsValue()
      console.log(formValues,"formValues-------------")
@@ -292,7 +324,7 @@ const ToolChange = () => {
             <Button type="primary" style={{ marginRight: "10px" }} onClick={createorUpdate}>
               Submit
             </Button>
-            <Button onClick={handleCancel} >Cancel</Button>
+            <Button type="primary"  onClick={handleCancel} >Cancel</Button>
           </div>
         </Form>
       </Card>

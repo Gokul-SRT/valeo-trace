@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Form, Select, Row, Col, Button, DatePicker, Input } from "antd";
 import { AgGridReact } from "ag-grid-react";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import CommonserverApi from "../../../../CommonserverApi";
@@ -56,6 +56,7 @@ const CriticalSparePartsList = () => {
   const [showAddCard, setShowAddCard] = useState(false);
   const [addCardData, setAddCardData] = useState([]);
   const [detailsData, setDetailsData] = useState([]);
+  const [isViewMode, setIsViewMode] = useState(false);
 
   // ✅ MAIN DROPDOWNS
   const [lineList, setLineList] = useState([]);
@@ -262,12 +263,16 @@ const CriticalSparePartsList = () => {
     setShowDetails(false);
     setShowAddCard(false);
     setAddCardData([]);
+    setIsViewMode(false);
   };
 
   const handleAddClick = () => {
+    addForm.resetFields();
+    setAddToolList([]);
     setShowAddCard(true);
     setShowDetails(false);
     setAddCardData([]);
+    setIsViewMode(false);
   };
 
   const handleAddFormChange = (changedValues, allValues) => {
@@ -286,6 +291,151 @@ const CriticalSparePartsList = () => {
       setAddCardData(updated);
     }
   };
+
+  // ================= FETCH CRITICAL SPARE DETAILS BY ID =================
+  const getCriticalSpareDetailsById = async (reportId) => {
+    try {
+      console.log("Fetching details for reportId:", reportId);
+      
+      const payload = {
+        logId: reportId,
+        tenantId,
+        branchCode,
+      };
+      
+      console.log("API payload:", payload);
+
+      const res = await backendService({
+        requestPath: "getCritcalSpareDetailsById",
+        requestData: payload,
+      });
+      
+      console.log("API response:", res);
+
+      const rawData = res?.data || res || [];
+      console.log("Raw data:", rawData);
+      
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        // Format data for the add card grid
+        const tableData = rawData.map((item, index) => ({
+          key: index + 1,
+          sno: index + 1,
+          toolDescription: item.operationDesc || "Tool Description",
+          criticalSpares: item.criticalSpareName,
+          minQty: parseInt(item.minimumThresholdQuantity) || 0,
+          spareLocation: item.storageLocation || "",
+          availableQty: parseInt(item.stockAvailable) || 0,
+          needToOrder: parseInt(item.needToOrder) || 0,
+          totalAvailable: parseInt(item.totalAvailable) || 0,
+          sparePartId: item.sparePartId,
+        }));
+        
+        console.log("Formatted table data:", tableData);
+
+        return {
+          data: tableData,
+          lineCode: rawData[0]?.lineMstCode,
+          toolNo: rawData[0]?.toolNo,
+          date: rawData[0]?.date ? rawData[0].date.split(' ')[0] : null,
+        };
+      }
+      console.log("No data returned from API");
+      return null;
+    } catch (err) {
+      console.error("getCriticalSpareDetailsById error", err);
+      toast.error("Failed to fetch critical spare details");
+      return null;
+    }
+  };
+
+  // ================= ACTION HANDLERS =================
+  const handleViewClick = async (data) => {
+    try {
+      console.log("View clicked with data:", data);
+      
+      // Use the key as reportId
+      const reportId = data.key;
+      console.log("Using reportId:", reportId);
+      
+      const result = await getCriticalSpareDetailsById(reportId);
+      console.log("API result:", result);
+      
+      if (result && result.data && result.data.length > 0) {
+        // Set the add card data with fetched details
+        setAddCardData(result.data);
+        
+        // Auto-populate the form fields
+        addForm.setFieldsValue({
+          line: result.lineCode,
+          toolId: result.toolNo,
+          monthYear: result.date ? dayjs(result.date) : null,
+        });
+        
+        // Show the add card with populated data in view mode
+        setShowAddCard(true);
+        setShowDetails(false);
+        setIsViewMode(true);
+        
+        toast.success(`Loaded ${result.data.length} critical spare details`);
+      } else {
+        toast.error("No data found for this record");
+      }
+    } catch (err) {
+      console.error("handleViewClick error", err);
+      toast.error("Failed to load critical spare details");
+    }
+  };
+
+  const ActionCellRenderer = (props) => {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <EyeOutlined 
+          style={{ 
+            fontSize: '16px', 
+            color: '#1890ff', 
+            cursor: 'pointer',
+            padding: '4px'
+          }}
+          onClick={() => handleViewClick(props.data)}
+          title="View Details"
+        />
+      </div>
+    );
+  };
+
+  // ================= COLUMN DEFINITIONS =================
+  const detailsColumns = [
+    {
+      headerName: "S.No",
+      field: "key",
+      width: 80,
+      cellStyle: { textAlign: "center" },
+    },
+    {
+      headerName: "Line",
+      field: "line",
+      flex: 1,
+    },
+    {
+      headerName: "Tool Description",
+      field: "toolDescription",
+      flex: 1,
+    },
+    {
+      headerName: "Month/Year",
+      field: "monthYear",
+      flex: 1,
+    },
+    {
+      headerName: "Action",
+      field: "action",
+      width: 100,
+      cellRenderer: ActionCellRenderer,
+      cellStyle: { textAlign: "center" },
+      sortable: false,
+      filter: false,
+    },
+  ];
 
   // ================= INPUT CHANGE HANDLERS =================
   const handleInputChange = (key, field, value) => {
@@ -430,7 +580,7 @@ const CriticalSparePartsList = () => {
       headerName: "Spare location",
       field: "spareLocation",
       width: 200,
-      editable: true,
+      editable: !isViewMode,
       cellEditor: 'agTextCellEditor',
     },
     {
@@ -448,7 +598,7 @@ const CriticalSparePartsList = () => {
       headerName: "Spares stock Qty",
       field: "availableQty",
       width: 160,
-      editable: true,
+      editable: !isViewMode,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 0,
@@ -458,7 +608,7 @@ const CriticalSparePartsList = () => {
       headerName: "Need to order",
       field: "needToOrder",
       width: 140,
-      editable: true,
+      editable: !isViewMode,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 0,
@@ -481,12 +631,7 @@ const CriticalSparePartsList = () => {
     },
   ];
 
-  const detailsColumns = [
-    { headerName: "S.No", field: "key", flex: 1 },
-    { headerName: "Line", field: "line", flex: 2 },
-    { headerName: "Tool Description", field: "toolDescription", flex: 3 },
-    { headerName: "Month Year", field: "monthYear", flex: 2 },
-  ];
+
 
   return (
     <>
@@ -585,7 +730,7 @@ const CriticalSparePartsList = () => {
       {/* ================= ADD POPUP PAGE ================= */}
       {showAddCard && (
         <Card
-          title="Add Critical Spare Parts Details"
+          title={isViewMode ? "Critical Spare Details" : "Add Critical Spare Parts Details"}
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
           style={{ marginTop: 20, borderRadius: 8 }}
         >
@@ -598,6 +743,7 @@ const CriticalSparePartsList = () => {
                     options={addLineList}
                     onChange={handleAddLineChange}
                     allowClear
+                    disabled={isViewMode}
                   />
                 </Form.Item>
               </Col>
@@ -608,6 +754,7 @@ const CriticalSparePartsList = () => {
                     placeholder="Select Tool Desc"
                     options={addToolList}
                     allowClear
+                    disabled={isViewMode}
                   />
                 </Form.Item>
               </Col>
@@ -618,6 +765,7 @@ const CriticalSparePartsList = () => {
                     format="YYYY-MM-DD"
                     placeholder="Select Date"
                     style={{ width: "100%" }}
+                    disabled={isViewMode}
                   />
                 </Form.Item>
               </Col>
@@ -654,18 +802,20 @@ const CriticalSparePartsList = () => {
             </div>
 
             <div style={{ textAlign: "center", marginTop: 20 }}>
-              <Button
-                type="primary"
-                onClick={handleAddFormSubmit}
-                style={{
-                  marginRight: 10,
-                  backgroundColor: "#00264d",
-                  borderColor: "#00264d",
-                }}
-              >
-                Submit
-              </Button>
-              <Button onClick={handleCancel}>Cancel</Button>
+              {!isViewMode && (
+                <Button
+                  type="primary"
+                  onClick={handleAddFormSubmit}
+                  style={{
+                    marginRight: 10,
+                    backgroundColor: "#00264d",
+                    borderColor: "#00264d",
+                  }}
+                >
+                  Submit
+                </Button>
+              )}
+              <Button onClick={handleCancel}>{isViewMode ? "Close" : "Cancel"}</Button>
             </div>
           </Form>
         </Card>
