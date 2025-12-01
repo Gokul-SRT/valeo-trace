@@ -140,7 +140,7 @@ const LabelPrint = () => {
   const handlePrint = async () => {
     try {
       const payload = {
-        printerName: "TSC MH241T",
+        printerName: "TSC MH241",
         data: tableData, // PRN data
       };
 
@@ -162,7 +162,7 @@ const LabelPrint = () => {
     try {
       const payload = {
         data: serialNumber,
-        printerName: "TSC MH241T",
+        printerName: "TSC MH241",
       };
 
       const response = await serverApi.post("/tscPrintQrByMachine", payload);
