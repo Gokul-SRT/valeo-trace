@@ -108,7 +108,7 @@ const LabelPrint = () => {
         handleReprintSubmit();
         
       } else {
-        toast.success(res.responseDataMessage);
+        toast.error(res.responseDataMessage);
       }
     } catch (error) {
       toast.error("Error,Please try again later.");
@@ -117,10 +117,12 @@ const LabelPrint = () => {
 
   const insertTraceabilityQRCodeDetails = async (qrCodeVal) => {
     try {
+      const currentDate = moment().format("YYYY-MM-DD");
+
       const response = await serverApi.post("insertTraceabilityQRCode", {
         tenantId: tenantId,
         branchCode: branchCode,
-        qrDate: " ",
+        qrDate: currentDate,
         plCode: selectedPlan,
         qrCode: qrCodeVal,
         printSts: "1",
@@ -130,7 +132,7 @@ const LabelPrint = () => {
       if (res.responseCode === "200") {
         toast.success(res.responseDataMessage);
       } else {
-        toast.success(res.responseDataMessage);
+        toast.error(res.responseDataMessage);
       }
     } catch (error) {
       toast.error("Error,Please try again later.");
@@ -146,8 +148,10 @@ const LabelPrint = () => {
 
       const response = await serverApi.post("/tscPrintQrByMachine", payload);
       const resData = response.data;
+
+      
       if (resData != null && resData === "200") {
-        toast.success("Print Successful");
+        toast.success("Print Successfuly");
 
         insertTraceabilityQRCodeDetails(tableData);
       } else {
