@@ -94,18 +94,19 @@ const LabelPrint = () => {
     fetchPicklistData(values.plan);
   };
 
-  const verifyTraceabilityQRCode = async (qrCodeVal) => {
+  const verifyTraceabilityQRCode = async () => {
     try {
       const response = await serverApi.post("verifyTraceabilityQRCode", {
         tenantId: tenantId,
         branchCode: branchCode,
-        qrCode: qrCodeVal,
+        qrCode: reprintForm.getFieldValue("serial"),
       });
 
       const res = response.data;
       if (res.responseCode === "200") {
         toast.success(res.responseDataMessage);
         handleReprintSubmit();
+        
       } else {
         toast.success(res.responseDataMessage);
       }
