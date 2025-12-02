@@ -79,7 +79,7 @@ const LabelPrint = () => {
         setShowTable(true);
         console.log("showTable", showTable);
       } else {
-        setTableData([]);
+        setTableData(null);
         setShowTable(false);
         toast.error("No Data Found");
       }
@@ -141,19 +141,28 @@ const LabelPrint = () => {
 
   const handlePrint = async () => {
     try {
+      const lineCode = tableData.lineCode;
+      const productGroupCode = tableData.productGroupCode;
+      const productCode = tableData.productCode;
+      const currentDateTime = moment().format("YYYYMMDDHHmmss");
+      
+      const strData = `${lineCode} ${productGroupCode} ${productCode} ${currentDateTime}`;
+
+
+
       const payload = {
         printerName: "TSC MH241",
-        data: tableData, // PRN data
+        data: strData, // PRN data
       };
 
       const response = await serverApi.post("/tscPrintQrByMachine", payload);
       const resData = response.data;
 
-      
+     
       if (resData != null && resData === "200") {
         toast.success("Print Successfuly");
 
-        insertTraceabilityQRCodeDetails(tableData);
+        insertTraceabilityQRCodeDetails(strData);
       } else {
         toast.error("Print Failed");
       }
@@ -301,7 +310,7 @@ const LabelPrint = () => {
       )}
 
       <Modal
-        title="Re-Print Label"
+        title="Re-Print QR Code"
         open={showReprintModal}
         onCancel={() => setShowReprintModal(false)}
         footer={null}
