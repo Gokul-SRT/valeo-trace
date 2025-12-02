@@ -6,6 +6,9 @@ import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import CommonserverApi from "../../../../CommonserverApi";
 import { backendService } from "../../../../service/ToolServerApi";
+import Loader from "../../../.././Utills/Loader";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 // import "./style.css";
 
 const { Option } = Select;
@@ -57,6 +60,9 @@ const CriticalSparePartsList = () => {
   const [addCardData, setAddCardData] = useState([]);
   const [detailsData, setDetailsData] = useState([]);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+  const [isViewLoading, setIsViewLoading] = useState(false);
 
   // ✅ MAIN DROPDOWNS
   const [lineList, setLineList] = useState([]);
@@ -65,6 +71,7 @@ const CriticalSparePartsList = () => {
   // ✅ ADD CARD DROPDOWNS
   const [addLineList, setAddLineList] = useState([]);
   const [addToolList, setAddToolList] = useState([]);
+  const [jsonResponse, settableJson] = useState([]);
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -158,9 +165,13 @@ const CriticalSparePartsList = () => {
   };
 
   // ================= FETCH CRITICAL SPARE DETAILS =================
-  const fetchCriticalSpareDetails = async (lineCode) => {
+  const fetchCriticalSpareDetails = async (lineCode, toolNo) => {
+    setIsLoading(true);
     try {
       const payload = { line: lineCode, tenantId, branchCode };
+      if (toolNo) {
+        payload.toolNo = toolNo;
+      }
       const res = await backendService({
         requestPath: "getcriticalsparedetailsbyline",
         requestData: payload,
@@ -192,14 +203,17 @@ const CriticalSparePartsList = () => {
             tableData.push({
               key: globalKey++,
               sno: index + 1,
-              toolDescription: operationDesc,
+              toolDescription: item.toolDesc || "",
+              operationDescription: operationDesc,
               criticalSpares: item.criticalSpareName,
-              minQty: parseInt(item.minimumThresholdQuantity),
-              spareLocation: "",
-              availableQty: 0,
-              needToOrder: 0,
-              totalAvailable: 0,
+              minQty: parseInt(item.minimumThresholdQuantity) || 0,
+              spareLocation: item.storageLocation || "",
+              availableQty: parseInt(item.stockAvailable) || 0,
+              needToOrder: parseInt(item.needToOrder) || 0,
+              totalAvailable: parseInt(item.totalAvailable) || 0,
               sparePartId: item.sparePartId,
+              operationId: item.operationId,
+              toolNo: item.toolNo,
             });
           });
         });
@@ -213,17 +227,19 @@ const CriticalSparePartsList = () => {
     } catch (err) {
       console.error("fetchCriticalSpareDetails error", err);
       setAddCardData([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // ================= FETCH CRITICAL SPARE PART REPORT HEADER =================
   const fetchCriticalSparePartReportHdr = async (formValues) => {
+    setIsDetailsLoading(true);
     try {
       const payload = {
         tenantId,
         branchCode,
         lineCode: formValues.line,
-        toolNo: formValues.toolId,
         monthYear: formValues.monthYear.format('MMM-YYYY'),
       };
 
@@ -235,10 +251,11 @@ const CriticalSparePartsList = () => {
       const rawData = res?.data || res || [];
       if (Array.isArray(rawData) && rawData.length > 0) {
         const formattedData = rawData.map((item, index) => ({
-          key: index + 1,
+          key: item.id || index + 1, // Use actual database ID instead of array index
           line: item.lineDescription,
           toolDescription: item.toolDescription,
           monthYear: item.createdDate,
+          actualId: item.id, // Store the actual ID for reference
         }));
         setDetailsData(formattedData);
       } else {
@@ -247,6 +264,8 @@ const CriticalSparePartsList = () => {
     } catch (err) {
       console.error("fetchCriticalSparePartReportHdr error", err);
       setDetailsData([]);
+    } finally {
+      setIsDetailsLoading(false);
     }
   };
 
@@ -276,8 +295,8 @@ const CriticalSparePartsList = () => {
   };
 
   const handleAddFormChange = (changedValues, allValues) => {
-    if (allValues.line && allValues.toolId && allValues.monthYear) {
-      fetchCriticalSpareDetails(allValues.line);
+    if (allValues.line) {
+      fetchCriticalSpareDetails(allValues.line, null);
     } else {
       setAddCardData([]);
     }
@@ -320,7 +339,8 @@ const CriticalSparePartsList = () => {
         const tableData = rawData.map((item, index) => ({
           key: index + 1,
           sno: index + 1,
-          toolDescription: item.operationDesc || "Tool Description",
+          toolDescription: item.toolDesc || "",
+          operationDescription: item.operationDesc || "",
           criticalSpares: item.criticalSpareName,
           minQty: parseInt(item.minimumThresholdQuantity) || 0,
           spareLocation: item.storageLocation || "",
@@ -328,7 +348,10 @@ const CriticalSparePartsList = () => {
           needToOrder: parseInt(item.needToOrder) || 0,
           totalAvailable: parseInt(item.totalAvailable) || 0,
           sparePartId: item.sparePartId,
+          toolNo: item.toolNo,
         }));
+
+        settableJson(rawData);
         
         console.log("Formatted table data:", tableData);
 
@@ -353,6 +376,15 @@ const CriticalSparePartsList = () => {
     try {
       console.log("View clicked with data:", data);
       
+      // Show the popup first
+      setShowAddCard(true);
+      setShowDetails(false);
+      setIsViewMode(true);
+      setAddCardData([]); // Clear existing data
+      
+      // Start loading
+      setIsViewLoading(true);
+      
       // Use the key as reportId
       const reportId = data.key;
       console.log("Using reportId:", reportId);
@@ -371,11 +403,6 @@ const CriticalSparePartsList = () => {
           monthYear: result.date ? dayjs(result.date) : null,
         });
         
-        // Show the add card with populated data in view mode
-        setShowAddCard(true);
-        setShowDetails(false);
-        setIsViewMode(true);
-        
         toast.success(`Loaded ${result.data.length} critical spare details`);
       } else {
         toast.error("No data found for this record");
@@ -383,6 +410,8 @@ const CriticalSparePartsList = () => {
     } catch (err) {
       console.error("handleViewClick error", err);
       toast.error("Failed to load critical spare details");
+    } finally {
+      setIsViewLoading(false);
     }
   };
 
@@ -417,11 +446,6 @@ const CriticalSparePartsList = () => {
       flex: 1,
     },
     {
-      headerName: "Tool Description",
-      field: "toolDescription",
-      flex: 1,
-    },
-    {
       headerName: "Month/Year",
       field: "monthYear",
       flex: 1,
@@ -444,11 +468,9 @@ const CriticalSparePartsList = () => {
     if (index > -1) {
       updated[index][field] = value;
       
-      // Auto-calculate total available
-      if (field === 'availableQty' || field === 'needToOrder') {
-        const availableQty = parseInt(updated[index].availableQty) || 0;
-        const needToOrder = parseInt(updated[index].needToOrder) || 0;
-        updated[index].totalAvailable = availableQty + needToOrder;
+      // Set total available to same as stock available
+      if (field === 'availableQty') {
+        updated[index].totalAvailable = parseInt(value) || 0;
       }
       
       setAddCardData(updated);
@@ -456,26 +478,60 @@ const CriticalSparePartsList = () => {
   };
 
   // ================= INSERT CRITICAL SPARE PART REPORT =================
-  const insertCriticalSparePartReport = async () => {
+  const insertCriticalSparePartReport = async (gridApi) => {
     try {
       const formValues = addForm.getFieldsValue();
       
-      // Prepare spare parts data
-      const sparePartsData = addCardData.map(row => ({
+      // Force grid to stop editing and commit all changes
+      if (gridApi) {
+        gridApi.stopEditing();
+        // Small delay to ensure all changes are committed
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Get current data from AgGrid API to ensure we have the latest values
+      const currentData = [];
+      if (gridApi) {
+        gridApi.forEachNode((node) => {
+          if (node.data) {
+            // Create a deep copy to ensure we get the latest values
+            const rowData = { ...node.data };
+            currentData.push(rowData);
+          }
+        });
+      }
+      
+      console.log("Current data from grid:", currentData);
+      console.log("State data:", addCardData);
+      
+      // Always use the current state data as it's more reliable
+      const dataToUse = addCardData;
+      console.log("Data to use for API:", dataToUse);
+      
+      // Get toolNo from first row (all rows should have same toolNo)
+      const toolNo = dataToUse.length > 0 ? dataToUse[0].toolNo : null;
+      
+      // Prepare spare parts data with current values (without toolNo)
+      const sparePartsData = dataToUse.map(row => ({
         sparePartId: row.sparePartId,
+        operationId: row.operationId,
         storageLocation: row.spareLocation || null,
         stockAvailable: parseInt(row.availableQty) || 0,
         needToOrder: parseInt(row.needToOrder) || 0,
         totalAvailable: parseInt(row.totalAvailable) || 0,
       }));
+      
+      console.log("Prepared sparePartsData:", sparePartsData);
 
       const payload = {
         line: formValues.line,
-        toolNo: formValues.toolId,
+        toolNo: toolNo,
         tenantId,
         branchCode,
         sparePartsData,
       };
+      
+      console.log("Final payload:", payload);
 
       const res = await backendService({
         requestPath: "insertcriticalsparepartreport",
@@ -497,15 +553,15 @@ const CriticalSparePartsList = () => {
   };
 
   // ================= HANDLE ADD FORM SUBMIT =================
-  const handleAddFormSubmit = async () => {
+  const handleAddFormSubmit = async (gridApi) => {
     try {
       const formValues = addForm.getFieldsValue();
-      if (!formValues.line || !formValues.toolId) {
-        toast.error("Please select Line and Tool");
+      if (!formValues.line) {
+        toast.error("Please select Line");
         return;
       }
 
-      const success = await insertCriticalSparePartReport();
+      const success = await insertCriticalSparePartReport(gridApi);
       if (success) {
         toast.success(`${addCardData.length} records inserted successfully`);
         handleCancel();
@@ -521,6 +577,11 @@ const CriticalSparePartsList = () => {
       headerName: "TOOL DESCRIPTION",
       field: "toolDescription",
       width: 180,
+    },
+    {
+      headerName: "OPERATION DESCRIPTION",
+      field: "operationDescription",
+      width: 180,
       rowSpan: (params) => {
         const value = params.value;
         const api = params.api;
@@ -529,7 +590,7 @@ const CriticalSparePartsList = () => {
 
         while (
           api.getDisplayedRowAtIndex(rowIndex + span) &&
-          api.getDisplayedRowAtIndex(rowIndex + span).data.toolDescription ===
+          api.getDisplayedRowAtIndex(rowIndex + span).data.operationDescription ===
             value
         ) {
           span++;
@@ -541,7 +602,7 @@ const CriticalSparePartsList = () => {
         const rowIndex = params.node.rowIndex;
         const prevRow = api.getDisplayedRowAtIndex(rowIndex - 1);
 
-        if (prevRow && prevRow.data.toolDescription === params.value) {
+        if (prevRow && prevRow.data.operationDescription === params.value) {
           return "hide-cell";
         }
         return "merge-cell";
@@ -554,7 +615,7 @@ const CriticalSparePartsList = () => {
         let span = 1;
         while (
           api.getDisplayedRowAtIndex(rowIndex + span) &&
-          api.getDisplayedRowAtIndex(rowIndex + span).data.toolDescription ===
+          api.getDisplayedRowAtIndex(rowIndex + span).data.operationDescription ===
             value
         ) {
           span++;
@@ -623,13 +684,43 @@ const CriticalSparePartsList = () => {
           ""
         ) : (
           <Input
-            value={params.data.totalAvailable}
+            value={params.data.availableQty || 0}
             readOnly
             style={{ backgroundColor: '#f5f5f5' }}
           />
         ),
     },
   ];
+
+
+  const downloadExcel = () => {
+    if (!jsonResponse || jsonResponse.length === 0) {
+      toast.error("No data available for download");
+      return;
+    }
+
+    console.log("JSON Response for Excel:", jsonResponse);
+
+    const excelData = jsonResponse.map((item, index) => ({
+      "S.No": index + 1,
+      "Tool Description": item.operationDesc || "",
+      "Critical Spares": item.criticalSpareName || "",
+      "Spare Location": item.storageLocation || "",
+      "Min Qty": parseInt(item.minimumThresholdQuantity) || 0,
+      "Available Qty": parseInt(item.stockAvailable) || 0,
+      "Need to Order": parseInt(item.needToOrder) || 0,
+      "Total Available": parseInt(item.totalAvailable) || 0,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Critical Spare Parts");
+    
+    const fileName = `Critical_Spare_Parts_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    
+    toast.success("Excel file downloaded successfully");
+  };
 
 
 
@@ -660,15 +751,7 @@ const CriticalSparePartsList = () => {
               </Form.Item>
             </Col>
 
-            <Col span={4}>
-              <Form.Item label="Tool Desc" name="toolId" rules={[{ required: true }]}>
-                <Select
-                  placeholder="Select Tool Desc"
-                  options={toolList}
-                  allowClear
-                />
-              </Form.Item>
-            </Col>
+            {/* Tool Desc dropdown hidden */}
 
             <Col span={4}>
               <Form.Item
@@ -698,31 +781,54 @@ const CriticalSparePartsList = () => {
             >
               Submit
             </Button>
-            <Button onClick={handleCancel}>Cancel</Button>
+            <Button 
+              type="primary"
+              onClick={handleCancel}
+              style={{
+                backgroundColor: "#00264d",
+                borderColor: "#00264d",
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </Form>
       </Card>
 
       {showDetails && (
         <Card
-          title="Critical Spare Parts Details"
+          title="Critical Spare Parts Summary"
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
           style={{ marginTop: 20, borderRadius: 8 }}
         >
-          <div
-            className="ag-theme-alpine"
-            style={{ height: 300, width: "100%" }}
-          >
-            <AgGridReact
-              rowData={detailsData}
-              columnDefs={detailsColumns}
-              domLayout="autoHeight"
-              defaultColDef={{
-                sortable: true,
-                filter: true,
-                resizable: true,
-              }}
-            />
+          <div style={{ position: "relative" }}>
+            {isDetailsLoading && (
+              <div
+                className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.6)",
+                  zIndex: 2,
+                  borderRadius: "8px",
+                }}
+              >
+                <Loader />
+              </div>
+            )}
+            <div
+              className="ag-theme-alpine"
+              style={{ height: 300, width: "100%" }}
+            >
+              <AgGridReact
+                rowData={detailsData}
+                columnDefs={detailsColumns}
+                domLayout="autoHeight"
+                defaultColDef={{
+                  sortable: true,
+                  filter: true,
+                  resizable: true,
+                }}
+              />
+            </div>
           </div>
         </Card>
       )}
@@ -748,64 +854,83 @@ const CriticalSparePartsList = () => {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Tool Desc" name="toolId" rules={[{ required: true }]}>
-                  <Select
-                    placeholder="Select Tool Desc"
-                    options={addToolList}
-                    allowClear
-                    disabled={isViewMode}
-                  />
-                </Form.Item>
-              </Col>
+              {/* Tool Desc dropdown hidden */}
 
               <Col span={4}>
-                <Form.Item label="Date" name="monthYear">
+                <Form.Item label="Date" name="monthYear" initialValue={dayjs()}>
                   <DatePicker
                     format="YYYY-MM-DD"
                     placeholder="Select Date"
                     style={{ width: "100%" }}
-                    disabled={isViewMode}
+                    disabled={true}
                   />
                 </Form.Item>
               </Col>
             </Row>
 
-            <div
-              className="ag-theme-alpine"
-              style={{ height: 400, width: "100%", marginTop: 20 }}
-            >
-              <AgGridReact
-                rowData={addCardData}
-                columnDefs={addCardColumns}
-                suppressRowTransform={true}
-                domLayout="normal"
-                getRowHeight={() => 48}
-                enableCellSpan={true}
-                onCellValueChanged={(params) => {
-                  const updated = [...addCardData];
-                  const index = updated.findIndex(row => row.key === params.data.key);
-                  if (index > -1) {
-                    updated[index][params.colDef.field] = params.newValue;
+            <div style={{ position: "relative" }}>
+              {(isLoading || isViewLoading) && (
+                <div
+                  className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.6)",
+                    zIndex: 2,
+                    borderRadius: "8px",
+                  }}
+                >
+                  <Loader />
+                </div>
+              )}
+              <div
+                className="ag-theme-alpine"
+                style={{ height: 400, width: "100%", marginTop: 20 }}
+              >
+                <AgGridReact
+                  rowData={addCardData}
+                  columnDefs={addCardColumns}
+                  suppressRowTransform={true}
+                  domLayout="normal"
+                  getRowHeight={() => 48}
+                  enableCellSpan={true}
+                  onGridReady={(params) => {
+                    window.gridApi = params.api;
+                  }}
+                  onCellValueChanged={(params) => {
+                    // Update the React state directly to ensure consistency
+                    const updated = [...addCardData];
+                    const index = updated.findIndex(row => row.key === params.data.key);
                     
-                    // Auto-calculate total available
-                    if (params.colDef.field === 'availableQty' || params.colDef.field === 'needToOrder') {
-                      const availableQty = parseInt(updated[index].availableQty) || 0;
-                      const needToOrder = parseInt(updated[index].needToOrder) || 0;
-                      updated[index].totalAvailable = availableQty + needToOrder;
+                    if (index > -1) {
+                      updated[index][params.colDef.field] = params.newValue;
+                      
+                      // Handle specific field updates
+                      if (params.colDef.field === 'availableQty') {
+                        const availableQty = parseInt(params.newValue) || 0;
+                        updated[index].totalAvailable = availableQty;
+                        params.node.setDataValue('totalAvailable', availableQty);
+                        params.api.refreshCells({ rowNodes: [params.node], columns: ['totalAvailable'] });
+                      }
+                      
+                      setAddCardData(updated);
                     }
                     
-                    setAddCardData(updated);
-                  }
-                }}
-              />
+                    console.log('Cell value changed:', {
+                      field: params.colDef.field,
+                      oldValue: params.oldValue,
+                      newValue: params.newValue,
+                      rowKey: params.data.key,
+                      updatedState: updated[index]
+                    });
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ textAlign: "center", marginTop: 20 }}>
               {!isViewMode && (
                 <Button
                   type="primary"
-                  onClick={handleAddFormSubmit}
+                  onClick={() => handleAddFormSubmit(window.gridApi)}
                   style={{
                     marginRight: 10,
                     backgroundColor: "#00264d",
@@ -815,7 +940,31 @@ const CriticalSparePartsList = () => {
                   Submit
                 </Button>
               )}
-              <Button onClick={handleCancel}>{isViewMode ? "Close" : "Cancel"}</Button>
+              <Button 
+                type="primary"
+                onClick={handleCancel}
+                style={{
+                  backgroundColor: "#00264d",
+                  borderColor: "#00264d",
+                }}
+              >
+                {isViewMode ? "Close" : "Cancel"}
+              </Button>
+
+              {isViewMode && (
+                <Button 
+                  type="primary"
+                  onClick={downloadExcel}
+                  style={{
+                    marginLeft: 10,
+                    backgroundColor: "#00264d",
+                    borderColor: "#00264d",
+                  }}
+                >
+                  Export
+                </Button>
+              )}
+
             </div>
           </Form>
         </Card>

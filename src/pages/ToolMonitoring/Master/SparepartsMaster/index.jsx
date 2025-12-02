@@ -32,10 +32,10 @@ const CriticalSpareMaster = () => {
   const gridRef = useRef(null);
 
   const [selectedLine, setSelectedLine] = useState("");
-  const [selectedOperation, setSelectedOperation] = useState("");
+  const [selectedTool, setSelectedTool] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [lineOptions, setLineOptions] = useState([]);
-  const [operationOptions, setOperationOptions] = useState([]);
+  const [toolOptions, setToolOptions] = useState([]);
   const [sparePartMstId, setSparePartMstId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -82,30 +82,39 @@ const CriticalSpareMaster = () => {
     }
   };
 
-  // Fetch operation dropdown
-  const fetchOperationDropdown = async (line) => {
+  // Fetch tool dropdown
+  const fetchToolDropdown = async (lineCode) => {
     try {
-      const payload = { tenantId, branchCode , lineCode:line || selectedLine };
+      const payload = {
+        lineCode,
+        tenantId,
+        branchCode,
+        isActive: "1",
+      };
 
-      const res = await backendService({
-        requestPath: "getOperationByLineCode",
-        requestData: payload,
-      });
-      
-      setOperationOptions(res?.responseData || []);
+      const res = await CommonserverApi.post("getToolByLineCode", payload);
+      const rawData = Array.isArray(res?.data)
+        ? res.data
+        : res?.data?.responseData || [];
+
+      const tools = rawData.map((tool) => ({
+        label: tool.toolDesc,
+        value: tool.toolNo,
+      }));
+
+      setToolOptions(tools);
     } catch {
-      toast.error("No data available");
+      toast.error("Failed to load Tool dropdown");
     }
   };
 
   useEffect(() => {
     fetchLineDropdown();
-    // fetchOperationDropdown();
   }, []);
 
-  // Fetch critical spare details based on line, operation, and status
-  const fetchCriticalSpareDetails = async (line, operation, status) => {
-    if (!line || !operation || status === "") {
+  // Fetch critical spare details based on line, tool, and status
+  const fetchCriticalSpareDetails = async (line, toolNo, status) => {
+    if (!line || !toolNo || status === "") {
       return;
     }
 
@@ -113,7 +122,7 @@ const CriticalSpareMaster = () => {
     try {
       const payload = {
         lineCode: line,
-        operation: operation,
+        toolNo: toolNo,
         status: status,
         tenantId:tenantId,
         branchCode:branchCode,
@@ -174,17 +183,17 @@ const CriticalSpareMaster = () => {
     }
   };
 
-  // Effect to fetch data whenever line, operation, or status changes
+  // Effect to fetch data whenever line, tool, or status changes
   useEffect(() => {
-    if (selectedLine && selectedOperation && selectedStatus !== "") {
-      fetchCriticalSpareDetails(selectedLine, selectedOperation, selectedStatus);
+    if (selectedLine && selectedTool && selectedStatus !== "") {
+      fetchCriticalSpareDetails(selectedLine, selectedTool, selectedStatus);
     } else {
       setMasterList([]);
     }
-  }, [selectedLine, selectedOperation, selectedStatus]);
+  }, [selectedLine, selectedTool, selectedStatus]);
 
   // Check if table should be displayed
-  const shouldShowTable = selectedLine && selectedOperation && selectedStatus;
+  const shouldShowTable = selectedLine && selectedTool && selectedStatus;
 
   // Fetch details for a single sparePartId
   const fetchCriticalSpareDetailById = async (mstId) => {
@@ -343,7 +352,7 @@ const CriticalSpareMaster = () => {
 
   // Add new row
   const handleAddRow = () => {
-    if (!selectedLine || !selectedOperation || selectedStatus === "") {
+    if (!selectedLine || !selectedTool || selectedStatus === "") {
       toast.error("Please fill all mandatory fields");
       return;
     }
@@ -462,9 +471,8 @@ const CriticalSpareMaster = () => {
       isUpdateMaster === "0"
         ? {
             isUpdate: "0",
-            toolNo: "null",
+            toolNo: selectedTool,
             line: selectedLine,
-            station: selectedOperation,
             spareDetails: spareDetailsPayload,
           }
         : {
@@ -483,7 +491,7 @@ const CriticalSpareMaster = () => {
       toast.success("Add/Update successful");
 
       // Always reload table data after update/insert
-      await fetchCriticalSpareDetails(selectedLine, selectedOperation, selectedStatus);
+      await fetchCriticalSpareDetails(selectedLine, selectedTool, selectedStatus);
     } catch (e) {
       console.error("Save error:", e);
       toast.error("Add/Update failed");
@@ -580,22 +588,25 @@ const CriticalSpareMaster = () => {
 
   const handleCancel = () => {
     setSelectedLine("");
-    setSelectedOperation("");
+    setSelectedTool("");
     setSelectedStatus("");
     setSparePartMstId("");
     setMasterList([]);
-
+    setToolOptions([]);
   };
 
 
   const handleLineOnChange = (e) => {
     setSelectedLine(e.target.value);
-    setSelectedOperation("");
+    setSelectedTool("");
     setMasterList([]);
-
-    fetchOperationDropdown(e.target.value)
-
-  }
+    
+    if (e.target.value) {
+      fetchToolDropdown(e.target.value);
+    } else {
+      setToolOptions([]);
+    }
+  };
 
   return (
     <div>
@@ -631,17 +642,17 @@ const CriticalSpareMaster = () => {
             </div>
 
             <div className="col-md-3">
-              <label className="form-label fw-semibold">Operation <span style={{color: 'red'}}>*</span></label>
+              <label className="form-label fw-semibold">Tool Desc <span style={{color: 'red'}}>*</span></label>
               <select
                 className="form-select"
-                value={selectedOperation}
-                onChange={(e) => setSelectedOperation(e.target.value)}
+                value={selectedTool}
+                onChange={(e) => setSelectedTool(e.target.value)}
                 disabled={isLoading}
               >
-                <option value="">Select Operation</option>
-                {operationOptions.map((op) => (
-                  <option key={op.operationId} value={op.operationId}>
-                    {op.operationDesc}
+                <option value="">Select Tool Desc</option>
+                {toolOptions.map((tool) => (
+                  <option key={tool.value} value={tool.value}>
+                    {tool.label}
                   </option>
                 ))}
               </select>
