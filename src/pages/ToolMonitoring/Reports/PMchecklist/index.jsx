@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Form,
@@ -9,307 +9,886 @@ import {
   Select,
   Table,
   Input,
-  Checkbox,
 } from "antd";
 import { PlusCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import store from "store";
+import {
+  backendService,
+  commonBackendService,
+} from "../../../../service/ToolServerApi";
+import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
+import { AgGridReact } from "ag-grid-react";
+import Loader from "../../../../Utills/Loader";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import logo from "../../../../assets/pngwing.com.png";
+
 
 const { Option } = Select;
-
-// Map checklist items from the image for Greasing Fixture
-const checklistByTool = {
-  "Greasing Fixture": [
-    { key: 1, SNo: "1", Characteristics: "CHECK THE GREASING PIN DIA (#20)", Spec: "Ø10.5 ± 0.10 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 2, SNo: "2", Characteristics: "TOP TOOL CAM/CAM BASE MOVEMENT CHECKED", Spec: "VISUAL / PHYSICAL", Tools: "-", Observed: "-", checked: false },
-    { key: 3, SNo: "3", Characteristics: "CHECK THE TOP TOOL CAM SPRING LENGTH", Spec: "51 ± 0.50 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 4, SNo: "4", Characteristics: "CHECK THE TOP TOOL MECHANICAL STOPPER HEIGHT", Spec: "40.0 ± 0.20 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 5, SNo: "5", Characteristics: "CHECK THE TOP TOOL SUPPORTING STOPPER LENGTH", Spec: "38.0 ± 0.05 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 6, SNo: "6", Characteristics: "CHECK THE BOTTOM TOOL COVER LOCATION PIN DIA-1", Spec: "Ø4.6 ± 0.10 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 7, SNo: "7", Characteristics: "CHECK THE BOTTOM TOOL COVER LOCATION PIN DIA-2", Spec: "Ø7.0 ± 0.10 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 8, SNo: "8", Characteristics: "CHECK THE BOTTOM TOOL MECHANICAL STOPPER HEIGHT", Spec: "20.5 ± 0.50 mm", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 9, SNo: "9", Characteristics: "EVERY 100000 NOS STROKE SPRING CONDITION TO BE CHECK (832-102)", Spec: "832-102", Tools: "VERNIER", Observed: "-", checked: false },
-    { key: 10, SNo: "10", Characteristics: "ENSURE ALL THE SCREW HOLE MARKING TO BE DONE AFTER TIGHTENING THE SCREWS", Spec: "VISUAL", Tools: "MARKER", Observed: "-", checked: false },
-  ],
-  // Extend mapping for other tools if you want dynamic PM checklist per tool
-};
-
-// Operation mapping by tool desc
-const toolOperationMap = {
-  "Greasing Fixture": "Greasing & Finger Folding Tool Stage",
-  // Add any other tool desc mappings here as needed
-};
-
-// PM Qty mapping by tool desc
-const toolPMQtyMap = {
-  "Greasing Fixture": "100000",
-  // Add any other tool desc qtys here as needed
-};
 
 const PreventiveMaintenanceCheckList = () => {
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
+
   const [showDetails, setShowDetails] = useState(false);
   const [showAddChecklist, setShowAddChecklist] = useState(false);
-  const [selectedTool, setSelectedTool] = useState(null);
+  const [showViewChecklist, setShowViewChecklist] = useState(false);
+
+  // SEARCH CARD STATES
+  const [selectedLineSearch, setSelectedLineSearch] = useState("getAll");
+  const [selectedToolSearch, setSelectedToolSearch] = useState(null);
+  const [productDataSearch, setProductDataSearch] = useState([]);
+  const [toolDataSearch, setToolDataSearch] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // ADD CHECKLIST CARD STATES
+  const [selectedLineAdd, setSelectedLineAdd] = useState("getAll");
+  const [selectedToolAdd, setSelectedToolAdd] = useState(null);
+  const [productDataAdd, setProductDataAdd] = useState([]);
+  const [toolDataAdd, setToolDataAdd] = useState([]);
+  const [isEditable, setIsEditable] = useState(true);
+
+  // Common
+  const [lineData, setLineData] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
 
-  // Add Checklist dynamic states
-  const [addChecklistTool, setAddChecklistTool] = useState("");
   const [operation, setOperation] = useState("");
+  const [operationId, setOperationId] = useState("");
+  const [product, setProduct] = useState("");
+  const [customer, setCustomer] = useState("");
   const [pmQty, setPmQty] = useState("");
+  const [preventiveQty, setPreventiveQty] = useState(0);
   const [addChecklistData, setAddChecklistData] = useState([]);
 
-  // Table sources
-  const dataSource = [
-    { key: 1, SNo: "1", Line: "Cover Assembly", Date: "05-Oct-2025", Customer: "Maruti", Modal: "Z12E" , operation: "Greasing & Finger Folding Tool Stage", pmQty: "100000"},
-    { key: 2, SNo: "2", Line: "Cover Assembly", Date: "02-Oct-2025", Customer: "Maruti", Modal: "Z12E", operation: "Greasing & Finger Folding Tool Stage", pmQty: "100000" },
-    { key: 3, SNo: "3", Line: "Cover Assembly", Date: "28-Sep-2025", Customer: "Maruti", Modal: "Z12E", operation: "Greasing & Finger Folding Tool Stage", pmQty: "100000" },
-    { key: 4, SNo: "4", Line: "Cover Assembly", Date: "25-Sep-2025", Customer: "Maruti", Modal: "Z12E", operation: "Greasing & Finger Folding Tool Stage", pmQty: "100000" },
-    { key: 5, SNo: "5", Line: "Disc Assembly - 1", Date: "20-Sep-2025", Customer: "Maruti", Modal: "YTE", operation: "Greasing & Finger Folding Tool Stage", pmQty: "100000" },
-  ];
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
 
   const columns = [
     { title: "S.No", dataIndex: "SNo", key: "SNo" },
     { title: "Line", dataIndex: "Line", key: "Line" },
-    { title: "Operation", dataIndex: "operation", key: "operation" },
-    { title: "Date", dataIndex: "Date", key: "Date" },
+    { title: "Tool", dataIndex: "Tool", key: "Tool" },
+    { title: "Product", dataIndex: "Product", key: "Product" },
     { title: "Customer", dataIndex: "Customer", key: "Customer" },
-    { title: "Modal", dataIndex: "Modal", key: "Modal" },
+    { title: "Date", dataIndex: "Date", key: "Date" },
+    {
+      title: "Action",
+      key: "action",
+      render: (_, record) => (
+        <Button type="link" onClick={() => handleViewChecklist(record)}>
+          View
+        </Button>
+      ),
+    },
   ];
 
   const addChecklistColumns = [
     { title: "S.No", dataIndex: "SNo", key: "SNo" },
-    { title: "CHARACTERISTICS", dataIndex: "Characteristics", key: "Characteristics" },
-    { title: "SPEC/UNIT", dataIndex: "Spec", key: "Spec" },
-    { title: "Measurement Tools", dataIndex: "Tools", key: "Tools" },
     {
-      title: "OBSERVED READING",
-      dataIndex: "Observed",
-      key: "Observed",
-      render: () => <Input placeholder="Enter observed reading" />,
+      title: "CHARACTERISTICS",
+      dataIndex: "characteristicName",
+      key: "characteristicName",
+    },
+    { title: "SPEC/UNIT", dataIndex: "specUnit", key: "specUnit" },
+    {
+      title: "Measurement Tools",
+      dataIndex: "measurementType",
+      key: "measurementType",
     },
     {
-      title: "OK/NOT OK",
-      dataIndex: "OkNotOk",
-      key: "OkNotOk",
-      render: (_, record) => (
-        <Checkbox
-          checked={record.checked}
-          onChange={(e) => handleCheckboxChange(record.key, e.target.checked)}
-        />
-      ),
+      title: "OBSERVED READING",
+      dataIndex: "observed",
+      key: "observed",
+      render: (_, record) =>
+        isEditable ? (
+          <Input
+            placeholder="Enter Observed Value"
+            value={record.observed || ""}
+            onChange={(e) =>
+              setAddChecklistData((prev) =>
+                prev.map((item) =>
+                  item.key === record.key
+                    ? { ...item, observed: e.target.value }
+                    : item
+                )
+              )
+            }
+          />
+        ) : (
+          <span>{record.observed}</span>
+        ),
+    },
+    {
+      title: "OK / NOT OK",
+      dataIndex: "okNotOk",
+      key: "okNotOk",
+      render: (_, record) =>
+        isEditable ? (
+          <Select
+            placeholder="Select"
+            style={{ width: 120 }}
+            value={record.okNotOk}
+            onChange={(value) =>
+              setAddChecklistData((prev) =>
+                prev.map((item) =>
+                  item.key === record.key ? { ...item, okNotOk: value } : item
+                )
+              )
+            }
+            options={[
+              { label: "OK", value: "OK" },
+              { label: "NOT OK", value: "NOT OK" },
+            ]}
+          />
+        ) : (
+          <span>{record.okNotOk}</span>
+        ),
     },
     {
       title: "REMARKS & REPLACED",
-      dataIndex: "Remarks",
-      key: "Remarks",
-      render: () => <Input placeholder="Enter remarks" />,
+      dataIndex: "remarks",
+      key: "remarks",
+      render: (_, record) =>
+        isEditable ? (
+          <Input
+            placeholder="Enter remarks"
+            value={record.remarks || ""}
+            onChange={(e) =>
+              setAddChecklistData((prev) =>
+                prev.map((item) =>
+                  item.key === record.key
+                    ? { ...item, remarks: e.target.value }
+                    : item
+                )
+              )
+            }
+          />
+        ) : (
+          <span>{record.remarks}</span>
+        ),
     },
   ];
 
-  const handleCheckboxChange = (key, checked) => {
-    setAddChecklistData(prev =>
-      prev.map(item => item.key === key ? { ...item, checked } : item)
-    );
-  };
-
-  const handleSubmit = (values) => {
-    setSelectedTool(values.toolId);
+  const handleSubmitSearch = async (values) => {
+    setSelectedToolSearch(values.toolId);
     setSelectedYear(values.year.format("YYYY"));
     setShowDetails(true);
     setShowAddChecklist(false);
+    setLoading(true);
+
+    try {
+      // Call API to get search results
+      const response = await backendService({
+        requestPath: "searchPMChecklist",
+        requestData: {
+          lineCode: values.lineId,
+          modelId: product,
+          customerId: customer,
+          toolNo: values.toolId,
+          year: values.year.format("YYYY"),
+          tenantId,
+          branchCode,
+        },
+      });
+      if (response?.responseCode === "200") {
+        setLoading(false);
+        setSearchResults(
+          response.responseData.map((item, index) => ({
+            sno: index + 1,
+            ...item,
+          }))
+        );
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error("Error fetching search results", error);
+      setSearchResults([]);
+    }
   };
 
-  const handleCancel = () => {
-    form.resetFields();
-    setShowDetails(false);
-    setShowAddChecklist(false);
+  const handleViewChecklist = async (record) => {
+    try {
+      setShowViewChecklist(true);
+      setShowDetails(false);
+
+      const response = await backendService({
+        requestPath: "getViewPMChecklistDtl",
+        requestData: {
+          hdrId: record.logId,
+          tenantId,
+          branchCode,
+        },
+      });
+
+      if (response?.responseCode === "200") {
+        const data = response.responseData;
+
+        if (data.length > 0) {
+          // Take the first object for header info
+          const firstRecord = data[0];
+
+          setSelectedLineAdd(firstRecord.lineMstDescription);
+          addForm.setFieldsValue({
+            lineId: firstRecord.lineMstDescription,
+          });
+          setSelectedToolAdd(firstRecord.toolDesc);
+          setOperation(firstRecord.toolDesc); // If operation info exists, replace this
+          setPmQty(firstRecord.pmQty);
+          setPreventiveQty(firstRecord.preventiveQty);
+          setProduct(firstRecord.productDescription);
+          setCustomer(firstRecord.customerName);
+
+          addForm.setFieldsValue({
+            lineId: firstRecord.lineMstDescription,
+            toolId: firstRecord.toolDesc,
+            operation: firstRecord.toolDesc, // replace if different
+            pmQty: firstRecord.pmQty,
+            preventiveQty: firstRecord.preventiveQty,
+            productId: firstRecord.productDescription,
+            customer: firstRecord.customerName,
+          });
+
+          // Map checklist data
+          const checklist = data.map((item, index) => ({
+            key: index + 1,
+            SNo: index + 1,
+            characteristicId: item.characteristicId,
+            characteristicName: item.characteristicName,
+            toolPmLogId: item.toolPmLogId,
+            specUnit: item.specUnit,
+            measurementType: item.measurementType,
+            observed: item.observedReadings,
+            okNotOk: item.okNok,
+            remarks: item.remarks,
+          }));
+
+          setAddChecklistData(checklist);
+
+          // Editable only if current date
+          const today = dayjs().format("YYYY-MM-DD");
+          setIsEditable(dayjs(record.Date).format("YYYY-MM-DD") === today);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching checklist details", error);
+    }
   };
 
   const handleAddChecklist = () => {
     setShowAddChecklist(true);
     setShowDetails(false);
-    // If previously selected tool present, keep that for Add Checklist
-    if (selectedTool) {
-      setAddChecklistTool(selectedTool);
-      const op = toolOperationMap[selectedTool] || "";
-      const qty = toolPMQtyMap[selectedTool] || "";
-      setOperation(op);
-      setPmQty(qty);
-      setAddChecklistData(checklistByTool[selectedTool] || []);
+    addForm.resetFields();
+    setAddChecklistData([]);
+    setOperation("");
+    setPmQty("");
+    setPreventiveQty(0);
+    setIsEditable(true);
+  };
 
-      addForm.setFieldsValue({
-        toolId: selectedTool,
-        operation: op,
-        pmQty: qty,
+  // existing product/tool dropdown functions remain unchanged
+
+  const productDropDownDataSearch = async (toolNo) => {
+    try {
+      const response = await commonBackendService({
+        requestPath: "getProductByTool",
+        requestData: { toolNo, tenantId, branchCode },
       });
-    } else {
-      setAddChecklistTool("");
+      if (response?.responseCode === "200") {
+        setProductDataSearch(response.responseData);
+        setProductDataAdd(response.responseData);
+      }
+    } catch (error) {
+      setProductDataSearch([]);
+      setProductDataAdd([]);
+    }
+  };
+
+  const productDropDownDataAdd = async (toolNo) => {
+    try {
+      const toolResp = await commonBackendService({
+        requestPath: "getToolOperationAndQty",
+        requestData: { toolNo, tenantId, branchCode },
+      });
+
+      if (
+        toolResp?.responseCode === "200" &&
+        toolResp.responseData?.length > 0
+      ) {
+        const data = toolResp.responseData[0];
+
+        setOperation(data.operation || "");
+        setOperationId(data.operationId || "");
+        setPmQty(data.pmQty || "");
+        setPreventiveQty(data.preventiveQty || 0);
+
+        addForm.setFieldsValue({
+          operation: data.operation || "",
+          pmQty: data.pmQty || "",
+          preventiveQty: data.preventiveQty || 0,
+        });
+
+        if (data.operationId) {
+          const charResp = await backendService({
+            requestPath: "getPMCharacteristicList",
+            requestData: {
+              lineCode: selectedLineAdd,
+              toolNo: toolNo,
+              operation: data.operationId,
+              tenantId,
+              branchCode,
+            },
+          });
+
+          if (charResp?.responseCode === "200") {
+            const checklist = charResp.responseData.map((item, index) => ({
+              key: index + 1,
+              SNo: index + 1,
+              characteristicId: item.characteristicId,
+              characteristicName: item.characteristicName || "",
+              specUnit: item.specUnit || "",
+              measurementType: item.measurementType || "",
+              observed: "",
+              checked: false,
+              remarks: "",
+            }));
+
+            setAddChecklistData(checklist);
+          } else {
+            setAddChecklistData([]);
+          }
+        }
+      } else {
+        setOperation("");
+        setPmQty("");
+        setPreventiveQty(0);
+        addForm.setFieldsValue({ operation: "", pmQty: "", preventiveQty: 0 });
+        setAddChecklistData([]);
+      }
+    } catch (error) {
+      console.error(
+        "Error fetching tool operation & PM characteristics",
+        error
+      );
       setOperation("");
       setPmQty("");
+      setPreventiveQty(0);
+      addForm.setFieldsValue({ operation: "", pmQty: "", preventiveQty: 0 });
       setAddChecklistData([]);
-      addForm.resetFields();
     }
   };
 
-  // When tool desc changes in "Add Checklist" form
-  const handleAddChecklistToolChange = (value) => {
-    setAddChecklistTool(value);
+  const fetchCustomerByProduct = async (productId) => {
+    try {
+      const response = await commonBackendService({
+        requestPath: "getCustomerByProduct",
+        requestData: {
+          productId,
+          tenantId,
+          branchCode,
+        },
+      });
 
-    const op = toolOperationMap[value] || "";
-    const qty = toolPMQtyMap[value] || "";
-    setOperation(op);
-    setPmQty(qty);
-    setAddChecklistData(checklistByTool[value] || []);
-
-    addForm.setFieldsValue({
-      operation: op,
-      pmQty: qty,
-    });
+      if (
+        response?.responseCode === "200" &&
+        response.responseData?.length > 0
+      ) {
+        // Assuming only one customer per product
+        console.log("first", response);
+        setCustomer(response.responseData[0].customerId);
+        addForm.setFieldsValue({
+          customer: response.responseData[0].customerName,
+        });
+        form.setFieldsValue({
+          customerSearch: response.responseData[0].customerName,
+        });
+      } else {
+        setCustomer("");
+      }
+    } catch (error) {
+      console.error("Error fetching customer by product", error);
+      setCustomer("");
+    }
   };
 
-  // Chart tool data sample
-  const chartData = [
-    { toolName: "Greasing Fixture", maxUsage: 100000, usedUsage: 60000 },
-    { toolName: "1st Top Tool", maxUsage: 90000, usedUsage: 70000 },
-    { toolName: "1st Bottom Tool", maxUsage: 120000, usedUsage: 80000 },
-    { toolName: "2nd Top Tool", maxUsage: 80000, usedUsage: 50000 },
-    { toolName: "2nd Bottom Tool", maxUsage: 110000, usedUsage: 85000 },
-    { toolName: "3rd Top Tool", maxUsage: 95000, usedUsage: 75000 },
-    { toolName: "3rd Bottom Tool", maxUsage: 105000, usedUsage: 65000 },
-    { toolName: "Balancing Fixture", maxUsage: 115000, usedUsage: 95000 },
-    // ...rest
+  const handleSubmitAddChecklist = async () => {
+    if (!isEditable) return;
+    try {
+      const payload = {
+        lineCode: selectedLineAdd,
+        toolNo: selectedToolAdd,
+        operation: operationId,
+        pmQty: pmQty,
+        preventiveQty: preventiveQty,
+        modelId: product,
+        customerId: customer,
+        tenantId,
+        branchCode,
+        characteristicList: addChecklistData.map((item) => ({
+          characteristicId: item.characteristicId,
+          observedReading: item.observed,
+          okNotOk: item.okNotOk,
+          remarks: item.remarks,
+        })),
+      };
+
+      const response = await backendService({
+        requestPath: "insertPMChecklist",
+        requestData: payload,
+      });
+
+      if (response?.responseCode === "200") {
+        setShowAddChecklist(false);
+        setAddChecklistData([]);
+        addForm.resetFields();
+      }
+    } catch (error) {
+      console.error("Insert PM Checklist Error:", error);
+    }
+  };
+  const handleSubmitViewChecklist = async () => {
+    if (!isEditable) return;
+
+    try {
+      const payload = {
+        tenantId,
+        branchCode,
+        characteristicList: addChecklistData.map((item) => ({
+          toolPmLogId: item.toolPmLogId, // REQUIRED for update
+          observedReading: item.observed,
+          okNotOk: item.okNotOk,
+          remarks: item.remarks,
+        })),
+      };
+
+      const response = await backendService({
+        requestPath: "updatePMCharacterList",
+        requestData: payload,
+      });
+
+      if (response?.responseCode === "200") {
+        // Close view card
+        setShowViewChecklist(false);
+        setIsEditable(false);
+      }
+    } catch (error) {
+      console.error("Update PM Checklist Error:", error);
+    }
+  };
+
+  const toolDropDownDataSearch = async (lineCode) => {
+    try {
+      const response = await commonBackendService({
+        requestPath: "getToolByLineCode",
+        requestData: { lineCode, tenantId, branchCode, isActive: "1" },
+      });
+      if (response?.responseCode === "200")
+        setToolDataSearch(response.responseData);
+    } catch (error) {}
+  };
+
+  const toolDropDownDataAdd = async (lineCode) => {
+    try {
+      const response = await commonBackendService({
+        requestPath: "getToolByLineCode",
+        requestData: { lineCode, tenantId, branchCode, isActive: "1" },
+      });
+      if (response?.responseCode === "200")
+        setToolDataAdd(response.responseData);
+    } catch (error) {}
+  };
+
+  const getLineDropDownData = useCallback(async () => {
+    try {
+      const response = await LineMstdropdown();
+      if (response) {
+        setLineData(
+          response.map((item) => ({
+            key: item.lineMstCode,
+            value: item.lineMstDesc,
+          }))
+        );
+      }
+    } catch (error) {
+      setLineData([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    getLineDropDownData();
+  }, []);
+
+  useEffect(() => {
+    toolDropDownDataSearch(selectedLineSearch);
+  }, [selectedLineSearch]);
+
+  useEffect(() => {
+    toolDropDownDataAdd(selectedLineAdd);
+  }, [selectedLineAdd]);
+
+  const agColumns = [
+    { headerName: "S.No", field: "sno", width: 90 },
+    { headerName: "Line", field: "lineMstDescription", flex: 1 },
+    { headerName: "Tool", field: "toolDesc", flex: 1 },
+    { headerName: "Product", field: "productDescription", flex: 1 },
+    { headerName: "Customer", field: "customerName", flex: 1 },
+    { headerName: "Date", field: "createdDate", flex: 1 },
+    {
+      headerName: "Action",
+      field: "action",
+      cellRenderer: (params) => {
+        return (
+          <Button type="link" onClick={() => handleViewChecklist(params.data)}>
+            View
+          </Button>
+        );
+      },
+      width: 120,
+    },
   ];
 
-  // Ensure checklist is correct if you open Add Checklist directly
-  useEffect(() => {
-    if (showAddChecklist && addChecklistTool) {
-      setOperation(toolOperationMap[addChecklistTool] || "");
-      setPmQty(toolPMQtyMap[addChecklistTool] || "");
-      setAddChecklistData(checklistByTool[addChecklistTool] || []);
+  const exportToFormattedExcel = async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("PM Checklist");
 
-      addForm.setFieldsValue({
-        toolId: addChecklistTool,
-        operation: toolOperationMap[addChecklistTool] || "",
-        pmQty: toolPMQtyMap[addChecklistTool] || "",
-      });
-    }
-  }, [showAddChecklist, addChecklistTool, addForm]);
+  // --- ADD LOGO IMAGE ---
+  const logoImage = workbook.addImage({
+    base64: await fetch(logo).then(res => res.blob())
+      .then(blob => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.readAsDataURL(blob);
+      })),
+    extension: "png",
+  });
+
+  // Place logo at top center (A1:G3 area)
+  sheet.addImage(logoImage, {
+    tl: { col: 0.2, row: 0.1 },   // top-left position
+    ext: { width: 160, height: 80 }, // size of logo
+  });
+
+  // Add empty rows under logo so title appears below
+  sheet.addRow([]);
+  sheet.addRow([]);
+  sheet.addRow([]);
+
+  // ----- MERGED HEADER -----
+  sheet.mergeCells("A4:G4");
+  const title = sheet.getCell("A4");
+  title.value = "PM CHECKLIST";
+  title.font = { size: 16, bold: true };
+  title.alignment = { horizontal: "center", vertical: "middle" };
+
+  // ----- HEADERS -----
+  const headers = [
+    "S.No",
+    "CHARACTERISTICS",
+    "SPEC/UNIT",
+    "MEASUREMENT TOOLS",
+    "OBSERVED READING",
+    "OK / NOK",
+    "REMARKS"
+  ];
+
+  const headerRow = sheet.addRow(headers);
+
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "87CEEB" },
+    };
+    cell.border = {
+      top: { style: "thin" },
+      bottom: { style: "thin" },
+      left: { style: "thin" },
+      right: { style: "thin" },
+    };
+    cell.alignment = { horizontal: "center" };
+  });
+
+  // ----- DATA ROWS -----
+  addChecklistData.forEach((row) => {
+    const dataRow = sheet.addRow([
+      row.SNo,
+      row.characteristicName,
+      row.specUnit,
+      row.measurementType,
+      row.observed,
+      row.okNotOk,
+      row.remarks
+    ]);
+    dataRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "thin" },
+        left: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+  });
+
+  // ----- COLUMN WIDTHS -----
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 35;
+  sheet.getColumn(3).width = 22;
+  sheet.getColumn(4).width = 22;
+  sheet.getColumn(5).width = 22;
+  sheet.getColumn(6).width = 12;
+  sheet.getColumn(7).width = 30;
+
+  // --- EXPORT ---
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer]), "PM_Checklist_Formatted.xlsx");
+};
 
   return (
     <>
-      {/* PM Checklist Search Card */}
+      {/* SEARCH CARD */}
       <Card
-        headStyle={{ backgroundColor: "#00264d", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}
         title="PM Checklist"
+        headStyle={{ backgroundColor: "#00264d", color: "white" }}
         extra={
           <PlusCircleOutlined
-            style={{ fontSize: "20px", color: "white", cursor: "pointer" }}
+            style={{ fontSize: 20, color: "white", cursor: "pointer" }}
             onClick={handleAddChecklist}
           />
         }
-        style={{ marginTop: "20px", borderRadius: "8px" }}
+        style={{ marginTop: 20, borderRadius: 8 }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form form={form} layout="vertical" onFinish={handleSubmitSearch}>
           <Row gutter={16}>
             <Col span={4}>
-              <Form.Item
-                label="Tool Desc"
-                name="toolId"
-                rules={[{ required: true, message: "Please select Tool Desc" }]}
-              >
-                <Select placeholder="Select Tool Desc">
-                  {chartData.map((tool) => (
-                    <Option key={tool.toolName} value={tool.toolName}>
-                      {tool.toolName}
+              <Form.Item label="Line" name="lineId">
+                <Select
+                  value={selectedLineSearch}
+                  onChange={(value) => setSelectedLineSearch(value)}
+                >
+                  <Option value="getAll">Get All</Option>
+                  {lineData.map((line) => (
+                    <Option key={line.key} value={line.key}>
+                      {line.value}
                     </Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
+
             <Col span={4}>
-              <Form.Item
-                label="Year"
-                name="year"
-                initialValue={dayjs()}
-                rules={[{ required: true, message: "Please select Year" }]}
-              >
+              <Form.Item label="Tool Desc" name="toolId">
+                <Select
+                  placeholder="Select Tool"
+                  onChange={(value) => {
+                    setSelectedToolSearch(value);
+                    productDropDownDataSearch(value);
+                  }}
+                >
+                  {toolDataSearch.map((tool) => (
+                    <Option key={tool.toolNo} value={tool.toolNo}>
+                      {tool.toolDesc}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={4}>
+              <Form.Item label="Product" name="productId">
+                <Select
+                  disabled={!selectedToolSearch}
+                  onChange={(value) => {
+                    addForm.setFieldsValue({ productId: value });
+                    setProduct(value);
+                    fetchCustomerByProduct(value); // Call the new function
+                  }}
+                >
+                  {productDataSearch.map((prod) => (
+                    <Option key={prod.productCode} value={prod.productCode}>
+                      {prod.productDescription}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item label="Customer" name="customerSearch">
+                <Input readOnly />
+              </Form.Item>
+            </Col>
+
+            <Col span={4}>
+              <Form.Item label="Year" name="year" initialValue={dayjs()}>
                 <DatePicker picker="year" style={{ width: "100%" }} />
               </Form.Item>
             </Col>
           </Row>
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
-            <Button type="primary" htmlType="submit" style={{ marginRight: "10px", backgroundColor: "#00264d", borderColor: "#00264d" }}>
+
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{ background: "#00264d", borderColor: "#00264d" }}
+            >
               Submit
             </Button>
-            <Button onClick={handleCancel}>Cancel</Button>
+
+            <Button
+              onClick={() => setShowDetails(false)}
+              type="primary"
+              style={{
+                marginLeft: 10,
+                background: "#00264d",
+                borderColor: "#00264d",
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </Form>
       </Card>
 
-      {/* PM Checklist Details Card */}
+      {/* SEARCH RESULTS SECTION */}
       {showDetails && (
         <Card
+          title={"PM Checklist Summary"}
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
-          title={
-            <span>
-              PM Checklist Details{" "}
-              {selectedTool && selectedYear && (
-                <span style={{ fontSize: "14px", fontWeight: "normal" }}>
-                  — Tool Desc: <b>{selectedTool}</b> | Year: <b>{selectedYear} </b>
-                </span>
-              )}
-            </span>
-          }
-          style={{ marginTop: "20px", borderRadius: "8px" }}
+          style={{ marginTop: 20, borderRadius: 8 }}
         >
-          <Table
-            dataSource={dataSource}
-            columns={columns}
-            pagination={{ pageSize: 5 }}
-            bordered
-            locale={{ emptyText: "No data available in table" }}
-          />
+          {/* If loading → show loader inside card */}
+          {loading ? (
+            <div
+              style={{
+                width: "100%",
+                height: 300,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Loader />
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                width: "100%",
+                padding: "60px 0",
+                fontSize: "18px",
+                color: "#999",
+              }}
+            >
+              No data to show
+            </div>
+          ) : (
+            searchResults.length > 0 && (
+              <div
+                className="ag-theme-alpine"
+                style={{ height: 400, width: "100%" }}
+              >
+                <AgGridReact
+                  columnDefs={agColumns}
+                  rowData={searchResults}
+                  pagination={true}
+                  paginationPageSize={10}
+                />
+              </div>
+            )
+          )}
         </Card>
       )}
 
-      {/* Add Checklist PM Card */}
+      {/* ADD / VIEW CHECKLIST CARD */}
       {showAddChecklist && (
         <Card
+          title={isEditable ? "Add PM Checklist" : "View PM Checklist"}
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
-          title="Add PM Checklist"
-          style={{ marginTop: "20px", borderRadius: "8px" }}
+          style={{ marginTop: 20, borderRadius: 8 }}
         >
           <Form form={addForm} layout="vertical">
             <Row gutter={16}>
               <Col span={4}>
-                <Form.Item label="Tool Desc" name="toolId">
+                <Form.Item label="Line" name="lineId">
                   <Select
-                    placeholder="Select Tool Desc"
-                    value={addChecklistTool}
-                    onChange={handleAddChecklistToolChange}
+                    value={selectedLineAdd}
+                    disabled={!isEditable}
+                    onChange={(value) => {
+                      setSelectedLineAdd(value);
+                      toolDropDownDataAdd(value);
+                    }}
                   >
-                    {chartData.map((tool) => (
-                      <Option key={tool.toolName} value={tool.toolName}>
-                        {tool.toolName}
+                    <Option value="getAll">Get All</Option>
+                    {lineData.map((line) => (
+                      <Option key={line.key} value={line.key}>
+                        {line.value}
                       </Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
+
+              <Col span={4}>
+                <Form.Item label="Tool Desc" name="toolId">
+                  <Select
+                    placeholder="Select Tool"
+                    disabled={!isEditable}
+                    onChange={(value) => {
+                      setSelectedToolAdd(value);
+                      productDropDownDataAdd(value);
+                      productDropDownDataSearch(value);
+                    }}
+                  >
+                    {toolDataAdd.map((tool) => (
+                      <Option key={tool.toolNo} value={tool.toolNo}>
+                        {tool.toolDesc}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+
               <Col span={6}>
                 <Form.Item label="Operation" name="operation">
                   <Input value={operation} readOnly />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="PM Qty" name="pmQty">
-                  <Input value={pmQty} disabled />
+                <Form.Item label="Product" name="productId">
+                  <Select
+                    disabled={!selectedToolAdd}
+                    onChange={(value) => {
+                      addForm.setFieldsValue({ productId: value });
+                      setProduct(value);
+                      fetchCustomerByProduct(value); // Call the new function
+                    }}
+                  >
+                    {productDataAdd.map((prod) => (
+                      <Option key={prod.productCode} value={prod.productCode}>
+                        {prod.productDescription}
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
+
+              <Col span={6}>
+                <Form.Item label="Customer" name="customer">
+                  <Input readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="PM Qty" name="pmQty">
+                  <Input value={pmQty} readOnly />
+                </Form.Item>
+              </Col>
+
               <Col span={4}>
                 <Form.Item label="Preventive Qty" name="preventiveQty">
-                  <Input defaultValue="45000" />
+                  <Input value={preventiveQty} readOnly />
                 </Form.Item>
               </Col>
             </Row>
@@ -319,17 +898,122 @@ const PreventiveMaintenanceCheckList = () => {
               columns={addChecklistColumns}
               pagination={{ pageSize: 10 }}
               bordered
-              style={{ marginTop: "10px" }}
+              style={{ marginTop: 10 }}
             />
           </Form>
-          
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
-            <Button type="primary" htmlType="submit" style={{ marginRight: "10px", backgroundColor: "#00264d", borderColor: "#00264d" }}>
-              Submit
-            </Button>
-            <Button onClick={handleCancel}>Cancel</Button>
-          </div>
 
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            {isEditable && (
+              <Button
+                type="primary"
+                style={{ background: "#00264d", borderColor: "#00264d" }}
+                onClick={handleSubmitAddChecklist}
+              >
+                Submit
+              </Button>
+            )}
+
+            <Button
+              onClick={() => setShowAddChecklist(false)}
+              style={{ marginLeft: 10 }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* view card table */}
+      {showViewChecklist && (
+        <Card
+          title={"PM Checklist Detail"}
+          headStyle={{ backgroundColor: "#00264d", color: "white" }}
+          style={{ marginTop: 20, borderRadius: 8 }}
+        >
+          <Form form={addForm} layout="vertical">
+            <Row gutter={16}>
+              <Col span={4}>
+                <Form.Item label="Line" name="lineId">
+                  <Input readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="Tool Desc" name="toolId">
+                  <Input value={selectedToolAdd} readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item label="Operation" name="operation">
+                  <Input value={operation} readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="Product" name="productId">
+                  <Input value={product} readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item label="Customer" name="customer">
+                  <Input value={customer} readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="PM Qty" name="pmQty">
+                  <Input value={pmQty} readOnly />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="Preventive Qty" name="preventiveQty">
+                  <Input value={preventiveQty} readOnly />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Table
+              dataSource={addChecklistData}
+              columns={addChecklistColumns}
+              pagination={{ pageSize: 10 }}
+              bordered
+              style={{ marginTop: 10 }}
+            />
+          </Form>
+
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <Button
+              type="primary"
+              style={{ background: "#28a745", borderColor: "#28a745" }}
+              onClick={exportToFormattedExcel}
+            >
+              Export Excel
+            </Button>
+            {isEditable && (
+              <Button
+                type="primary"
+                style={{ background: "#00264d", borderColor: "#00264d" }}
+                onClick={handleSubmitViewChecklist}
+              >
+                Update
+              </Button>
+            )}
+
+            <Button
+              onClick={() => setShowViewChecklist(false)}
+              type="primary"
+              style={{
+                marginLeft: 10,
+                background: "#00264d",
+                borderColor: "#00264d",
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
         </Card>
       )}
     </>
