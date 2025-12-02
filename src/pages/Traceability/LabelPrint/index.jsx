@@ -145,8 +145,18 @@ const LabelPrint = () => {
       const productGroupCode = tableData.productGroupCode;
       const productCode = tableData.productCode;
       const currentDateTime = moment().format("YYYYMMDDHHmmss");
+
+      let cleanProductCode = productCode;
+
+      if (productGroupCode == 1) {
+        cleanProductCode = productCode.replace(/OE$/, "");
+      } else if (productGroupCode == 2) {
+        cleanProductCode = productCode.replace(/OES$/, "");
+      } else {
+        cleanProductCode = productCode.replace(/IAM$/, "");
+      }
       
-      const strData = `${lineCode} ${productGroupCode} ${productCode} ${currentDateTime}`;
+      const strData = `${lineCode} ${productGroupCode} ${cleanProductCode} ${currentDateTime}`;
 
 
 
@@ -158,8 +168,9 @@ const LabelPrint = () => {
       const response = await serverApi.post("/tscPrintQrByMachine", payload);
       const resData = response.data;
 
-     
-      if (resData != null && resData === "200") {
+     console.log("resDataresDataresData",resData)
+      // if (resData != null && resData === "200") {
+         if (resData != null && resData == 200) {
         toast.success("Print Successfuly");
 
         insertTraceabilityQRCodeDetails(strData);
