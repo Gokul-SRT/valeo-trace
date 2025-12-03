@@ -146,6 +146,8 @@ const LabelPrint = () => {
       const productCode = tableData.productCode;
       const currentDateTime = moment().format("YYYYMMDDHHmmss");
 
+
+/*
       let cleanProductCode = productCode;
 
       if (productGroupCode == 1) {
@@ -155,8 +157,8 @@ const LabelPrint = () => {
       } else {
         cleanProductCode = productCode.replace(/IAM$/, "");
       }
-      
-      const strData = `${lineCode} ${productGroupCode} ${cleanProductCode} ${currentDateTime}`;
+      */
+      const strData = `${lineCode} ${productGroupCode} ${productCode} ${currentDateTime}`;
 
 
 
