@@ -194,7 +194,7 @@ const LabelPrint = () => {
       const response = await serverApi.post("/tscPrintQrByMachine", payload);
 
       const resData = response.data;
-      if (resData != null && resData === "200") {
+      if (resData != null && resData == 200) {
         toast.success("Re-Print Successful");
         setShowReprintModal(false);
         setSerialNumber("");
