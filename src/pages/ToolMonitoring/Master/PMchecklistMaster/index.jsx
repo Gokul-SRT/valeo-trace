@@ -19,9 +19,9 @@ ModuleRegistry.registerModules([CellStyleModule, CheckboxEditorModule]);
 
 // Custom Spec/Unit Editor
 const SpecUnitRenderer = ({ data, update }) => {
-  const [isSplit, setIsSplit] = useState(data.specUnit?.includes("±") || false);
-  const [base, setBase] = useState(isSplit ? data.specUnit.split("±")[0].trim() : data.specUnit || "");
-  const [tolerance, setTolerance] = useState(isSplit ? data.specUnit.split("±")[1]?.trim() : "");
+  const [isSplit, setIsSplit] = useState(data.specUnit?.includes("±") || true);
+  const [base, setBase] = useState(isSplit ? data.specUnit?.split("±")[0]?.trim() || "" : data.specUnit || "");
+  const [tolerance, setTolerance] = useState(isSplit ? data.specUnit?.split("±")[1]?.trim() || "" : "");
 
   useEffect(() => {
     update(isSplit ? `${base}±${tolerance}` : base);
@@ -276,7 +276,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         characteristicName: item.characteristicName,
         specUnit: item.specUnit,
         mesurementType: item.mesurementType,
-        seqNo: item.seqNo,
+        seqNo: "1",
         status: item.status,
         tenantId,
         branchCode,
@@ -343,13 +343,6 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       headerComponentParams: { displayName: "Measurement Tools" },
     },
     {
-      headerName: "Sequence No",
-      field: "seqNo",
-      filter: "agTextColumnFilter",
-      headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Sequence No" },
-    },
-    {
       headerName: "Status",
       field: "status",
       editable: true,
@@ -411,7 +404,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       });
 
       const titleCell = worksheet.getCell("B1");
-      titleCell.value = "PM Checklist Master Report";
+      titleCell.value = "rt";
       titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
       titleCell.alignment = {
         horizontal: "center",

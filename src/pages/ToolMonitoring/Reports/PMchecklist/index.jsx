@@ -10,7 +10,7 @@ import {
   Table,
   Input,
 } from "antd";
-import { PlusCircleOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, EyeOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import store from "store";
 import {
@@ -22,7 +22,7 @@ import { AgGridReact } from "ag-grid-react";
 import Loader from "../../../../Utills/Loader";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import logo from "../../../../assets/pngwing.com.png";
+import { toast } from "react-toastify";
 
 
 const { Option } = Select;
@@ -61,6 +61,7 @@ const PreventiveMaintenanceCheckList = () => {
   const [pmQty, setPmQty] = useState("");
   const [preventiveQty, setPreventiveQty] = useState(0);
   const [addChecklistData, setAddChecklistData] = useState([]);
+  const [currentViewedRecordId, setCurrentViewedRecordId] = useState(null);
 
   const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
@@ -212,6 +213,7 @@ const PreventiveMaintenanceCheckList = () => {
     try {
       setShowViewChecklist(true);
       setShowDetails(false);
+      setCurrentViewedRecordId(record.logId); // Store the record ID for export
 
       const response = await backendService({
         requestPath: "getViewPMChecklistDtl",
@@ -533,117 +535,76 @@ const PreventiveMaintenanceCheckList = () => {
     { headerName: "Tool", field: "toolDesc", flex: 1 },
     { headerName: "Product", field: "productDescription", flex: 1 },
     { headerName: "Customer", field: "customerName", flex: 1 },
-    { headerName: "Date", field: "createdDate", flex: 1 },
+    { 
+      headerName: "Date", 
+      field: "createdDate", 
+      flex: 1,
+      cellRenderer: (params) => {
+        if (params.value) {
+          const date = dayjs(params.value);
+          return date.isValid() ? date.format('DD-MMM-YYYY') : params.value;
+        }
+        return params.value;
+      },
+    },
     {
       headerName: "Action",
       field: "action",
       cellRenderer: (params) => {
         return (
-          <Button type="link" onClick={() => handleViewChecklist(params.data)}>
-            View
-          </Button>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <EyeOutlined 
+              style={{ 
+                fontSize: '16px', 
+                color: '#1890ff', 
+                cursor: 'pointer',
+                padding: '4px'
+              }}
+              onClick={() => handleViewChecklist(params.data)}
+              title="View Details"
+            />
+          </div>
         );
       },
-      width: 120,
+      width: 100,
+      cellStyle: { textAlign: "center" },
+      sortable: false,
+      filter: false,
     },
   ];
 
   const exportToFormattedExcel = async () => {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("PM Checklist");
+    let reportId = currentViewedRecordId;
+    
+    if (!reportId) {
+      toast.error("No report data available for export");
+      return;
+    }
 
-  // --- ADD LOGO IMAGE ---
-  const logoImage = workbook.addImage({
-    base64: await fetch(logo).then(res => res.blob())
-      .then(blob => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(",")[1]);
-        reader.readAsDataURL(blob);
-      })),
-    extension: "png",
-  });
-
-  // Place logo at top center (A1:G3 area)
-  sheet.addImage(logoImage, {
-    tl: { col: 0.2, row: 0.1 },   // top-left position
-    ext: { width: 160, height: 80 }, // size of logo
-  });
-
-  // Add empty rows under logo so title appears below
-  sheet.addRow([]);
-  sheet.addRow([]);
-  sheet.addRow([]);
-
-  // ----- MERGED HEADER -----
-  sheet.mergeCells("A4:G4");
-  const title = sheet.getCell("A4");
-  title.value = "PM CHECKLIST";
-  title.font = { size: 16, bold: true };
-  title.alignment = { horizontal: "center", vertical: "middle" };
-
-  // ----- HEADERS -----
-  const headers = [
-    "S.No",
-    "CHARACTERISTICS",
-    "SPEC/UNIT",
-    "MEASUREMENT TOOLS",
-    "OBSERVED READING",
-    "OK / NOK",
-    "REMARKS"
-  ];
-
-  const headerRow = sheet.addRow(headers);
-
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true };
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "87CEEB" },
+    const payload = {
+      id: reportId,
+      tenantId,
+      branchCode,
+      logoPath: "/images/logo.png"
     };
-    cell.border = {
-      top: { style: "thin" },
-      bottom: { style: "thin" },
-      left: { style: "thin" },
-      right: { style: "thin" },
-    };
-    cell.alignment = { horizontal: "center" };
-  });
 
-  // ----- DATA ROWS -----
-  addChecklistData.forEach((row) => {
-    const dataRow = sheet.addRow([
-      row.SNo,
-      row.characteristicName,
-      row.specUnit,
-      row.measurementType,
-      row.observed,
-      row.okNotOk,
-      row.remarks
-    ]);
-    dataRow.eachCell((cell) => {
-      cell.border = {
-        top: { style: "thin" },
-        bottom: { style: "thin" },
-        left: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-  });
+    const response = await backendService({
+      requestPath: 'pmChecklistExport',
+      requestData: payload,
+    })
 
-  // ----- COLUMN WIDTHS -----
-  sheet.getColumn(1).width = 8;
-  sheet.getColumn(2).width = 35;
-  sheet.getColumn(3).width = 22;
-  sheet.getColumn(4).width = 22;
-  sheet.getColumn(5).width = 22;
-  sheet.getColumn(6).width = 12;
-  sheet.getColumn(7).width = 30;
-
-  // --- EXPORT ---
-  const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(new Blob([buffer]), "PM_Checklist_Formatted.xlsx");
-};
+    if (response.responseCode === '200') {
+      if (response?.responseData[0]?.fileContent !== null) {
+        const link = document.createElement('a')
+        link.href = `data:application/octet-stream;base64,${response?.responseData[0]?.fileContent}`
+        link.download = response?.fileName
+        link.click()
+        toast.success(response.responseMessage)
+      } else {
+        toast.error(response.responseMessage)
+      }
+    }
+  };
 
   return (
     <>
@@ -683,9 +644,14 @@ const PreventiveMaintenanceCheckList = () => {
                   placeholder="Select Tool"
                   onChange={(value) => {
                     setSelectedToolSearch(value);
+                    if (value === "getAll") {
+                      form.setFieldsValue({ productId: "getAll" });
+                      setProduct("getAll");
+                    }
                     productDropDownDataSearch(value);
                   }}
                 >
+                  <Option value="getAll">Get All</Option>
                   {toolDataSearch.map((tool) => (
                     <Option key={tool.toolNo} value={tool.toolNo}>
                       {tool.toolDesc}
@@ -705,6 +671,7 @@ const PreventiveMaintenanceCheckList = () => {
                     fetchCustomerByProduct(value); // Call the new function
                   }}
                 >
+                  <Option value="getAll">Get All</Option>
                   {productDataSearch.map((prod) => (
                     <Option key={prod.productCode} value={prod.productCode}>
                       {prod.productDescription}
@@ -716,7 +683,7 @@ const PreventiveMaintenanceCheckList = () => {
 
             <Col span={6}>
               <Form.Item label="Customer" name="customerSearch">
-                <Input readOnly />
+                <Input readOnly disabled={selectedToolSearch === "getAll"} />
               </Form.Item>
             </Col>
 
@@ -990,12 +957,16 @@ const PreventiveMaintenanceCheckList = () => {
               style={{ background: "#28a745", borderColor: "#28a745" }}
               onClick={exportToFormattedExcel}
             >
-              Export Excel
+              Export 
             </Button>
             {isEditable && (
               <Button
                 type="primary"
-                style={{ background: "#00264d", borderColor: "#00264d" }}
+                style={{ 
+                  marginLeft: 10,
+                  background: "#00264d", 
+                  borderColor: "#00264d" 
+                }}
                 onClick={handleSubmitViewChecklist}
               >
                 Update

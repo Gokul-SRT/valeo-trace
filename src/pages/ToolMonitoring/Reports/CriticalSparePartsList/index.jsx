@@ -7,8 +7,8 @@ import { toast } from "react-toastify";
 import CommonserverApi from "../../../../CommonserverApi";
 import { backendService } from "../../../../service/ToolServerApi";
 import Loader from "../../../.././Utills/Loader";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import store from 'store';
+import axios from 'axios';
 // import "./style.css";
 
 const { Option } = Select;
@@ -360,6 +360,7 @@ const CriticalSparePartsList = () => {
           lineCode: rawData[0]?.lineMstCode,
           toolNo: rawData[0]?.toolNo,
           date: rawData[0]?.date ? rawData[0].date.split(' ')[0] : null,
+          reportId: reportId, // Store the report ID for PDF export
         };
       }
       console.log("No data returned from API");
@@ -446,9 +447,17 @@ const CriticalSparePartsList = () => {
       flex: 1,
     },
     {
-      headerName: "Month/Year",
+      headerName: "Date",
       field: "monthYear",
       flex: 1,
+      cellRenderer: (params) => {
+        if (params.value) {
+          // Convert from YYYY-MM-DD to DD-MMM-YYYY format
+          const date = dayjs(params.value);
+          return date.isValid() ? date.format('DD-MMM-YYYY') : params.value;
+        }
+        return params.value;
+      },
     },
     {
       headerName: "Action",
@@ -574,12 +583,12 @@ const CriticalSparePartsList = () => {
 
   const addCardColumns = [
     {
-      headerName: "TOOL DESCRIPTION",
+      headerName: "Tool Description",
       field: "toolDescription",
       width: 180,
     },
     {
-      headerName: "OPERATION DESCRIPTION",
+      headerName: "Operation Description",
       field: "operationDescription",
       width: 180,
       rowSpan: (params) => {
@@ -625,7 +634,7 @@ const CriticalSparePartsList = () => {
       },
     },
     {
-      headerName: "S.NO",
+      headerName: "S.No",
       field: "sno",
       width: 80,
       cellRenderer: (params) => (params.data.isSection ? "" : params.value),
@@ -645,7 +654,7 @@ const CriticalSparePartsList = () => {
       cellEditor: 'agTextCellEditor',
     },
     {
-      headerName: "Spares Min Qty in tool",
+      headerName: "Spares Min Qty",
       field: "minQty",
       width: 180,
       cellRenderer: (params) =>
@@ -676,7 +685,7 @@ const CriticalSparePartsList = () => {
       },
     },
     {
-      headerName: "TOTAL AVAILABLE",
+      headerName: "Total Available",
       field: "totalAvailable",
       width: 160,
       cellRenderer: (params) =>
@@ -693,34 +702,157 @@ const CriticalSparePartsList = () => {
   ];
 
 
-  const downloadExcel = () => {
-    if (!jsonResponse || jsonResponse.length === 0) {
-      toast.error("No data available for download");
-      return;
-    }
+   const downloadExcel = async () => {
+    let reportId = null;
+      
+      if (isViewMode && addCardData.length > 0) {
+        // In view mode, get the ID from the stored context
+        const viewedRecord = detailsData.find(item => item.key);
+        reportId = viewedRecord?.key;
+      } else {
+        // Fallback to finding from current data
+        const currentViewData = detailsData.find(item => 
+          addCardData.length > 0 && item.key
+        );
+        reportId = currentViewData?.key;
+      }
+      
+      if (!reportId) {
+        toast.error("No report data available for export");
+        return;
+      }
 
-    console.log("JSON Response for Excel:", jsonResponse);
+      const payload = {
+        id: reportId,
+        tenantId,
+        branchCode,
+        logoPath: "/images/logo.png"
+      };
 
-    const excelData = jsonResponse.map((item, index) => ({
-      "S.No": index + 1,
-      "Tool Description": item.operationDesc || "",
-      "Critical Spares": item.criticalSpareName || "",
-      "Spare Location": item.storageLocation || "",
-      "Min Qty": parseInt(item.minimumThresholdQuantity) || 0,
-      "Available Qty": parseInt(item.stockAvailable) || 0,
-      "Need to Order": parseInt(item.needToOrder) || 0,
-      "Total Available": parseInt(item.totalAvailable) || 0,
-    }));
+      const response = await backendService({
+        requestPath: 'critical-spare-export',
+        requestData: payload,
+      })
+  
+      if (response.responseCode === '200') {
+        if (response?.responseData[0]?.fileContent !== null) {
+          const link = document.createElement('a')
+          link.href = `data:application/octet-stream;base64,${response?.responseData[0]?.fileContent}`
+          link.download = response?.fileName
+          link.click()
+          toast.success(response.responseMessage)
+        } else {
+          toast.error(response.responseMessage)
+        }
+      }
+    };
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Critical Spare Parts");
-    
-    const fileName = `Critical_Spare_Parts_${dayjs().format('YYYY-MM-DD')}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-    
-    toast.success("Excel file downloaded successfully");
-  };
+
+  // const downloadExcel = async () => {
+  //   try {
+  //     // Get the report ID from the current view context or from the viewed record
+  //     let reportId = null;
+      
+  //     if (isViewMode && addCardData.length > 0) {
+  //       // In view mode, get the ID from the stored context
+  //       const viewedRecord = detailsData.find(item => item.key);
+  //       reportId = viewedRecord?.key;
+  //     } else {
+  //       // Fallback to finding from current data
+  //       const currentViewData = detailsData.find(item => 
+  //         addCardData.length > 0 && item.key
+  //       );
+  //       reportId = currentViewData?.key;
+  //     }
+      
+  //     if (!reportId) {
+  //       toast.error("No report data available for export");
+  //       return;
+  //     }
+
+  //     const payload = {
+  //       id: reportId,
+  //       tenantId,
+  //       branchCode,
+  //       logoPath: "/images/logo.png"
+  //     };
+
+  //     console.log("PDF Export payload:", payload);
+
+  //     const accessToken = store.get('accessToken');
+      
+  //     const response = await axios.post(
+  //       `${process.env.REACT_APP_API_URL || 'http://localhost:8901'}/traceability/critical-spare-export`,
+  //       payload,
+  //       {
+  //         responseType: 'blob',
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           'Authorization': `Bearer ${accessToken}`
+  //         }
+  //       }
+  //     );
+
+  //     console.log("Response status:", response.status);
+  //     console.log("Response headers:", response.headers);
+  //     console.log("Response data size:", response.data.size);
+  //     console.log("Response data type:", response.data.type);
+      
+  //     // Check if response is actually a PDF
+  //     if (response.data.size === 0) {
+  //       toast.error("Received empty file from server");
+  //       return;
+  //     }
+      
+  //     // Check content type
+  //     const contentType = response.headers['content-type'];
+  //     console.log("Content type:", contentType);
+      
+  //     // Read first few bytes to check if it's a valid PDF
+  //     const arrayBuffer = await response.data.arrayBuffer();
+  //     const uint8Array = new Uint8Array(arrayBuffer);
+  //     const firstBytes = Array.from(uint8Array.slice(0, 10)).map(b => String.fromCharCode(b)).join('');
+  //     console.log("First 10 bytes as string:", firstBytes);
+  //     console.log("First 10 bytes as hex:", Array.from(uint8Array.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      
+  //     // Check if it starts with PDF header
+  //     if (!firstBytes.startsWith('%PDF')) {
+  //       console.error("Response is not a valid PDF file");
+  //       // Try to read as text to see what we got
+  //       const text = new TextDecoder().decode(uint8Array);
+  //       console.error("Response as text:", text.substring(0, 500));
+  //       toast.error("Server returned invalid PDF data");
+  //       return;
+  //     }
+
+  //     const file = new Blob([arrayBuffer], { type: 'application/pdf' });
+  //     const fileURL = URL.createObjectURL(file);
+  //     console.log("Created blob URL:", fileURL);
+  //     console.log("Final blob size:", file.size);
+      
+  //     // Create download link
+  //     const link = document.createElement('a');
+  //     link.href = fileURL;
+  //     link.download = `CriticalSpareList_${dayjs().format('YYYY-MM-DD')}.pdf`;
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     document.body.removeChild(link);
+      
+  //     // Clean up after a delay to ensure download completes
+  //     setTimeout(() => {
+  //       URL.revokeObjectURL(fileURL);
+  //     }, 1000);
+      
+  //     toast.success("PDF exported successfully");
+  //   } catch (error) {
+  //     console.error("Error exporting PDF:", error);
+  //     if (error.response) {
+  //       console.error("Error response status:", error.response.status);
+  //       console.error("Error response data:", error.response.data);
+  //     }
+  //     toast.error("Failed to export PDF");
+  //   }
+  // };
 
 
 
@@ -841,6 +973,24 @@ const CriticalSparePartsList = () => {
           style={{ marginTop: 20, borderRadius: 8 }}
         >
           <Form layout="vertical" form={addForm} onValuesChange={handleAddFormChange}>
+            <style>
+              {`
+                .ant-select-disabled .ant-select-selector {
+                  background-color: white !important;
+                  color: black !important;
+                }
+                .ant-select-disabled .ant-select-selection-item {
+                  color: black !important;
+                }
+                .ant-picker-disabled {
+                  background-color: white !important;
+                  color: black !important;
+                }
+                .ant-picker-disabled .ant-picker-input > input {
+                  color: black !important;
+                }
+              `}
+            </style>
             <Row gutter={16}>
               <Col span={4}>
                 <Form.Item label="Line" name="line" rules={[{ required: true }]}>
@@ -850,6 +1000,10 @@ const CriticalSparePartsList = () => {
                     onChange={handleAddLineChange}
                     allowClear
                     disabled={isViewMode}
+                    style={{
+                      backgroundColor: isViewMode ? 'white' : undefined,
+                      color: isViewMode ? 'black' : undefined
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -861,7 +1015,11 @@ const CriticalSparePartsList = () => {
                   <DatePicker
                     format="YYYY-MM-DD"
                     placeholder="Select Date"
-                    style={{ width: "100%" }}
+                    style={{ 
+                      width: "100%",
+                      backgroundColor: 'white',
+                      color: 'black'
+                    }}
                     disabled={true}
                   />
                 </Form.Item>
