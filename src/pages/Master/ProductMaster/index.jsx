@@ -18,6 +18,7 @@ import {
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
+import Loader from "../../../Utills/Loader"
 
 ModuleRegistry.registerModules([
   SetFilterModule,
@@ -25,7 +26,7 @@ ModuleRegistry.registerModules([
   ExcelExportModule,
 ]);
 
-const ProductMaster = ({ modulesprop, screensprop }) => {
+const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
@@ -37,6 +38,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
   const [selectedOperations, setSelectedOperations] = useState([]);
   const gridRef = useRef(null);
   const [currentFilter, setCurrentFilter] = useState("GetAll");
+  const [loading, setLoading] = useState(false);
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -111,6 +113,7 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const response = await backendService({
         requestPath: "getproductmasterdtl",
         requestData: {
@@ -142,6 +145,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     } catch (error) {
       console.error("Error fetching master data:", error);
       toast.error("Error fetching data. Please try again later.");
+    }finally {
+      setLoading(false); // ✅ Stop loader
     }
   };
 
@@ -320,36 +325,70 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
   ];
 
   const handleAddRow = () => {
-    const emptyRow = {
-      isUpdate: 0,
-      productCode: "",
-      productDesc: "",
-      productUomCode: "",
-      groupCode: "",
-      groupId: "",
-      operationCodes: [],
-      operationDescription: "",
-      isActive: "1",
-      productCategoryCode: "FG",
-      isInventory: "0",
-      tenantId,
-      branchCode,
-      updatedBy: employeeId,
-    };
-
-    const productcodeempty = masterList.filter((item) => !item.productCode);
-    if (productcodeempty.length === 0) {
-      const updated = [...masterList, emptyRow];
-      setMasterList(updated);
-      setOriginalList(updated);
-    } else {
-      message.error("Please enter the Product code for all the rows.");
-    }
+  const emptyRow = {
+    isUpdate: 0,
+    productCode: "",
+    productDesc: "",
+    productUomCode: "",
+    groupCode: "",
+    groupId: "",
+    operationCodes: [],
+    operationDescription: "",
+    isActive: "1",
+    productCategoryCode: "FG",
+    isInventory: "0",
+    tenantId,
+    branchCode,
+    updatedBy: employeeId,
   };
+
+  // Check if there is any row with empty productCode
+  const productCodeEmpty = masterList.filter((item) => !item.productCode);
+  if (productCodeEmpty.length > 0) {
+    message.error("Please enter the Product code for all the rows.");
+    return;
+  }
+
+  const updated = [...masterList, emptyRow];
+  setMasterList(updated);
+  setOriginalList(updated);
+
+  // Scroll to last page and focus new row after a small delay
+  setTimeout(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+
+    const lastRowIndex = updated.length - 1;
+    const totalPages = api.paginationGetTotalPages();
+
+    // Go to last page
+    api.paginationGoToLastPage();
+
+    // Ensure the last row is visible at the bottom
+    setTimeout(() => {
+      api.ensureIndexVisible(lastRowIndex, "bottom");
+
+      // Flash the new row to draw attention
+      api.flashCells({
+        rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+      });
+
+      // Focus and start editing on Product Code column
+      const firstColId = "productCode"; // field name of first editable column
+      api.setFocusedCell(lastRowIndex, firstColId);
+      api.startEditingCell({
+        rowIndex: lastRowIndex,
+        colKey: firstColId,
+      });
+    }, 150);
+  }, 100);
+};
+
 
   // ✅ FIXED Update function
   const createorUpdate = async () => {
     try {
+      setLoading(true);
       // Validate data before sending
       const invalidRows = masterList.filter(
         (item) =>
@@ -434,11 +473,14 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
     } catch (error) {
       console.error("Error saving product data:", error);
       toast.error("Error while saving data!");
+    }finally {
+      setLoading(false); // ✅ Stop loader
     }
   };
 
   const handleCancel = () => {
     fetchData();
+    if (onCancel) onCancel();
   };
 
   const handleFilterChange = (value) => {
@@ -527,8 +569,8 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
           extension: "png",
         });
         worksheet.addImage(imageId2, {
-          tl: { col: 6, row: 0 },
-          br: { col: 7, row: 1 },
+          tl: { col: 5, row: 0 },
+          br: { col: 6.5, row: 1 },
         });
       } catch (error) {
         console.warn("Right logo not found, continuing without it");
@@ -677,7 +719,24 @@ const ProductMaster = ({ modulesprop, screensprop }) => {
             }}
             onCellClicked={handlecellclicked}
           />
-
+           {loading && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(255,255,255,0.7)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 10,
+              }}
+            >
+              <Loader />
+            </div>
+          )}
           <div className="text-center mt-4">
             <button
               onClick={onExportExcelProductMaster}
