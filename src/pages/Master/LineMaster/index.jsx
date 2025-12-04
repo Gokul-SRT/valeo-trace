@@ -18,6 +18,7 @@ import serverApi from "../../../serverAPI";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
+import Loader from "../../../Utills/Loader"
 
 ModuleRegistry.registerModules([
   SetFilterModule,
@@ -75,6 +76,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const [masterList, setMasterList] = useState([]);
   const [productData, setProductData] = useState([]);
   const [originalList, setOriginalList] = useState([]); // 🔹 keep backup for dynamic filtering
+  const [loading, setLoading] = useState(false);
   const gridRef = useRef(null);
 
   const autoSizeAllColumns = (params) => {
@@ -102,6 +104,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const employeeId = JSON.parse(localStorage.getItem("employeeId"));
   const fetchData = async () => {
     try {
+      setLoading(true);
       const response = await backendService({requestPath:"getlineMasterdtl", 
         requestData:{
         isActive: "getAll",
@@ -125,6 +128,8 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     } catch (error) {
       console.error("Error fetching master data:", error);
       toast.error("Error fetching data. Please try again later.");
+    }finally {
+      setLoading(false); // ✅ Stop loader
     }
   };
 
@@ -261,6 +266,37 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
       setOriginalList(updated);
+
+// Scroll to last page and focus new row after a small delay
+setTimeout(() => {
+  const api = gridRef.current?.api;
+  if (!api) return;
+
+  const lastRowIndex = updated.length - 1;
+  const totalPages = api.paginationGetTotalPages();
+
+  // Go to last page
+  api.paginationGoToLastPage();
+
+  // Ensure the last row is visible at the bottom
+  setTimeout(() => {
+    api.ensureIndexVisible(lastRowIndex, "bottom");
+
+    // Flash the new row to draw attention
+    api.flashCells({
+      rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+    });
+
+    // Focus and start editing on Product Code column
+    const firstColId = "lineMstCode"; // field name of first editable column
+    api.setFocusedCell(lastRowIndex, firstColId);
+    api.startEditingCell({
+      rowIndex: lastRowIndex,
+      colKey: firstColId,
+    });
+  }, 150);
+}, 100);
+
     } else {
       message.error("Please enter the Line code for all the rows.");
       toast.error("Please enter the Line code for all the rows.");
@@ -269,7 +305,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
 
   const createorUpdate = async () => {
     try {
-
+      setLoading(true);
   // Check EMPTY line codes
   const hasEmptyLineCode = masterList.some(
     (item) => !item.lineMstCode || item.lineMstCode.trim() === ""
@@ -328,6 +364,8 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       console.error("Error saving product data:", error);
       toast.error("Error while saving data!");
       fetchData();
+    }finally {
+      setLoading(false); // ✅ Stop loader
     }
   };
 
@@ -515,7 +553,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
             rowData={masterList}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={10}
+            paginationPageSize={5}
             pagination={true}
             domLayout="autoHeight"
             singleClickEdit={true}
@@ -527,6 +565,25 @@ const LineMaster = ({ modulesprop, screensprop }) => {
               setOriginalList(updatedList);
             }}
           />
+
+     {loading && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(255,255,255,0.7)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 10,
+              }}
+            >
+              <Loader />
+            </div>
+          )}
           <div className="text-center mt-4">
             <button
               onClick={onExportExcel}
