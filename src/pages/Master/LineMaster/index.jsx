@@ -122,7 +122,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
           isUpdate: 1,
         }));
         setMasterList(updatedResponseData);
-        setOriginalList(updatedResponseData);
+        setOriginalList(structuredClone(updatedResponseData));
         console.log(updatedResponseData);
       }
     } catch (error) {
@@ -233,7 +233,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       },
     },
     {
-      headerName: "IsActive",
+      headerName: "Status",
       field: "isActive",
       filter: true,
       editable: true,
@@ -303,9 +303,29 @@ setTimeout(() => {
     }
   };
 
+  const normalizeList = (list) => {
+    return list.map(item => ({
+      ...item,
+      isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
+    }));
+  };
+
+  const hasChanges = () => {
+    const normMaster = normalizeList(masterList);
+    const normOriginal = normalizeList(originalList);
+    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  };
+
+
   const createorUpdate = async () => {
     try {
       setLoading(true);
+ //  Commit any ongoing edits
+ gridRef.current.api.stopEditing();
+      if (!hasChanges()) {
+        toast.error("Change any one field before saving.");
+        return;
+      }
   // Check EMPTY line codes
   const hasEmptyLineCode = masterList.some(
     (item) => !item.lineMstCode || item.lineMstCode.trim() === ""
@@ -534,7 +554,7 @@ setTimeout(() => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold"><span className="text-danger">*</span>&nbsp;Status</label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange(e.target.value)}
@@ -558,12 +578,19 @@ setTimeout(() => {
             domLayout="autoHeight"
             singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
-            onCellValueChanged={(params) => {
-              const updatedList = [...masterList];
-              updatedList[params.rowIndex] = params.data;
-              setMasterList(updatedList);
-              setOriginalList(updatedList);
-            }}
+            // onCellValueChanged={(params) => {
+            //   const updatedList = [...masterList];
+            //   updatedList[params.rowIndex] = params.data;
+            //   setMasterList(updatedList);
+             
+            // }}
+
+            // Update masterList immediately after cell editing stops
+    onCellEditingStopped={(params) => {
+      const updatedList = [...masterList];
+      updatedList[params.rowIndex] = { ...params.data }; // copy updated row
+      setMasterList(updatedList);
+    }}
           />
 
      {loading && (

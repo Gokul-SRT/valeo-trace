@@ -140,7 +140,8 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
         }));
         console.log("Fetched and mapped data:", updated);
         setMasterList(updated);
-        setOriginalList(updated);
+       // setOriginalList(updated);
+       setOriginalList(structuredClone(updated));
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
@@ -158,6 +159,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
   };
 
   // ✅ Group Code Dropdown Editor (FIXED)
+  /*
   const GroupCodeDropdownEditor = (props) => {
     const [selectedValue, setSelectedValue] = useState(props.value || "");
 
@@ -199,6 +201,49 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       </select>
     );
   };
+*/
+const GroupCodeDropdownEditor = (props) => {
+  const [selectedValue, setSelectedValue] = useState(props.value || "");
+
+  useEffect(() => {
+    setSelectedValue(props.value || "");
+  }, [props.value]);
+
+  const handleChange = (e) => {
+    const value = e.target.value;
+    setSelectedValue(value);
+    // Do NOT setDataValue here; AG Grid will handle it when editing stops
+  };
+
+  // AG Grid calls this when editing stops to get the value
+  useEffect(() => {
+    return () => {
+      const selectedGrp = groupDropdown.find((g) => g.grpCode === selectedValue);
+      if (selectedGrp) {
+        // Update both fields in the row
+        props.node.setDataValue("groupCode", selectedGrp.grpCode);
+        props.node.setDataValue("groupId", selectedGrp.grpId);
+      }
+    };
+  }, [selectedValue, props.node]);
+
+  return (
+    <select
+      value={selectedValue}
+      onChange={handleChange}
+      style={{ width: "100%", height: "100%" }}
+      autoFocus
+    >
+      <option value="">Select Group Code</option>
+      {groupDropdown.map((grp) => (
+        <option key={grp.grpId} value={grp.grpCode}>
+          {grp.grpCode}
+        </option>
+      ))}
+    </select>
+  );
+};
+
 
   // ✅ Group Code Cell Renderer (NEW - to display selected value)
   const GroupCodeCellRenderer = (props) => {
@@ -260,7 +305,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
           : item
       );
       setMasterList(updatedList);
-      setOriginalList(updatedList);
+     // setOriginalList(updatedList);
       setIsModalOpen(false);
       setSelectedOperations([]);
       setEditingRow(null);
@@ -287,11 +332,11 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       field: "productDesc",
       filter: "agTextColumnFilter",
     },
-    {
-      headerName: "UOM",
-      field: "productUomCode",
-      filter: "agTextColumnFilter",
-    },
+    // {
+    //   headerName: "UOM",
+    //   field: "productUomCode",
+    //   filter: "agTextColumnFilter",
+    // },
     {
       headerName: "Group Code",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
@@ -300,7 +345,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       cellRenderer: GroupCodeCellRenderer,
     },
     {
-      headerName: "Operation Id",
+      headerName: "Operations",
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
@@ -308,7 +353,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       cellStyle: { cursor: "pointer" },
     },
     {
-      headerName: "IsActive",
+      headerName: "Status",
       field: "isActive",
       filter: true,
       editable: true,
@@ -329,7 +374,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
     isUpdate: 0,
     productCode: "",
     productDesc: "",
-    productUomCode: "",
+   // productUomCode: "",
     groupCode: "",
     groupId: "",
     operationCodes: [],
@@ -385,10 +430,76 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
 };
 
 
+// Normalize each row for comparison
+/*
+const normalizeItem = (item) => ({
+  productCode: item.productCode?.trim() || "",
+  productDesc: item.productDesc?.trim() || "",
+  groupCode: item.grpCode || "",
+  groupId: item.grpId || "",
+  isActive:
+    item.isActive === "1" || item.isActive === 1 || item.isActive === true
+      ? "1"
+      : "0",
+      operationId: Array.isArray(item.operationId)
+    ? item.operationId.map((op) => op.trim()).sort()
+    : item.operationId
+    ? item.operationId.split(",").map((op) => op.trim()).sort()
+    : [],
+});
+
+// Check if masterList has any changes compared to originalList
+const hasChanges = () => {
+  if (!masterList || !originalList || masterList.length !== originalList.length)
+    return true;
+
+  for (let i = 0; i < masterList.length; i++) {
+    const m = normalizeItem(masterList[i]);
+    const o = normalizeItem(originalList[i]);
+
+    if (
+      m.productCode !== o.productCode ||
+      m.productDesc !== o.productDesc ||
+      m.grpCode !== o.grpCode ||
+      m.grpId !== o.grpId ||
+      m.isActive !== o.isActive ||
+      m.operationId.length !== o.operationId.length ||
+      m.operationId.some((val, idx) => val !== o.operationId[idx])
+    ) {
+      return true; // found a difference
+    }
+  }
+
+  return false; // no changes
+};
+
+*/
+
+const normalizeList = (list) => {
+  return list.map(item => ({
+    ...item,
+    isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
+  }));
+};
+
+const hasChanges = () => {
+  const normMaster = normalizeList(masterList);
+  const normOriginal = normalizeList(originalList);
+  return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+};
+
+
+
   // ✅ FIXED Update function
   const createorUpdate = async () => {
     try {
       setLoading(true);
+      gridRef.current.api.stopEditing();
+      if (!hasChanges()) {
+        toast.error("Change any one field before saving.");
+        return;
+      }
+
       // Validate data before sending
       const invalidRows = masterList.filter(
         (item) =>
@@ -399,6 +510,15 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
         toast.error(
           "Please fill Product Code and Description for all new rows."
         );
+        return;
+      }
+
+
+      const productCodes=masterList.map((item)=> item.productCode.trim());
+      const duplicateCodes=productCodes.filter((code,index)=> productCodes.indexOf(code) !== index);
+
+      if (duplicateCodes.length > 0) {
+        toast.error(`Duplicate Product Code found: ${duplicateCodes[0]}`);
         return;
       }
 
@@ -498,10 +618,10 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       // === Column widths ===
       worksheet.getColumn(1).width = 20; // Product Code
       worksheet.getColumn(2).width = 30; // Product Description
-      worksheet.getColumn(3).width = 15; // UOM
-      worksheet.getColumn(4).width = 15; // Group Code
-      worksheet.getColumn(5).width = 40; // Operation Description
-      worksheet.getColumn(6).width = 12; // Is Active
+      // worksheet.getColumn(3).width = 15; // UOM
+      worksheet.getColumn(3).width = 15; // Group Code
+      worksheet.getColumn(4).width = 40; // Operation Description
+      worksheet.getColumn(5).width = 12; // Is Active
 
       worksheet.getRow(1).height = 65;
 
@@ -523,7 +643,8 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       }
 
       // === Title (center cell) ===
-      const titleCell = worksheet.getCell("C1");
+      worksheet.mergeCells("B1:D2");
+      const titleCell = worksheet.getCell("B1");
 
       // Filter data based on current selection from ORIGINAL LIST
       const currentFilter = "GetAll"; // You might want to track this state like in the previous example
@@ -569,8 +690,8 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
           extension: "png",
         });
         worksheet.addImage(imageId2, {
-          tl: { col: 5, row: 0 },
-          br: { col: 6.5, row: 1 },
+          tl: { col: 4, row: 0 },
+          br: { col: 5, row: 1 },
         });
       } catch (error) {
         console.warn("Right logo not found, continuing without it");
@@ -581,10 +702,10 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       const headers = [
         "Product Code",
         "Product Description",
-        "UOM",
+        // "UOM",
         "Group Code",
         "Operation Description",
-        "Is Active",
+        "Status",
       ];
 
       const headerRow = worksheet.getRow(startRow);
@@ -613,10 +734,10 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
 
         row.getCell(1).value = item.productCode || "";
         row.getCell(2).value = item.productDesc || "";
-        row.getCell(3).value = item.productUomCode || "";
-        row.getCell(4).value = item.groupCode || "";
-        row.getCell(5).value = item.operationDescription || "";
-        row.getCell(6).value =
+       // row.getCell(3).value = item.productUomCode || "";
+        row.getCell(3).value = item.groupCode || "";
+        row.getCell(4).value = item.operationDescription || "";
+        row.getCell(5).value =
           item.isActive === 1 || item.isActive === "1" || item.isActive === true
             ? "Active"
             : "Inactive";
@@ -683,7 +804,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold"><span className="text-danger">*</span>&nbsp;Status</label>
               <select
                 className="form-select"
                 value={currentFilter}
@@ -711,13 +832,18 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
             domLayout="autoHeight"
             singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
-            onCellValueChanged={(params) => {
+            // onCellValueChanged={(params) => {
+            //   const updatedList = [...masterList];
+            //   updatedList[params.rowIndex] = params.data;
+            //   setMasterList(updatedList);
+            //  // setOriginalList(updatedList);
+            // }}
+             onCellClicked={handlecellclicked}
+            onCellEditingStopped={(params) => {
               const updatedList = [...masterList];
-              updatedList[params.rowIndex] = params.data;
+              updatedList[params.rowIndex] = { ...params.data }; // copy updated row
               setMasterList(updatedList);
-              setOriginalList(updatedList);
             }}
-            onCellClicked={handlecellclicked}
           />
            {loading && (
             <div
@@ -768,7 +894,7 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
       {/* ✅ Modal for Operation Id multi-select */}
       {isModalOpen && (
         <Modal
-          title={`Select Operation Ids for Product: ${
+          title={`Select Single or Multiple Operations: ${
             editingRow?.productCode || "New Product"
           }`}
           open={isModalOpen}
