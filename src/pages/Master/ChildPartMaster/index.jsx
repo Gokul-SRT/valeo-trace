@@ -2,10 +2,10 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import { SetFilterModule } from "ag-grid-enterprise";
-import { DateFilterModule } from "ag-grid-enterprise";
+// import "ag-grid-enterprise";
+// import { ModuleRegistry } from "ag-grid-community";
+// import { SetFilterModule } from "ag-grid-enterprise";
+// import { DateFilterModule } from "ag-grid-enterprise";
 import { toast } from "react-toastify";
 import serverApi from '../../../serverAPI';
 import { gettypeMasterdtl } from "../../../services/ChildPartMasterService"
@@ -14,7 +14,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 
-ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+// ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
 const ChildPartMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -326,7 +326,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -361,10 +361,11 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             paginationPageSize={10}
-            paginationPageSizeSelector={[10, 20, 50, 100]}
-            pagination={true}
+            paginationPageSizeSelector={[10, 25, 50, 100]}
+            pagination
             domLayout="autoHeight"
             singleClickEdit={true}
+             overlayNoRowsTemplate="<span style='padding:10px; color:#555; font-size:14px;'>No data available</span>"
             onFirstDataRendered={autoSizeAllColumns}
             onCellValueChanged={(params) => {
               const updatedList = [...masterList];
@@ -379,7 +380,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
-              Excel
+              Excel Export
             </button>
             <button
               type="submit"

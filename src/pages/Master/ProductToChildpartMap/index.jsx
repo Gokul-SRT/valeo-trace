@@ -2,18 +2,19 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import { SetFilterModule, DateFilterModule } from "ag-grid-enterprise";
+// import "ag-grid-enterprise";
+// import { ModuleRegistry } from "ag-grid-community";
+// import { SetFilterModule, DateFilterModule } from "ag-grid-enterprise";
 import { Select } from "antd";
 import ServerApi from "../../../serverAPI";
 import CommonserverApi from "../../../CommonserverApi";
 import ExcelJS from "exceljs";
 import moment from "moment";
 import { saveAs } from "file-saver";
+import {toast} from "react-toastify"
 
 
-ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+// ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
 const tenantId = JSON.parse(localStorage.getItem("tenantId"));
 const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -62,7 +63,7 @@ const MultiSelectEditor = forwardRef((props, ref) => {
   );
 });
 
-const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
+const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [mappingList, setMappingList] = useState([]);
   const [originalMappingList, setOriginalMappingList] = useState([]);
@@ -70,6 +71,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
   const [childPartData, setChildPartData] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const mappingGridRef = useRef(null);
+  const [currentFilter, setCurrentFilter] = useState("GetAll");
 
   // 🔹 Initialize dropdowns and fetch mapping
   useEffect(() => {
@@ -111,7 +113,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
         }));
         console.log("Fetched Mapping Data:", updatedData);
         setMappingList(updatedData);
-        setOriginalMappingList(updatedData);
+        setOriginalMappingList(JSON.parse(JSON.stringify(updatedData))); // Deep copy
       } else {
         setMappingList([]);
         setOriginalMappingList([]);
@@ -244,16 +246,6 @@ const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
 
   // 🔹 Add new mapping row
   const handleAddMappingRow = () => {
-    const emptyRowExists = mappingList.some(
-      (item) => !item.productCode?.trim()
-    );
-    if (emptyRowExists) {
-      alert(
-        "Please fill in the Product Code for all new rows before adding another."
-      );
-      return;
-    }
-
     const newRow = {
       productCode: "",
       childPartId: [],
@@ -262,23 +254,40 @@ const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
       isUpdate: "0",
     };
 
-    const updatedList = [...mappingList, newRow];
-    setMappingList(updatedList);
+    const updated = [...mappingList, newRow];
+    setMappingList(updated);
 
     setTimeout(() => {
-      if (mappingGridRef.current && mappingGridRef.current.api) {
-        const lastRowIndex = updatedList.length - 1;
-        mappingGridRef.current.api.ensureIndexVisible(lastRowIndex, "bottom");
-        mappingGridRef.current.api.startEditingCell({
-          rowIndex: lastRowIndex,
-          colKey: "productCode",
-        });
+      const api = mappingGridRef.current?.api;
+      if (api) {
+        const totalPages = api.paginationGetTotalPages();
+        const lastRowIndex = updated.length - 1;
+
+        // Go to last page
+        api.paginationGoToPage(totalPages - 1);
+
+        setTimeout(() => {
+          // Ensure last row is visible
+          api.ensureIndexVisible(lastRowIndex, "bottom");
+
+          // Flash last added row
+          api.flashCells({
+            rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+          });
+
+          // Start editing first cell (productCode)
+          api.startEditingCell({
+            rowIndex: lastRowIndex,
+            colKey: "productCode",
+          });
+        }, 150);
       }
     }, 100);
   };
 
   // 🔹 Filter handler
   const handleMappingFilterChange = (value) => {
+    setCurrentFilter(value);
     if (!value || value === "GetAll") {
       setMappingList(originalMappingList);
     } else if (value === "Active") {
@@ -295,99 +304,71 @@ const ProductChildPartMapping = ({ modulesprop, screensprop }) => {
   // 🔹 Cancel - reset to original
   const handleCancelMapping = () => {
     setMappingList(originalMappingList);
+    if (onCancel) onCancel();
   };
 
-const onExportMappingExcel = async () => {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Product Child Part Mapping");
-
-    // === Row Height for header ===
-    worksheet.getRow(1).height = 60;
-
-    // === Set column widths ===
-    worksheet.columns = [
-      { header: "Product Code", key: "productCode", width: 25 },
-      { header: "Child Part Codes", key: "childPartId", width: 40 },
-      { header: "Is Active", key: "isActive", width: 15 },
-    ];
-
-    // === Insert Logo (Optional) ===
+  const onExportMappingExcel = async () => {
     try {
-      const imgResponse = await fetch("/pngwing.com.png");
-      const imgBlob = await imgResponse.blob();
-      const arrayBuffer = await imgBlob.arrayBuffer();
-      const imageId = workbook.addImage({
-        buffer: arrayBuffer,
-        extension: "png",
-      });
-      worksheet.addImage(imageId, {
-        tl: { col: 0, row: 0 },
-        br: { col: 1, row: 1 },
-        editAs: "oneCell",
-      });
-    } catch (err) {
-      console.warn("Logo image not found, skipping logo insert.");
-    }
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Product Child Part Mapping");
 
-    // === Title Cell ===
-    worksheet.mergeCells("B1:D2");
-    const titleCell = worksheet.getCell("B1");
-    titleCell.value = "Product to Child Part Mapping Report";
-    titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
-    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      // === Row Height for header ===
+      worksheet.getRow(1).height = 60;
 
-    // === Date Cell (top right) ===
-    worksheet.mergeCells("E1:F2");
-    const dateCell = worksheet.getCell("E1");
-    dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
-    dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
-    dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      // === Set column widths ===
+      worksheet.columns = [
+        { header: "Product Code", key: "productCode", width: 25 },
+        { header: "Child Part Codes", key: "childPartId", width: 40 },
+        { header: "Is Active", key: "isActive", width: 15 },
+      ];
 
-    // === Header Row ===
-    const headerRow = worksheet.addRow([
-      "Product Code",
-      "Child Part Codes",
-      "Is Active",
-    ]);
+      // === Insert Logo (Optional) ===
+      try {
+        const imgResponse = await fetch("/pngwing.com.png");
+        const imgBlob = await imgResponse.blob();
+        const arrayBuffer = await imgBlob.arrayBuffer();
+        const imageId = workbook.addImage({
+          buffer: arrayBuffer,
+          extension: "png",
+        });
+        worksheet.addImage(imageId, {
+          tl: { col: 0, row: 0 },
+          br: { col: 1, row: 1 },
+          editAs: "oneCell",
+        });
+      } catch (err) {
+        console.warn("Logo image not found, skipping logo insert.");
+      }
 
-    headerRow.eachCell((cell) => {
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
-      };
-      cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
-      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
+      // === Title Cell ===
+      worksheet.mergeCells("B1:D2");
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = "Product to Child Part Mapping Report";
+      titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
 
-    headerRow.height = 25;
+      // === Date Cell (top right) ===
+      worksheet.mergeCells("E1:F2");
+      const dateCell = worksheet.getCell("E1");
+      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+      dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
+      dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
-    // === AutoFilter ===
-    worksheet.autoFilter = {
-      from: { row: headerRow.number, column: 1 },
-      to: { row: headerRow.number, column: worksheet.columns.length },
-    };
+      // === Header Row ===
+      const headerRow = worksheet.addRow([
+        "Product Code",
+        "Child Part Codes",
+        "Is Active",
+      ]);
 
-    // === Data Rows ===
-    mappingList.forEach((row) => {
-      const newRow = worksheet.addRow({
-        productCode: row.productCode || "",
-        childPartId: Array.isArray(row.childPartId)
-          ? row.childPartId.join(", ")
-          : row.childPartId || "",
-        isActive: Number(row.isActive) === 1 ? "Active" : "Inactive",
-      });
-
-      newRow.eachCell((cell) => {
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.font = { size: 10 };
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
+        cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -395,20 +376,48 @@ const onExportMappingExcel = async () => {
           right: { style: "thin" },
         };
       });
-    });
 
-    // === Save File ===
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-      new Blob([buffer], { type: "application/octet-stream" }),
-      `Product_ChildPart_Mapping_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-    );
-  } catch (error) {
-    console.error("Excel export error:", error);
-    alert("Error exporting to Excel. Please try again.");
-  }
-};
+      headerRow.height = 25;
 
+      // === AutoFilter ===
+      worksheet.autoFilter = {
+        from: { row: headerRow.number, column: 1 },
+        to: { row: headerRow.number, column: worksheet.columns.length },
+      };
+
+      // === Data Rows ===
+      mappingList.forEach((row) => {
+        const newRow = worksheet.addRow({
+          productCode: row.productCode || "",
+          childPartId: Array.isArray(row.childPartId)
+            ? row.childPartId.join(", ")
+            : row.childPartId || "",
+          isActive: Number(row.isActive) === 1 ? "Active" : "Inactive",
+        });
+
+        newRow.eachCell((cell) => {
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.font = { size: 10 };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+
+      // === Save File ===
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Product_ChildPart_Mapping_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+    } catch (error) {
+      console.error("Excel export error:", error);
+     toast.error("Error exporting Excel. Please try again.");
+    }
+  };
 
   // 🔹 Insert or Update Mapping
   const insertUpdateMapping = async () => {
@@ -416,21 +425,56 @@ const onExportMappingExcel = async () => {
     setIsSaving(true);
 
     try {
+      // Stop any ongoing editing
+      mappingGridRef.current?.api?.stopEditing();
+
       // ✅ Validate rows
       const invalidRow = mappingList.find(
         (item) => !item.productCode?.trim() || item.childPartId?.length === 0
       );
       console.log("Validating rows before save:", mappingList, invalidRow);
       if (invalidRow) {
-        alert(
+        toast.info(
           "Please fill in both Product Code and Child Part Code for all rows before saving."
         );
         setIsSaving(false);
         return;
       }
 
+      // Find new rows (isUpdate === "0")
+      const newRows = mappingList.filter((item) => item.isUpdate === "0");
+
+      // Find modified rows by comparing with originalMappingList
+      const modifiedRows = mappingList.filter((currentRow) => {
+        if (currentRow.isUpdate === "0") return false; // Skip new rows
+
+        const originalRow = originalMappingList.find(
+          (orig) => orig.productCode === currentRow.productCode
+        );
+
+        if (!originalRow) return false;
+
+        // Compare all relevant fields
+        return (
+          currentRow.productCode !== originalRow.productCode ||
+          JSON.stringify(currentRow.childPartId) !== JSON.stringify(originalRow.childPartId) ||
+          currentRow.isActive !== originalRow.isActive
+        );
+      });
+
+      // Combine new and modified rows
+      const changedRows = [...newRows, ...modifiedRows];
+
+      if (changedRows.length === 0) {
+        toast.info("No new or modified rows to save.");
+        setIsSaving(false);
+        return;
+      }
+
+      console.log("Changed rows:", changedRows);
+
       // ✅ Prepare payload
-      const dataToSend = mappingList.map((item) => ({
+      const dataToSend = changedRows.map((item) => ({
         productCode: item.productCode,
         childPartCode: Array.isArray(item.childPartId)
           ? item.childPartId
@@ -447,14 +491,14 @@ const onExportMappingExcel = async () => {
       );
 
       if (response?.data?.responseCode === "200") {
-        alert(response.data.responseDataMessage || "Mapping data saved successfully!");
+        toast.success(response.data.responseDataMessage || "Mapping data saved successfully!");
         fetchMappingData();
       } else {
-        alert("Failed to save records. Check console for details.");
+       toast.error("Failed to save records. Check console for details.");
       }
     } catch (error) {
       console.error("Error saving mapping data:", error);
-      alert("Error while saving data!");
+       toast.error("Error while saving data!");
     } finally {
       setIsSaving(false);
     }
@@ -507,19 +551,31 @@ const onExportMappingExcel = async () => {
             rowData={mappingList}
             columnDefs={mappingColumnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={100}
-            pagination={true}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 25, 50, 100]}
+            pagination
             domLayout="autoHeight"
             singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
             onCellValueChanged={(params) => {
               const updatedList = [...mappingList];
-              updatedList[params.rowIndex] = {
-                ...params.data,
-                isUpdate:
-                  updatedList[params.rowIndex].isUpdate === "0" ? "0" : "1",
-              };
-              setMappingList(updatedList);
+              const rowIndex = params.rowIndex;
+
+              if (rowIndex >= 0 && rowIndex < updatedList.length) {
+                const row = updatedList[rowIndex];
+
+                // Update the specific field that was changed
+                if (params.colDef.field) {
+                  row[params.colDef.field] = params.newValue;
+                }
+
+                // If it's not a new row, mark it as modified
+                if (row.isUpdate !== "0") {
+                  row.isUpdate = "1";
+                }
+
+                setMappingList(updatedList);
+              }
             }}
           />
 
@@ -531,7 +587,7 @@ const onExportMappingExcel = async () => {
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
-              Excel
+              Excel Export
             </button>
             <button
               type="button"

@@ -2,10 +2,10 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import { SetFilterModule } from "ag-grid-enterprise";
-import { DateFilterModule } from "ag-grid-enterprise";
+// import "ag-grid-enterprise";
+// import { ModuleRegistry } from "ag-grid-community";
+// import { SetFilterModule } from "ag-grid-enterprise";
+// import { DateFilterModule } from "ag-grid-enterprise";
 import { Select } from "antd";
 import store from "store";
 import { toast } from "react-toastify";
@@ -13,7 +13,7 @@ import serverApi from "../../../serverAPI";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+// ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
 
 const { Option } = Select;
@@ -699,8 +699,8 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             paginationPageSize={10}
-            paginationPageSizeSelector={[10, 20, 50, 100]}
-            pagination={true}
+            paginationPageSizeSelector={[10, 25, 50, 100]}
+            pagination
             domLayout="autoHeight"
             singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
@@ -718,7 +718,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
-              Excel
+              Excel Export
             </button>
             <button
               type="submit"

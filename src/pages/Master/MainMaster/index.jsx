@@ -88,7 +88,7 @@ const Traceability = () => {
   };
 
   return (
-    <div className="container mt-1">
+    <div>
       <div className="card shadow" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"

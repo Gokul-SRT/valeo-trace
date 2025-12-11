@@ -2,11 +2,11 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import { SetFilterModule } from "ag-grid-enterprise";
-import { DateFilterModule } from "ag-grid-enterprise";
-import { ExcelExportModule } from "ag-grid-enterprise";
+// import "ag-grid-enterprise";
+// import { ModuleRegistry } from "ag-grid-community";
+// import { SetFilterModule } from "ag-grid-enterprise";
+// import { DateFilterModule } from "ag-grid-enterprise";
+// import { ExcelExportModule } from "ag-grid-enterprise";
 
 import { Input, Button, Form, message,Select } from "antd";
 import { backendService } from "../../../service/ToolServerApi";
@@ -20,11 +20,11 @@ import { saveAs } from "file-saver";
 import moment from "moment";
 import Loader from "../../../Utills/Loader"
 
-ModuleRegistry.registerModules([
-  SetFilterModule,
-  DateFilterModule,
-  ExcelExportModule,
-]);
+// ModuleRegistry.registerModules([
+//   SetFilterModule,
+//   DateFilterModule,
+//   ExcelExportModule,
+// ]);
 
 const { Option } = Select;
 // 🔹 Custom MultiSelect Cell Editor
@@ -573,8 +573,9 @@ setTimeout(() => {
             rowData={masterList}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            paginationPageSize={5}
-            pagination={true}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 25, 50, 100]}
+            pagination
             domLayout="autoHeight"
             singleClickEdit={true}
             onFirstDataRendered={autoSizeAllColumns}
@@ -617,7 +618,7 @@ setTimeout(() => {
               className="btn text-white me-2"
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
             >
-              Excel
+              Excel Export
             </button>
             <button
               type="submit"

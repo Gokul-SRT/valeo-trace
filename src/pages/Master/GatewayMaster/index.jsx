@@ -2,13 +2,13 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import {
-  SetFilterModule,
-  DateFilterModule,
-  ExcelExportModule,
-} from "ag-grid-enterprise";
+// import "ag-grid-enterprise";
+// import { ModuleRegistry } from "ag-grid-community";
+// import {
+//   SetFilterModule,
+//   DateFilterModule,
+//   ExcelExportModule,
+// } from "ag-grid-enterprise";
 import { Select, message } from "antd";
 import { toast } from "react-toastify";
 import ExcelJS from "exceljs";
@@ -19,11 +19,11 @@ import store from "store";
 import EquipMstdropdown from "../../../CommonDropdownServices/Service/EquipmentMstService"; 
 
 // Register AG Grid modules
-ModuleRegistry.registerModules([
-  SetFilterModule,
-  DateFilterModule,
-  ExcelExportModule,
-]);
+// ModuleRegistry.registerModules([
+//   SetFilterModule,
+//   DateFilterModule,
+//   ExcelExportModule,
+// ]);
 
 // 🔹 Custom MultiSelect Editor for Equipment IDs
 const MultiSelectEditor = forwardRef((props, ref) => {
@@ -63,7 +63,7 @@ const MultiSelectEditor = forwardRef((props, ref) => {
   );
 });
 
-const GatewayMaster = ({ modulesprop, screensprop }) => {
+const GatewayMaster = ({ modulesprop, screensprop,onCancel }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
@@ -188,24 +188,56 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
 
   // 🔹 Add new blank row
   const handleAddRow = () => {
-    const emptyRow = {
-      isUpdate: 0,
-      gatewayId: "",
-      gatewayLocation: "",
-      equipmentId: [],
-      equipmentDescriptions: [],
-    };
-
-    const hasEmpty = masterList.some((item) => !item.gatewayId);
-    if (hasEmpty) {
-      message.error("Please enter Gateway ID for all rows first.");
-      return;
-    }
-
-    const updated = [...masterList, emptyRow];
-    setMasterList(updated);
-    setOriginalList(updated);
+  const newRow = {
+    gatewayId: "",
+    gatewayLocation: "",
+    equipmentId: [],
+    equipmentDescriptions: [],
+    isUpdate: "0",
   };
+
+  // Prevent multiple empty rows
+  const emptyRowExists = masterList.some(
+    (item) => !item.gatewayId?.trim()
+  );
+
+  if (emptyRowExists) {
+    message.error("Please enter Gateway ID for all rows first.");
+    return;
+  }
+
+  const updated = [...masterList, newRow];
+  setMasterList(updated);
+  setOriginalList([...originalList]);
+
+  setTimeout(() => {
+    const api = gridRef.current?.api;
+    if (api) {
+      const totalPages = api.paginationGetTotalPages();
+      const lastRowIndex = updated.length - 1;
+
+      // Move to last page
+      api.paginationGoToPage(totalPages - 1);
+
+      setTimeout(() => {
+        // Ensure last row is visible
+        api.ensureIndexVisible(lastRowIndex, "bottom");
+
+        // Highlight (flash) last row
+        api.flashCells({
+          rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+        });
+
+        // Start editing first cell (gatewayId)
+        api.startEditingCell({
+          rowIndex: lastRowIndex,
+          colKey: "gatewayId",
+        });
+      }, 150);
+    }
+  }, 100);
+};
+
 
   // 🔹 Insert / Update API Integration
   const createOrUpdate = async () => {
@@ -246,6 +278,7 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
     setSelectedModule("");
     setSelectedScreen("");
     setOriginalList([]);
+    if(onCancel) onCancel();
   };
 
   // 🔹 Excel export
@@ -283,7 +316,7 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
   };
 
   return (
-    <div className="container mt-1 p-0">
+    <div>
       <div className="card shadow" style={{ borderRadius: "6px" }}>
         <div
           className="card-header text-white fw-bold d-flex justify-content-between align-items-center"
@@ -308,8 +341,9 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
                   rowData={masterList}
                   columnDefs={columnDefs}
                   defaultColDef={defaultColDef}
-                  pagination={true}
                   paginationPageSize={10}
+                  paginationPageSizeSelector={[10, 25, 50, 100]}
+                  pagination
                   domLayout="autoHeight"
                   singleClickEdit={true}
                   onCellValueChanged={(params) => {
@@ -326,7 +360,7 @@ const GatewayMaster = ({ modulesprop, screensprop }) => {
                     className="btn text-white me-2"
                     style={{ backgroundColor: "#00264d", minWidth: "90px" }}
                   >
-                    Excel
+                    Excel Export
                   </button>
                   <button
                     onClick={createOrUpdate}
