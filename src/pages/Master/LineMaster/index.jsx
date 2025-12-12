@@ -27,7 +27,8 @@ import Loader from "../../../Utills/Loader"
 // ]);
 
 const { Option } = Select;
-// 🔹 Custom MultiSelect Cell Editor
+//  Custom MultiSelect Cell Editor
+
 const MultiSelectEditor = forwardRef((props, ref) => {
   const [selectedValues, setSelectedValues] = useState([]);
 
@@ -35,24 +36,27 @@ const MultiSelectEditor = forwardRef((props, ref) => {
     if (props.data && props.colDef.field) {
       const initial = props.data[props.colDef.field];
       if (typeof initial === "string" && initial.length > 0) {
-        setSelectedValues(initial.split(",")); // string to array
+        setSelectedValues(initial.split(",").map(s => s.trim()));
       } else if (Array.isArray(initial)) {
-        setSelectedValues(initial); // already array
+        setSelectedValues(initial);
       } else {
-        setSelectedValues([]); // fallback empty
+        setSelectedValues([]);
       }
     }
   }, [props.data, props.colDef.field]);
 
   React.useImperativeHandle(ref, () => ({
     getValue() {
-      return selectedValues.join(","); // always string
+      const value = selectedValues.filter(v => v).join(","); // Remove empty values
+      return value || null; // Return null for empty instead of empty string
     },
+    isPopup() { return false; }
   }));
 
   const handleChange = (values) => {
-    setSelectedValues(values);
-    props.data[props.colDef.field] = values.join(","); // update row data as string
+    setSelectedValues(values || []);
+    // CRITICAL: Trigger ag-grid value change properly
+    props.onValueChange(values.filter(v => v).join(",") || null);
   };
 
   return (
@@ -62,13 +66,15 @@ const MultiSelectEditor = forwardRef((props, ref) => {
       style={{ width: "100%" }}
       onChange={handleChange}
       placeholder="Select Product Codes"
-      options={props.values.map((item) => ({
+      options={props.values?.map((item) => ({
         label: item.value,
         value: item.key,
-      }))}
+      })) || []}
     />
   );
 });
+
+
 
 const LineMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -183,35 +189,33 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
+
+  const RequiredHeader = (props) => {
+    return (
+      <span>
+        <span style={{ color: "red" }}>*</span> {props.displayName}
+      </span>
+    );
+  };
+
+
+
   const columnDefs = [
     {
       headerName: "Line Code",
       field: "lineMstCode",
       filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Line Description",
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
     },
-    /* {
-      headerName: "Product Code",
-      field: "productCode",
-      filter: "agTextColumnFilter",
-      editable: true, 
-      cellEditor: "agSelectCellEditor", 
-      cellEditorParams: {
-      values: productData.map(item => item.key), // Ag-Grid typically expects an array of keys for 'values'
-    },
-    valueFormatter: (params) => {
-      // Find the corresponding display value (item.value) based on the stored key (params.value)
-      const option = productData.find(item => item.key === params.value);
-      return option ? option.value : params.value; // Display the value or the original code if not found
-    },
-    },*/
-
-    {
+  
+   /* {
       headerName: "Product Code",
       field: "productCode",
       filter: "agTextColumnFilter",
@@ -232,6 +236,41 @@ const LineMaster = ({ modulesprop, screensprop }) => {
           .join(", ");
       },
     },
+*/
+
+
+{
+  headerName: "Product Code",
+  field: "productCode",
+  filter: "agTextColumnFilter",
+  editable: true,
+  headerComponent: RequiredHeader,
+  cellEditor: MultiSelectEditor,
+  cellEditorParams: { values: productData },
+  valueSetter: (params) => {
+    // ✅ Handle both string and array inputs
+    const value = params.newValue;
+    if (value === null || value === undefined || value === "") {
+      params.data.productCode = null;
+    } else if (typeof value === "string") {
+      params.data.productCode = value;
+    }
+    return true;
+  },
+  valueFormatter: (params) => {
+    if (!params.value) return "";
+    const keys = typeof params.value === "string" ? params.value.split(",").map(k => k.trim()) : params.value;
+    return keys
+      .filter(k => k)
+      .map((k) => {
+        const option = productData.find((item) => item.key === k);
+        return option ? option.value : k;
+      })
+      .join(", ");
+  },
+},
+
+
     {
       headerName: "Status",
       field: "isActive",
@@ -335,7 +374,26 @@ setTimeout(() => {
     toast.error("Please fill Line Code for all rows!");
     return;
   }
+//  Validate: Line Description mandatory
+const missingLineDesc = masterList.some(
+  (item) => !item.lineMstDesc || item.lineMstDesc.trim() === ""
+);
+if (missingLineDesc) {
+  toast.error("Line Description is required for all rows!");
+  return;
+}
 
+//  Validate: Product Code mandatory (multi-select)
+const missingProduct = masterList.some(
+  (item) =>
+    !item.productCode ||
+    item.productCode === "" ||
+    (Array.isArray(item.productCode) && item.productCode.length === 0)
+);
+if (missingProduct) {
+  toast.error("Product Code is required for all rows!");
+  return;
+}
 
    // Check DUPLICATE line codes
    const lineCodes = masterList.map((item) => item.lineMstCode.trim());
