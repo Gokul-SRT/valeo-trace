@@ -428,7 +428,7 @@ if (missingProduct) {
 
 
       if (response && response.data === "SUCCESS") {
-        toast.success("Data saved successfully!");
+        toast.success("Add/Update successfully!");
         fetchData();
 
       } else if (response.data && response.data === "DUBLICATE") {

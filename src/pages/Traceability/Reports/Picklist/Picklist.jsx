@@ -38,6 +38,8 @@ const [finalSubmitAndPartialSubmitDatas,setFinalSubmitAndPartialSubmitDatas] = u
 
 const [plksCode,setPlksCode]=useState("")
 
+const [selectedLine, setSelectedLine] = useState(null);
+
 
   // const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   // const branchCode = JSON.parse(localStorage.getItem("branchCode"));
@@ -51,13 +53,44 @@ const [plksCode,setPlksCode]=useState("")
 
   useEffect(() => {
     setShowLineFeeder(false);
-    fetchProductDetails();
+    //fetchProductDetails();
     fetchLineDetails();
     fetchStatusDetails();
     fetchDefaultCompletedTable();
     setScanValue(""); // reset input
   }, []);
 
+ // Handle line change
+ const handleLineChange = (value) => {
+  setSelectedLine(value);
+};
+useEffect(() => {
+  fetchProductDetails();
+}, [selectedLine]);
+  
+  const fetchProductDetails = async () => {
+    try {
+      const response = await serverApi.post("getProductByLine", {
+        tenantId,
+        branchCode,
+        lineCode:selectedLine,
+       // isActive: "1",
+      });
+  
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        setProductList(res.responseData);
+      } else {
+        setProductList([]);
+      }
+    } catch (error) {
+     
+      toast.error("Error fetching productCode. Please try again later.");
+    }
+  };
+
+
+  /*
   const fetchProductDetails = async () => {
     try {
       const response = await serverApi.post("getProductDropdown", {
@@ -77,7 +110,7 @@ const [plksCode,setPlksCode]=useState("")
       toast.error("Error fetching productCode. Please try again later.");
     }
   };
-
+*/
 
   const fetchLineDetails = async () => {
     try {
@@ -826,28 +859,8 @@ const inputRef = useRef(null);
         }}
       >
           <Row gutter={16}>
-            <Col span={6}>
-            <Form.Item label="Product" name="product" rules={[{ required: true }]}>
-                <Select placeholder="Select a Product">
-                {productList.map((productLis) => (
-                <Option key={productLis.productCode} value={productLis.productCode}>
-                  {productLis.productCode+"-"+productLis.productDesc}
-                </Option>
-              ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-            <Form.Item label="Line" name="line" rules={[{ required: true }]}>
-                <Select placeholder="Select a line">
-                 {lineList.map((linelis)=>(
-                  <Option key={linelis.lineMstCode} value={linelis.lineMstCode || linelis.lineMstDesc} >
-                    {linelis.lineMstDesc}
-                  </Option>
-                 ))}
-                </Select>
-              </Form.Item>
-            </Col>
+           
+           
             <Col span={6}>
             <Form.Item label="Date" name="date" rules={[{ required: true }]}>
               <DatePicker
@@ -858,6 +871,30 @@ const inputRef = useRef(null);
 
               </Form.Item>
             </Col>
+            <Col span={6}>
+            <Form.Item label="Line" name="line" rules={[{ required: true }]}>
+                <Select placeholder="Select a line"   onChange={handleLineChange}>
+                 {lineList.map((linelis)=>(
+                  <Option key={linelis.lineMstCode} value={linelis.lineMstCode || linelis.lineMstDesc} >
+                    {linelis.lineMstDesc}
+                  </Option>
+                 ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+            <Form.Item label="Product" name="product" rules={[{ required: true }]}>
+                <Select placeholder="Select a Product" disabled={!selectedLine || productList.length === 0}>
+                {productList.map((productLis) => (
+                <Option key={productLis.productCode} value={productLis.productCode}>
+                  {/* {productLis.productCode+"-"+productLis.productDesc} */}
+                  {productLis.prodDesc}
+                </Option>
+              ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
             <Col span={6}>
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
                 <Select placeholder="Select a Status">

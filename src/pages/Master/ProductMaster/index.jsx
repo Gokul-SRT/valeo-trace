@@ -320,17 +320,27 @@ const GroupCodeDropdownEditor = (props) => {
     setEditingRow(null);
   };
 
+  const RequiredHeader = (props) => {
+    return (
+      <span>
+        <span style={{ color: "red" }}>*</span> {props.displayName}
+      </span>
+    );
+  };
+
   const columnDefs = [
     {
       headerName: "Product Code",
       field: "productCode",
       filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
       editable: (params) => params.data.isUpdate === 0,
     },
     {
       headerName: "Product Description",
       field: "productDesc",
       filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
     },
     // {
     //   headerName: "UOM",
@@ -341,6 +351,7 @@ const GroupCodeDropdownEditor = (props) => {
       headerName: "Group Code",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
+      headerComponent: RequiredHeader,
       cellEditor: GroupCodeDropdownEditor,
       cellRenderer: GroupCodeCellRenderer,
     },
@@ -349,6 +360,7 @@ const GroupCodeDropdownEditor = (props) => {
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
+      headerComponent: RequiredHeader,
       cellRenderer: OperationIdCellRenderer,
       cellStyle: { cursor: "pointer" },
     },
@@ -514,6 +526,32 @@ const hasChanges = () => {
       }
 
 
+      const invalidGroupCode = masterList.filter(
+        (item) =>
+          item.isUpdate === 0 && (!item.groupCode || item.groupCode.trim() === "")
+      );
+
+      if (invalidGroupCode.length > 0) {
+        toast.error(
+          "Please fill GroupCode for all new rows."
+        );
+        return;
+      }
+
+      const invalidOperation = masterList.filter(
+        (item) =>
+          item.isUpdate === 0 && (!item.operationDescription || item.operationDescription.trim() === "")
+      );
+
+      if (invalidOperation.length > 0) {
+        toast.error(
+          "Please fill Operations for all new rows."
+        );
+        return;
+      }
+
+
+
       const productCodes=masterList.map((item)=> item.productCode.trim());
       const duplicateCodes=productCodes.filter((code,index)=> productCodes.indexOf(code) !== index);
 
@@ -581,7 +619,7 @@ const hasChanges = () => {
       });
 
       if (response === "SUCCESS") {
-        toast.success("Data saved successfully!");
+        toast.success("Add/Update successfully!");
 
         // Refresh data after successful save
         fetchData();
