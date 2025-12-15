@@ -90,25 +90,34 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
     );
   };
 
+  const RequiredHeaderRight = (props) => {
+    return (
+      <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", textAlign: "right" }}>
+        {/* <span style={{ color: "red" }}>*</span> */}
+        <span>{props.displayName}</span>
+      </div>
+    );
+  };
+
   const columnDefs = [
     {
       headerName: "Type Code",
       field: "typeCode",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader, // Add required indicator
+   //   headerComponent: RequiredHeader, // Add required indicator
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Type Description",
       field: "typeDescription",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader, // Add required indicator
+    //  headerComponent: RequiredHeader, // Add required indicator
     },
     {
       headerName: "Bin Quantity",
       field: "stantardQuantity",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader,
+      headerComponent: RequiredHeaderRight,
       cellStyle: { textAlign: "right" },
       valueFormatter: (params) => {
         return params.value ? Number(params.value).toLocaleString() : "";
@@ -248,7 +257,10 @@ if (invalidTypeDesc) {
         }
 
         const qtyNumber = Number(qty);
-
+        if ((!qtyNumber) || !/^\d+$/.test(qtyNumber)) {
+          toast.error("Please enter only Valid Numbers.");
+          return;
+        }
         // 2️⃣ Not a number or negative
         if (isNaN(qtyNumber) || qtyNumber < 0) {
           toast.error("Please enter only positive values");
@@ -260,6 +272,7 @@ if (invalidTypeDesc) {
           toast.error("Bin Quantity must be greater than 0!");
           return;
         }
+      
       }
 
       // Check DUPLICATE Type codes
@@ -293,7 +306,7 @@ if (invalidTypeDesc) {
       );
 
       if (response.data && response.data === "SUCCESS") {
-        toast.success("Data saved successfully!");
+        toast.success("Add/Update successfully!");
         fetchData();
       } else if (response.data && response.data === "DUBLICATE") {
         toast.error("Do Not Allow Duplicate Type Code!");
