@@ -49,6 +49,7 @@ const PreventiveMaintenanceCheckList = () => {
   const [productDataAdd, setProductDataAdd] = useState([]);
   const [toolDataAdd, setToolDataAdd] = useState([]);
   const [isEditable, setIsEditable] = useState(true);
+  const [addChecklistLoading, setAddChecklistLoading] = useState(false);
 
   // Common
   const [lineData, setLineData] = useState([]);
@@ -91,7 +92,8 @@ const PreventiveMaintenanceCheckList = () => {
       dataIndex: "characteristicName",
       key: "characteristicName",
     },
-    { title: "SPEC/UNIT", dataIndex: "specUnit", key: "specUnit" },
+    { title: "SPEC", dataIndex: "spec", key: "spec" },
+    { title: "UNIT", dataIndex: "unit", key: "unit" },
     {
       title: "Measurement Tools",
       dataIndex: "measurementType",
@@ -184,8 +186,8 @@ const PreventiveMaintenanceCheckList = () => {
         requestPath: "searchPMChecklist",
         requestData: {
           lineCode: values.lineId,
-          modelId: product,
-          customerId: customer,
+          modelId: values.productId || product,
+          customerId: values.toolId === "getAll" ? "getAll" : customer,
           toolNo: values.toolId,
           year: values.year.format("YYYY"),
           tenantId,
@@ -253,18 +255,40 @@ const PreventiveMaintenanceCheckList = () => {
           });
 
           // Map checklist data
-          const checklist = data.map((item, index) => ({
-            key: index + 1,
-            SNo: index + 1,
-            characteristicId: item.characteristicId,
-            characteristicName: item.characteristicName,
-            toolPmLogId: item.toolPmLogId,
-            specUnit: item.specUnit,
-            measurementType: item.measurementType,
-            observed: item.observedReadings,
-            okNotOk: item.okNok,
-            remarks: item.remarks,
-          }));
+          const checklist = data.map((item, index) => {
+            // Split specUnit into spec and unit if it contains both
+            let spec = item.specUnit || "";
+            let unit = "";
+            
+            if (item.specUnit && item.unit) {
+              spec = item.specUnit;
+              unit = item.unit;
+            } else if (item.specUnit) {
+              // If only specUnit exists, try to extract unit from it
+              const specUnitStr = item.specUnit.toString();
+              const unitMatch = specUnitStr.match(/([a-zA-Z]+)$/);
+              if (unitMatch) {
+                unit = unitMatch[1];
+                spec = specUnitStr.replace(unitMatch[1], '').trim();
+              } else {
+                spec = specUnitStr;
+              }
+            }
+            
+            return {
+              key: index + 1,
+              SNo: index + 1,
+              characteristicId: item.characteristicId,
+              characteristicName: item.characteristicName,
+              toolPmLogId: item.toolPmLogId,
+              spec: spec,
+              unit: unit,
+              measurementType: item.measurementType,
+              observed: item.observedReadings,
+              okNotOk: item.okNok,
+              remarks: item.remarks,
+            };
+          });
 
           setAddChecklistData(checklist);
 
@@ -308,6 +332,9 @@ const PreventiveMaintenanceCheckList = () => {
   };
 
   const productDropDownDataAdd = async (toolNo) => {
+    setAddChecklistLoading(true);
+    // Small delay to make loader visible
+    await new Promise(resolve => setTimeout(resolve, 500));
     try {
       const toolResp = await commonBackendService({
         requestPath: "getToolOperationAndQty",
@@ -344,17 +371,36 @@ const PreventiveMaintenanceCheckList = () => {
           });
 
           if (charResp?.responseCode === "200") {
-            const checklist = charResp.responseData.map((item, index) => ({
-              key: index + 1,
-              SNo: index + 1,
-              characteristicId: item.characteristicId,
-              characteristicName: item.characteristicName || "",
-              specUnit: item.specUnit || "",
-              measurementType: item.measurementType || "",
-              observed: "",
-              checked: false,
-              remarks: "",
-            }));
+            const checklist = charResp.responseData.map((item, index) => {
+              // Split specUnit into spec and unit if it contains both
+              let spec = item.specUnit || "";
+              let unit = item.unit || "";
+              
+              if (item.specUnit && !item.unit) {
+                // If only specUnit exists, try to extract unit from it
+                const specUnitStr = item.specUnit.toString();
+                const unitMatch = specUnitStr.match(/([a-zA-Z]+)$/);
+                if (unitMatch) {
+                  unit = unitMatch[1];
+                  spec = specUnitStr.replace(unitMatch[1], '').trim();
+                } else {
+                  spec = specUnitStr;
+                }
+              }
+              
+              return {
+                key: index + 1,
+                SNo: index + 1,
+                characteristicId: item.characteristicId,
+                characteristicName: item.characteristicName || "",
+                spec: spec,
+                unit: unit,
+                measurementType: item.measurementType || "",
+                observed: "",
+                checked: false,
+                remarks: "",
+              };
+            });
 
             setAddChecklistData(checklist);
           } else {
@@ -378,6 +424,8 @@ const PreventiveMaintenanceCheckList = () => {
       setPreventiveQty(0);
       addForm.setFieldsValue({ operation: "", pmQty: "", preventiveQty: 0 });
       setAddChecklistData([]);
+    } finally {
+      setAddChecklistLoading(false);
     }
   };
 
@@ -407,15 +455,52 @@ const PreventiveMaintenanceCheckList = () => {
         });
       } else {
         setCustomer("");
+        form.setFieldsValue({
+          customerSearch: "",
+        });
+        toast.error("There is no Customer for this corresponding Product");
       }
     } catch (error) {
       console.error("Error fetching customer by product", error);
       setCustomer("");
+      form.setFieldsValue({
+        customerSearch: "",
+      });
+      toast.error("There is no Customer for this corresponding Product");
     }
   };
 
   const handleSubmitAddChecklist = async () => {
     if (!isEditable) return;
+    
+    // Get form values for validation
+    const formValues = addForm.getFieldsValue();
+    
+    // Validate required fields
+    const fieldsToValidate = [
+      { field: 'lineId', value: formValues.lineId, message: 'Please fill Line' },
+      { field: 'toolId', value: formValues.toolId, message: 'Please fill Tool Desc' },
+      { field: 'productId', value: formValues.productId, message: 'Please fill Product' }
+    ];
+    
+    let hasErrors = false;
+    const errors = {};
+    
+    fieldsToValidate.forEach(({ field, value, message }) => {
+      if (!value || value === 'getAll') {
+        errors[field] = [message];
+        hasErrors = true;
+      }
+    });
+    
+    if (hasErrors) {
+      addForm.setFields(Object.keys(errors).map(field => ({
+        name: field,
+        errors: errors[field]
+      })));
+      return;
+    }
+    
     try {
       const payload = {
         lineCode: selectedLineAdd,
@@ -441,12 +526,16 @@ const PreventiveMaintenanceCheckList = () => {
       });
 
       if (response?.responseCode === "200") {
+        toast.success("Add/insert successfully");
         setShowAddChecklist(false);
         setAddChecklistData([]);
         addForm.resetFields();
+      } else {
+        toast.error("Failed to insert data");
       }
     } catch (error) {
       console.error("Insert PM Checklist Error:", error);
+      toast.error("Failed to insert data");
     }
   };
   const handleSubmitViewChecklist = async () => {
@@ -623,7 +712,11 @@ const PreventiveMaintenanceCheckList = () => {
         <Form form={form} layout="vertical" onFinish={handleSubmitSearch}>
           <Row gutter={16}>
             <Col span={4}>
-              <Form.Item label="Line" name="lineId">
+              <Form.Item 
+                label="Line" 
+                name="lineId"
+                rules={[{ required: true, message: "Please select Line" }]}
+              >
                 <Select
                   value={selectedLineSearch}
                   onChange={(value) => setSelectedLineSearch(value)}
@@ -639,7 +732,11 @@ const PreventiveMaintenanceCheckList = () => {
             </Col>
 
             <Col span={4}>
-              <Form.Item label="Tool Desc" name="toolId">
+              <Form.Item 
+                label="Tool Desc" 
+                name="toolId"
+                rules={[{ required: true, message: "Please select Tool Desc" }]}
+              >
                 <Select
                   placeholder="Select Tool"
                   onChange={(value) => {
@@ -647,6 +744,11 @@ const PreventiveMaintenanceCheckList = () => {
                     if (value === "getAll") {
                       form.setFieldsValue({ productId: "getAll" });
                       setProduct("getAll");
+                      setCustomer("getAll");
+                    } else {
+                      form.setFieldsValue({ productId: undefined });
+                      setProduct("");
+                      setCustomer("");
                     }
                     productDropDownDataSearch(value);
                   }}
@@ -662,8 +764,13 @@ const PreventiveMaintenanceCheckList = () => {
             </Col>
 
             <Col span={4}>
-              <Form.Item label="Product" name="productId">
+              <Form.Item 
+                label="Product" 
+                name="productId"
+                rules={[{ required: true, message: "Please select Product" }]}
+              >
                 <Select
+                  placeholder="Select Product"
                   disabled={!selectedToolSearch}
                   onChange={(value) => {
                     addForm.setFieldsValue({ productId: value });
@@ -671,7 +778,7 @@ const PreventiveMaintenanceCheckList = () => {
                     fetchCustomerByProduct(value); // Call the new function
                   }}
                 >
-                  <Option value="getAll">Get All</Option>
+                  {selectedToolSearch === "getAll" && <Option value="getAll">Get All</Option>}
                   {productDataSearch.map((prod) => (
                     <Option key={prod.productCode} value={prod.productCode}>
                       {prod.productDescription}
@@ -683,7 +790,11 @@ const PreventiveMaintenanceCheckList = () => {
 
             <Col span={6}>
               <Form.Item label="Customer" name="customerSearch">
-                <Input readOnly disabled={selectedToolSearch === "getAll"} />
+                <Input 
+                  readOnly 
+                  disabled 
+                  style={{ backgroundColor: 'white', color: 'black' }}
+                />
               </Form.Item>
             </Col>
 
@@ -778,16 +889,20 @@ const PreventiveMaintenanceCheckList = () => {
           <Form form={addForm} layout="vertical">
             <Row gutter={16}>
               <Col span={4}>
-                <Form.Item label="Line" name="lineId">
+                <Form.Item 
+                  label={<span>Line <span style={{ color: 'red' }}>*</span></span>}
+                  name="lineId"
+                >
                   <Select
                     value={selectedLineAdd}
                     disabled={!isEditable}
                     onChange={(value) => {
                       setSelectedLineAdd(value);
+                      addForm.setFieldsValue({ lineId: value });
+                      addForm.setFields([{ name: 'lineId', errors: [] }]);
                       toolDropDownDataAdd(value);
                     }}
                   >
-                    <Option value="getAll">Get All</Option>
                     {lineData.map((line) => (
                       <Option key={line.key} value={line.key}>
                         {line.value}
@@ -798,12 +913,17 @@ const PreventiveMaintenanceCheckList = () => {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Tool Desc" name="toolId">
+                <Form.Item 
+                  label={<span>Tool Desc <span style={{ color: 'red' }}>*</span></span>}
+                  name="toolId"
+                >
                   <Select
                     placeholder="Select Tool"
                     disabled={!isEditable}
                     onChange={(value) => {
                       setSelectedToolAdd(value);
+                      addForm.setFieldsValue({ toolId: value });
+                      addForm.setFields([{ name: 'toolId', errors: [] }]);
                       productDropDownDataAdd(value);
                       productDropDownDataSearch(value);
                     }}
@@ -823,11 +943,16 @@ const PreventiveMaintenanceCheckList = () => {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Product" name="productId">
+                <Form.Item 
+                  label={<span>Product <span style={{ color: 'red' }}>*</span></span>}
+                  name="productId"
+                >
                   <Select
+                    placeholder="Select Product"
                     disabled={!selectedToolAdd}
                     onChange={(value) => {
                       addForm.setFieldsValue({ productId: value });
+                      addForm.setFields([{ name: 'productId', errors: [] }]);
                       setProduct(value);
                       fetchCustomerByProduct(value); // Call the new function
                     }}
@@ -860,13 +985,44 @@ const PreventiveMaintenanceCheckList = () => {
               </Col>
             </Row>
 
-            <Table
-              dataSource={addChecklistData}
-              columns={addChecklistColumns}
-              pagination={{ pageSize: 10 }}
-              bordered
-              style={{ marginTop: 10 }}
-            />
+            <div style={{ position: "relative" }}>
+              {addChecklistLoading && (
+                <div
+                  className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.6)",
+                    zIndex: 2,
+                    borderRadius: "8px",
+                  }}
+                >
+                  <Loader />
+                </div>
+              )}
+              {addChecklistData.length === 0 && !addChecklistLoading ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "60px 0",
+                    fontSize: "16px",
+                    color: "#999",
+                    border: "1px solid #d9d9d9",
+                    borderRadius: "6px",
+                    marginTop: 10,
+                    backgroundColor: "#fafafa"
+                  }}
+                >
+                  No data found
+                </div>
+              ) : (
+                <Table
+                  dataSource={addChecklistData}
+                  columns={addChecklistColumns}
+                  pagination={{ pageSize: 10 }}
+                  bordered
+                  style={{ marginTop: 10 }}
+                />
+              )}
+            </div>
           </Form>
 
           <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -942,13 +1098,30 @@ const PreventiveMaintenanceCheckList = () => {
               </Col>
             </Row>
 
-            <Table
-              dataSource={addChecklistData}
-              columns={addChecklistColumns}
-              pagination={{ pageSize: 10 }}
-              bordered
-              style={{ marginTop: 10 }}
-            />
+            {addChecklistData.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "60px 0",
+                  fontSize: "16px",
+                  color: "#999",
+                  border: "1px solid #d9d9d9",
+                  borderRadius: "6px",
+                  marginTop: 10,
+                  backgroundColor: "#fafafa"
+                }}
+              >
+                No data found
+              </div>
+            ) : (
+              <Table
+                dataSource={addChecklistData}
+                columns={addChecklistColumns}
+                pagination={{ pageSize: 10 }}
+                bordered
+                style={{ marginTop: 10 }}
+              />
+            )}
           </Form>
 
           <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -974,7 +1147,10 @@ const PreventiveMaintenanceCheckList = () => {
             )}
 
             <Button
-              onClick={() => setShowViewChecklist(false)}
+              onClick={() => {
+                setShowViewChecklist(false);
+                setShowDetails(true);
+              }}
               type="primary"
               style={{
                 marginLeft: 10,

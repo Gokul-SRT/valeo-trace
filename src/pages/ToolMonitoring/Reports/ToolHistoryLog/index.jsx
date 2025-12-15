@@ -6,7 +6,6 @@ import { saveAs } from "file-saver";
 import { AgGridReact } from "ag-grid-react";
 import { backendService } from "../../../../service/ToolServerApi";
 import store from "store";
-import "ag-grid-enterprise";
 import { toast } from "react-toastify";
 import moment from "moment";
 

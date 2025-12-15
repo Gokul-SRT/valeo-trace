@@ -2,13 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import {
-  SetFilterModule,
-  DateFilterModule,
-  ExcelExportModule,
-} from "ag-grid-enterprise";
 import { toast } from "react-toastify";
 import Loader from "../../../.././Utills/Loader";
 import axios from "axios";
@@ -19,12 +12,6 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 
-ModuleRegistry.registerModules([
-  SetFilterModule,
-  DateFilterModule,
-  ExcelExportModule,
-]);
-
 const USED_IDS_STORAGE_KEY = "criticalSpare_usedIds_v1";
 
 const CriticalSpareMaster = () => {
@@ -33,7 +20,7 @@ const CriticalSpareMaster = () => {
 
   const [selectedLine, setSelectedLine] = useState("");
   const [selectedTool, setSelectedTool] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("getAll");
   const [lineOptions, setLineOptions] = useState([]);
   const [toolOptions, setToolOptions] = useState([]);
   const [sparePartMstId, setSparePartMstId] = useState("");
@@ -114,7 +101,7 @@ const CriticalSpareMaster = () => {
 
   // Fetch critical spare details based on line, tool, and status
   const fetchCriticalSpareDetails = async (line, toolNo, status) => {
-    if (!line || !toolNo || status === "") {
+    if (!line || !toolNo || !status) {
       return;
     }
 
@@ -173,6 +160,7 @@ const CriticalSpareMaster = () => {
       } else {
         setMasterList([]);
         setSparePartMstId("");
+        toast.info("No data available");
       }
     } catch (err) {
       console.error("fetchCriticalSpareDetails error", err);
@@ -185,7 +173,7 @@ const CriticalSpareMaster = () => {
 
   // Effect to fetch data whenever line, tool, or status changes
   useEffect(() => {
-    if (selectedLine && selectedTool && selectedStatus !== "") {
+    if (selectedLine && selectedTool && selectedStatus) {
       fetchCriticalSpareDetails(selectedLine, selectedTool, selectedStatus);
     } else {
       setMasterList([]);
@@ -272,23 +260,22 @@ const CriticalSpareMaster = () => {
       headerName: "S.No",
       field: "id",
       editable: false,
-      cellStyle: { textAlign: "center" },
+      filter: true,
+      cellStyle: { textAlign: "left" },
       valueGetter: (params) => params.node.rowIndex + 1,
     },
     {
-      headerName: "Spare Description",
+      headerName: "Spare Description *",
       field: "criticalSpareName",
       editable: true,
-      headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Spare Description" }
+      filter: true,
     },
     {
-      headerName: "Spare Min. Qty.",
+      headerName: "Spare Min. Qty(Nos.) *",
       field: "minimumThresholdQuantity",
       editable: true,
+      filter: true,
       cellEditor: "agTextCellEditor",
-      headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Spare Min. Qty." },
       valueParser: (params) => {
         let v = params.newValue;
         v = v === null || v === undefined ? "" : String(v).trim();
@@ -296,12 +283,11 @@ const CriticalSpareMaster = () => {
         if (/^\d+$/.test(v)) return v;
         return params.oldValue;
       },
-      cellStyle: { textAlign: "center" },
+      cellStyle: { textAlign: "left" },
     },
     {
       headerName: "Status",
       field: "status",
-      filter: true,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
@@ -352,7 +338,7 @@ const CriticalSpareMaster = () => {
 
   // Add new row
   const handleAddRow = () => {
-    if (!selectedLine || !selectedTool || selectedStatus === "") {
+    if (!selectedLine || !selectedTool || !selectedStatus) {
       toast.error("Please fill all mandatory fields");
       return;
     }
@@ -371,7 +357,7 @@ const CriticalSpareMaster = () => {
 
     setMasterList((prev) => {
       const updated = [...prev, newRow];
-      // After state update, go to last page and scroll to last row
+      // After state update, go to last page, scroll to last row, and start editing
       setTimeout(() => {
         const api = gridRef.current?.api;
         if (api) {
@@ -380,6 +366,14 @@ const CriticalSpareMaster = () => {
           const lastPage = Math.floor((totalRows - 1) / pageSize);
           api.paginationGoToPage(lastPage);
           api.ensureIndexVisible(totalRows - 1, "bottom");
+          
+          // Start editing the Spare Description cell of the new row
+          setTimeout(() => {
+            api.startEditingCell({
+              rowIndex: totalRows - 1,
+              colKey: "criticalSpareName"
+            });
+          }, 200);
         }
       }, 100);
       return updated;
@@ -431,9 +425,48 @@ const CriticalSpareMaster = () => {
 
   // Prepare and send payload for insert/update
   const handleUpdate = async () => {
+    // Check mandatory fields first
+    if (!selectedLine || !selectedTool || !selectedStatus) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
+
+    // Check if there's any data in the grid
+    if (masterList.length === 0) {
+      toast.error("No data available");
+      return;
+    }
+
     // Stop any active editing to capture current cell values
     if (gridRef.current?.api) {
       gridRef.current.api.stopEditing();
+    }
+
+    // Validate mandatory fields in grid data
+    const emptySpareNames = masterList.filter(row => !row.criticalSpareName || row.criticalSpareName.trim() === "");
+    const emptyMinQty = masterList.filter(row => !row.minimumThresholdQuantity || row.minimumThresholdQuantity.trim() === "");
+    const zeroMinQty = masterList.filter(row => {
+      const qty = row.minimumThresholdQuantity ? row.minimumThresholdQuantity.trim() : "";
+      return qty !== "" && Number(qty) <= 0;
+    });
+    
+    if (emptySpareNames.length > 0 || emptyMinQty.length > 0) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
+    
+    if (zeroMinQty.length > 0) {
+      toast.error("Spare Min. Qty. must be greater than 0");
+      return;
+    }
+
+    // Check for duplicate Spare Description values
+    const spareNames = masterList.map(row => row.criticalSpareName.trim().toLowerCase());
+    const duplicateNames = spareNames.filter((name, index) => spareNames.indexOf(name) !== index);
+    
+    if (duplicateNames.length > 0) {
+      toast.error("Duplicate Spare Description values are not allowed");
+      return;
     }
 
     const isUpdateMaster = sparePartMstId ? "1" : "0";
@@ -443,7 +476,7 @@ const CriticalSpareMaster = () => {
     const rowsToUpdate = masterList.filter(row => row.changed === true);
 
     if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
-      toast.info("No data available");
+      toast.info("No data added/updated");
       return;
     }
 
@@ -452,7 +485,7 @@ const CriticalSpareMaster = () => {
     );
 
     if (rowsToSend.length === 0) {
-      toast.info("No data available");
+      toast.info("No data added/updated");
       return;
     }
 
@@ -499,6 +532,11 @@ const CriticalSpareMaster = () => {
   };
 
   const onExportExcel = async () => {
+    if (masterList.length === 0) {
+      toast.error("No data available");
+      return;
+    }
+    
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Critical Spare Master");
@@ -529,7 +567,9 @@ const CriticalSpareMaster = () => {
 
       worksheet.mergeCells("C1:D2");
       const dateCell = worksheet.getCell("C1");
-      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
+      const selectedLineName = lineOptions.find(line => line.lineMstCode === selectedLine)?.lineMstDesc || selectedLine;
+      const selectedToolName = toolOptions.find(tool => tool.value === selectedTool)?.label || selectedTool;
+      dateCell.value = `Line: ${selectedLineName}\nTool: ${selectedToolName}`;
       dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
       dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
@@ -544,7 +584,7 @@ const CriticalSpareMaster = () => {
         editAs: "oneCell",
       });
 
-      const headers = ["S.No", "Spare Description", "Spare Min. Qty.", "Status"];
+      const headers = ["S.No", "Spare Description", "Spare Min. Qty(Nos.)", "Status"];
       const headerRow = worksheet.addRow(headers);
       headerRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
@@ -589,7 +629,7 @@ const CriticalSpareMaster = () => {
   const handleCancel = () => {
     setSelectedLine("");
     setSelectedTool("");
-    setSelectedStatus("");
+    setSelectedStatus("getAll");
     setSparePartMstId("");
     setMasterList([]);
     setToolOptions([]);
@@ -709,7 +749,7 @@ const CriticalSpareMaster = () => {
                   className="btn text-white me-2"
                   onClick={onExportExcel}
                   style={{ backgroundColor: "#00264d" }}
-                  disabled={isLoading}
+                  disabled={isLoading || masterList.length === 0}
                 >
                   Excel Export
                 </button>

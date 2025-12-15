@@ -3,15 +3,14 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Select, Modal } from "antd";
-import "ag-grid-enterprise";
+// import "ag-grid-enterprise";
 import store from "store";
 import { toast } from "react-toastify";
 import { backendService, commonBackendService } from "../../../../service/ToolServerApi";
 // import commonApi from "../../../../CommonserverApi";
 import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 import OperationMasterDropdown from "../../../../CommonDropdownServices/Service/OperationMasterService";
-import { Select as AntdSelect } from "antd";
-import ReactDOM from "react-dom/client";
+
 import Loader from "../../../.././Utills/Loader";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -203,19 +202,19 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         gridRef.current.api.stopEditing();
       }
 
-      // Validation checks
+      // Validation checks for all mandatory fields
       const ToolNoEmpty = masterList.filter((item) => !item.toolNo || item.toolNo.trim() === "");
+      const ToolDescEmpty = masterList.filter((item) => !item.toolDesc || item.toolDesc.trim() === "");
+      const MaxShotsEmpty = masterList.filter((item) => !item.maxShots || item.maxShots.toString().trim() === "");
       const LineEmpty = masterList.filter((item) => !item.line || item.line.trim() === "");
+      const OperationEmpty = masterList.filter((item) => !item.operation || item.operation.trim() === "");
+      const ProductCodeEmpty = masterList.filter((item) => !item.modelId || (Array.isArray(item.modelId) ? item.modelId.length === 0 : item.modelId.toString().trim() === ""));
       const InvalidToolNo = masterList.filter((item) => item.toolNo && item.toolNo.length > 20);
-      const InvalidMaxShots = masterList.filter((item) => item.maxShots && (isNaN(item.maxShots) || item.maxShots < 0 || item.maxShots.toString().length > 10000000));
+      const InvalidMaxShots = masterList.filter((item) => item.maxShots && item.maxShots.toString().trim() !== "" && (isNaN(item.maxShots) || parseInt(item.maxShots) < 0 || item.maxShots.toString().length > 8));
       
-      if (ToolNoEmpty && ToolNoEmpty?.length > 0) {
-        toast.error("Please fill all mandatory fields");
-        return;
-      }
-      
-      if (LineEmpty && LineEmpty?.length > 0) {
-        toast.error("Please fill all mandatory fields");
+      // Check for any mandatory field missing
+      if (ToolNoEmpty?.length > 0 || ToolDescEmpty?.length > 0 || MaxShotsEmpty?.length > 0 || LineEmpty?.length > 0 || OperationEmpty?.length > 0 || ProductCodeEmpty?.length > 0) {
+        toast.error("Please fill all mandatory(*) fields");
         return;
       }
       
@@ -225,22 +224,26 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       }
       
       if (InvalidMaxShots && InvalidMaxShots?.length > 0) {
-        toast.error("Maximum Shot Count must be a valid positive number with maximum 1000000 characters.");
+        toast.error("Maximum Shot Count must be a valid positive number with maximum 8 digits.");
         return;
       }
       
-      if (ToolNoEmpty?.length === 0 && LineEmpty?.length === 0 && InvalidToolNo?.length === 0 && InvalidMaxShots?.length === 0) {
+      if (ToolNoEmpty?.length === 0 && ToolDescEmpty?.length === 0 && MaxShotsEmpty?.length === 0 && LineEmpty?.length === 0 && OperationEmpty?.length === 0 && ProductCodeEmpty?.length === 0 && InvalidToolNo?.length === 0 && InvalidMaxShots?.length === 0) {
         // Check for changes
-        const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
-        const rowsToUpdate = masterList.filter(row => row.changed === true);
+        const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+        const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+
+        console.log("masterList:", masterList);
+        console.log("rowsToInsert:", rowsToInsert);
+        console.log("rowsToUpdate:", rowsToUpdate);
 
         if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
           toast.info("No data available");
           return;
         }
 
-        // If there are changes, send all records
-        const payloadRows = masterList;
+        // Send rows - either new rows or changed rows
+        const payloadRows = [...rowsToInsert, ...rowsToUpdate];
 
 
 
@@ -288,6 +291,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   const defaultColDef = {
     sortable: true,
     filter: true,
+    resizable: true,
     editable: true,
     flex: 1,
   };
@@ -344,6 +348,84 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
 
+  const NumberOnlyEditor = forwardRef((props, ref) => {
+    const [value, setValue] = useState(props.value || "");
+    const inputRef = useRef(null);
+  
+    useEffect(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
+    }, []);
+  
+    React.useImperativeHandle(ref, () => ({
+      getValue() {
+        return value;
+      },
+    }));
+  
+    const handleKeyDown = (e) => {
+      // Allow: backspace, delete, tab, escape, enter, home, end, left, right
+      if ([8, 9, 27, 13, 46, 35, 36, 37, 39].indexOf(e.keyCode) !== -1 ||
+          // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+          (e.keyCode === 65 && e.ctrlKey === true) ||
+          (e.keyCode === 67 && e.ctrlKey === true) ||
+          (e.keyCode === 86 && e.ctrlKey === true) ||
+          (e.keyCode === 88 && e.ctrlKey === true)) {
+        return;
+      }
+      
+      // Check if adding this digit would exceed the limit
+      if (e.keyCode >= 48 && e.keyCode <= 57 || e.keyCode >= 96 && e.keyCode <= 105) {
+        const digit = e.keyCode >= 96 ? e.keyCode - 96 : e.keyCode - 48;
+        const newValue = value + digit;
+        const numericValue = parseInt(newValue) || 0;
+        
+        if (numericValue > 100000000) {
+          e.preventDefault();
+          setTimeout(() => {
+            toast.error("Maximum 100000000 reached");
+          }, 0);
+          return;
+        }
+      }
+      
+      // Ensure that it is a number and stop the keypress
+      if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+        e.preventDefault();
+      }
+    };
+  
+    const handleChange = (e) => {
+      const newValue = e.target.value.replace(/[^0-9]/g, '');
+      const numericValue = parseInt(newValue) || 0;
+      
+      if (numericValue > 100000000) {
+        setTimeout(() => {
+          toast.error("Maximum 100000000 reached");
+        }, 0);
+        return;
+      }
+      
+      if (newValue.length <= 8) {
+        setValue(newValue);
+      }
+    };
+  
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        style={{ width: "100%", border: "none", outline: "none", padding: "4px" }}
+        maxLength={8}
+      />
+    );
+  });
+
   const MultiSelectEditor = forwardRef((props, ref) => {
     const [selectedValues, setSelectedValues] = useState([]);
   
@@ -368,7 +450,9 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   
     const handleChange = (values) => {
       setSelectedValues(values);
-      props.data[props.colDef.field] = values.join(","); // update row data as string
+      const newValue = values.join(",");
+      props.data[props.colDef.field] = newValue; // update row data as string
+      props.data.changed = true; // mark as changed
     };
   
     return (
@@ -392,9 +476,20 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
   };
 
   const MandatoryHeaderComponent = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <div>
-        {props.displayName} <span style={{color: 'red'}}>*</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
@@ -403,31 +498,39 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     { 
       headerName: "Tool No.", 
       field: "toolNo", 
-      filter: "agTextColumnFilter", 
       editable: (params) => (params.data.isUpdate === "0" ? true : false),
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Tool No." }
     },
     { 
       headerName: "Tool Description", 
-      field: "toolDesc", 
-      filter: "agTextColumnFilter",
+      field: "toolDesc",
       headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Tool Description" }
+      headerComponentParams: { displayName: "Tool Description" },
+      valueSetter: (params) => {
+        params.data.toolDesc = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Maximum Shot Count (Nos.)",
       field: "maxShots",
-      filter: "agNumberColumnFilter",
+      cellEditor: "agTextCellEditor",
       headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Maximum Shot Count (Nos.)" }
+      headerComponentParams: { displayName: "Maximum Shot Count (Nos.)" },
+      valueSetter: (params) => {
+        console.log('MaxShots valueSetter called:', params.newValue, 'Old:', params.oldValue);
+        params.data.maxShots = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Line",
       field: "line",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      filter: "agSetColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Line" },
       cellEditorParams: {
@@ -437,13 +540,17 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         const option = lineData.find(item => item.key === params.value);
         return option ? option.value : params.value;
       },
+      valueSetter: (params) => {
+        params.data.line = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Operation",
       field: "operation",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      filter: "agSetColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Operation" },
       cellEditorParams: {
@@ -453,6 +560,11 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         const option = operationData.find(item => item.key === params.value);
         return option ? option.value : params.value;
       },
+      valueSetter: (params) => {
+        params.data.operation = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     // {
     //   headerName: "Customer",
@@ -473,7 +585,6 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       {
       headerName: "Product Code",
       field: "modelId",
-      filter: "agTextColumnFilter",
       editable: true,
       cellEditor: MultiSelectEditor,
       cellEditorParams: { values: productData },
@@ -492,11 +603,16 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
           })
           .join(", ");
       },
+      valueSetter: (params) => {
+        params.data.modelId = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Status",
       field: "status",
-      filter: true,
+      filter: false,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
@@ -529,7 +645,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     // Validation before adding new row
     const ToolNoEmpty = masterList.filter((item) => !item.toolNo || item.toolNo.trim() === "");
     const LineEmpty = masterList.filter((item) => !item.line || item.line.trim() === "");
-    const InvalidMaxShots = masterList.filter((item) => item.maxShots && (isNaN(item.maxShots) || item.maxShots < 0 || item.maxShots.toString().length > 1000000));
+    const InvalidMaxShots = masterList.filter((item) => item.maxShots && (isNaN(item.maxShots) || item.maxShots < 0 || item.maxShots.toString().length > 8));
     
     if (ToolNoEmpty && ToolNoEmpty?.length > 0) {
       toast.error("Please fill all mandatory fields");
@@ -627,13 +743,15 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         if (isTargetRow) {
           const updateObject = {
             ...item,
-            isUpdate: item.isUpdate === '0' ? '0' : 1,
+            changed: true,
           };
           if (editingField === 'modelId') {
-            updateObject.modelId = selectedModelIds;
+            // Store as comma-separated string
+            updateObject.modelId = Array.isArray(selectedModelIds) ? selectedModelIds.join(',') : selectedModelIds;
           } else if (editingField === 'customerId') {
-            updateObject.customerId = selectedCustomerIds;
+            updateObject.customerId = Array.isArray(selectedCustomerIds) ? selectedCustomerIds.join(',') : selectedCustomerIds;
           }
+
           return updateObject;
         }
         return item;
@@ -641,12 +759,29 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
       setMasterList(updatedMasterList);
 
+      // Update the grid node data to ensure AG Grid recognizes the change
+      if (gridRef.current?.api) {
+        gridRef.current.api.forEachNode((node) => {
+          const isTargetRow = (node.data.toolNo && node.data.toolNo === editingToolData.toolNo) ||
+            (node.data.localId && node.data.localId === editingToolData.localId);
+          if (isTargetRow) {
+            const updatedData = { ...node.data, changed: true };
+            if (editingField === 'modelId') {
+              // Store as comma-separated string
+              updatedData.modelId = Array.isArray(selectedModelIds) ? selectedModelIds.join(',') : selectedModelIds;
+            } else if (editingField === 'customerId') {
+              updatedData.customerId = Array.isArray(selectedCustomerIds) ? selectedCustomerIds.join(',') : selectedCustomerIds;
+            }
+            node.setData(updatedData);
+          }
+        });
+      }
+
       setIsModelIdModalOpen(false);
       setEditingToolData(null);
       setSelectedModelIds([]);
       setSelectedCustomerIds([]);
       setEditingField(null);
-      gridRef.current?.api.refreshCells({ force: true });
     }
   };
 
@@ -803,7 +938,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         return;
       }
     }
-
+    
     // Validation for tool description
     if (field === "toolDesc") {
       if (newValue && newValue.length > 100) {
@@ -811,12 +946,41 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         params.node.setDataValue(field, oldValue || "");
         return;
       }
+      
+      // Check for duplicate tool description
+      if (newValue && newValue.trim() !== "") {
+        const isDuplicate = masterList.some(item => 
+          item.toolDesc === newValue && item !== data
+        );
+        
+        if (isDuplicate) {
+          toast.error("Duplicate Tool Description is not allowed");
+          params.node.setDataValue(field, oldValue || "");
+          return;
+        }
+      }
     }
 
     // Validation for max shots
     if (field === "maxShots") {
-      if (newValue && (isNaN(newValue) || newValue < 0 || newValue.toString().length > 10000000)) {
-        toast.error("Maximum Shot Count must be a valid positive number with maximum 1000000 characters.");
+      // Remove any non-numeric characters
+      const numericValue = newValue ? newValue.toString().replace(/[^0-9]/g, '') : '';
+      
+      // Check if length exceeds 8 digits (100000000)
+      if (numericValue.length > 8) {
+        toast.error("Maximum Shot Count cannot exceed 8 digits (100000000).");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+      
+      if (numericValue !== newValue.toString()) {
+        // If non-numeric characters were removed, update with cleaned value
+        params.node.setDataValue(field, numericValue);
+        return;
+      }
+      
+      if (newValue && (isNaN(newValue) || newValue < 0)) {
+        toast.error("Maximum Shot Count must be a valid positive number.");
         params.node.setDataValue(field, oldValue || "");
         return;
       }
@@ -831,37 +995,22 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       }
     }
 
-    // Mark row as changed and update the masterList state
-    data.changed = true;
+    // Mark row as changed
+    params.data.changed = true;
     
-    setMasterList((prev) =>
-      prev.map((row) => {
-        const isTargetRow = (row.toolNo && row.toolNo === data.toolNo) ||
-          (row.localId && row.localId === data.localId);
-        
-        if (!isTargetRow) return row;
-        
-        const updated = { 
-          ...row, 
-          changed: true,
-          isUpdate: row.isUpdate === '0' ? '0' : 1
-        };
-        
-        if (field === "modelId") {
-          updated.modelId = Array.isArray(newValue) ? newValue : (newValue ? String(newValue).split(",") : []);
-        } else if (field === "customerId") {
-          updated.customerId = Array.isArray(newValue) ? newValue : (newValue ? String(newValue).split(",") : []);
-        } else if (field === "status") {
-          updated[field] = newValue ? "1" : "0";
-        } else {
-          updated[field] = newValue;
+    // Update masterList state with the new value
+    setMasterList((prev) => {
+      return prev.map((row, idx) => {
+        if (idx === params.node.rowIndex) {
+          return { ...row, [field]: newValue, changed: true };
         }
-        
-        return updated;
-      })
-    );
+        return row;
+      });
+    });
+    
+    console.log(`Cell changed - Field: ${field}, Old: ${oldValue}, New: ${newValue}, Row marked as changed:`, params.data.changed);
   };
-
+  
   return (
     <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
@@ -923,21 +1072,22 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
                           }}
                         >
                           <Loader />
-                        </div>
-                      )}
-          <AgGridReact
-            ref={gridRef}
-            rowData={masterList}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            paginationPageSize={10}
-            pagination={true}
-            domLayout="autoHeight"
-            // singleClickEdit={true}
-            onFirstDataRendered={autoSizeAllColumns}
-            context={gridContext}
-            onCellValueChanged={onCellValueChanged}
-          />
+            </div>
+              )}
+          <div className="ag-theme-alpine" style={{ width: '100%' }}>
+            <AgGridReact
+              ref={gridRef}
+              rowData={masterList}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              paginationPageSize={10}
+              pagination={true}
+              domLayout="autoHeight"
+              onFirstDataRendered={autoSizeAllColumns}
+              context={gridContext}
+              onCellValueChanged={onCellValueChanged}
+            />
+          </div>
           </div>
           {/* )} */}
 
@@ -984,7 +1134,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
               onChange={modalOnChange}
               options={modalOptions}
             />
-          </Modal>
+          </Modal>  
         )}
       </div>
     </div>

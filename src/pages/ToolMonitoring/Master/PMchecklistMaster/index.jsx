@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperat
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
+import { Input } from "antd";
 import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 import { backendService } from "../../../../service/ToolServerApi";
 import store from "store";
@@ -19,13 +19,40 @@ ModuleRegistry.registerModules([CellStyleModule, CheckboxEditorModule]);
 
 // Custom Spec/Unit Editor
 const SpecUnitRenderer = ({ data, update }) => {
-  const [isSplit, setIsSplit] = useState(data.specUnit?.includes("±") || true);
+  const hasExistingValues = data.specUnit?.includes("±") && data.specUnit.split("±").length === 2 && 
+                           data.specUnit.split("±")[0]?.trim() && data.specUnit.split("±")[1]?.trim();
+  
+  const [isSplit, setIsSplit] = useState(hasExistingValues);
   const [base, setBase] = useState(isSplit ? data.specUnit?.split("±")[0]?.trim() || "" : data.specUnit || "");
   const [tolerance, setTolerance] = useState(isSplit ? data.specUnit?.split("±")[1]?.trim() || "" : "");
 
   useEffect(() => {
     update(isSplit ? `${base}±${tolerance}` : base);
-  }, [base, tolerance, isSplit]);
+    // Store validation info in data for later use
+    data.specValidation = {
+      isSplit,
+      hasBase: !!base,
+      hasTolerance: !!tolerance
+    };
+  }, [base, tolerance, isSplit, data, update]);
+
+  const handleBaseChange = (e) => {
+    const value = e.target.value;
+    if (isSplit) {
+      // Only numbers allowed when checkbox is checked
+      const numericValue = value.replace(/[^0-9.]/g, '');
+      setBase(numericValue);
+    } else {
+      // Both numbers and letters allowed when checkbox is unchecked
+      setBase(value);
+    }
+  };
+
+  const handleToleranceChange = (e) => {
+    // Only numbers allowed for tolerance (always when checkbox is checked)
+    const numericValue = e.target.value.replace(/[^0-9.]/g, '');
+    setTolerance(numericValue);
+  };
 
   // AG Grid input style
   const inputStyle = {
@@ -56,7 +83,7 @@ const SpecUnitRenderer = ({ data, update }) => {
       <input
         style={inputStyle}
         value={base}
-        onChange={(e) => setBase(e.target.value)}
+        onChange={handleBaseChange}
       />
       <input
         type="checkbox"
@@ -71,7 +98,7 @@ const SpecUnitRenderer = ({ data, update }) => {
           <input
             style={inputStyle}
             value={tolerance}
-            onChange={(e) => setTolerance(e.target.value)}
+            onChange={handleToleranceChange}
           />
         </>
       )}
@@ -79,6 +106,49 @@ const SpecUnitRenderer = ({ data, update }) => {
   );
 };
 
+
+// Custom Unit Renderer - Only allows alphabets
+const UnitRenderer = ({ data, update }) => {
+  const [value, setValue] = useState(data.unit || "mm");
+
+  useEffect(() => {
+    update(value);
+  }, [value, update]);
+
+  const handleChange = (e) => {
+    // Only allow alphabets (a-z, A-Z)
+    const alphabetsOnly = e.target.value.replace(/[^a-zA-Z]/g, '');
+    setValue(alphabetsOnly);
+  };
+
+  const handleKeyPress = (e) => {
+    // Block all numbers and non-alphabetic characters
+    const char = String.fromCharCode(e.which);
+    if (!/[a-zA-Z]/.test(char)) {
+      e.preventDefault();
+    }
+  };
+
+  const inputStyle = {
+    border: "1px solid #d9d9d9",
+    borderRadius: "2px",
+    padding: "2px 4px",
+    height: "24px",
+    fontSize: "13px",
+    width: "100%",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <input
+      style={inputStyle}
+      value={value}
+      onChange={handleChange}
+      onKeyPress={handleKeyPress}
+      maxLength={10}
+    />
+  );
+};
 
 const SpecUnitCellEditor = forwardRef((props, ref) => {
   const initialValue = props.value || "";
@@ -263,9 +333,26 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         return;
       }
 
-      const missingNames = rowsToInsert.some((item) => !item.characteristicName);
-      if (rowsToInsert.length > 0 && (!selectedLine || !selectedTool || !selectedOperat || missingNames)) {
+      // Check for missing mandatory fields
+      const missingFields = [...rowsToInsert, ...rowsToUpdate].some((item) => {
+        const missingCharacteristic = !item.characteristicName?.trim();
+        const missingSpec = !item.specUnit?.trim();
+        const missingUnit = !item.unit?.trim();
+        
+        // Check for incomplete SPEC values when checkbox is checked
+        const incompleteSpec = item.specValidation?.isSplit && 
+          (!item.specValidation.hasBase || !item.specValidation.hasTolerance);
+        
+        return missingCharacteristic || missingSpec || missingUnit || incompleteSpec;
+      });
+      
+      if (rowsToInsert.length > 0 && (!selectedLine || !selectedTool || !selectedOperat)) {
         toast.error("Please fill all mandatory fields");
+        return;
+      }
+      
+      if (missingFields) {
+        toast.error("Please fill all mandatory fields: Characteristic, SPEC, and UNIT are required");
         return;
       }
 
@@ -275,6 +362,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         characteristicId: item.characteristicId,
         characteristicName: item.characteristicName,
         specUnit: item.specUnit,
+        unit: item.unit,
         mesurementType: item.mesurementType,
         seqNo: "1",
         status: item.status,
@@ -298,7 +386,13 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-  const defaultColDef = { sortable: true, filter: true, editable: true, flex: 1 };
+  const defaultColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+    editable: true,
+    flex: 1,
+  };
 
   const onCellValueChanged = (params) => {
     params.data.changed = true;
@@ -310,35 +404,84 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
   const onCellEditingStarted = (params) => (params.data.changed = true);
   const onCellEditingStopped = (params) => (params.data.changed = true);
 
-  const MandatoryHeaderComponent = (props) => (
-    <div>{props.displayName} <span style={{ color: "red" }}>*</span></div>
-  );
+  const MandatoryHeaderComponent = (props) => {
+    const buttonRef = React.useRef(null);
+    
+    return (
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
+    );
+  };
 
-  const frameworkComponents = { specUnitCellEditor: SpecUnitCellEditor };
+  const frameworkComponents = { 
+    specUnitCellEditor: SpecUnitCellEditor
+  };
 
   const columnDefs = [
-    { headerName: "S.NO", field: "id", filter: "agNumberColumnFilter", editable: false },
+    { 
+      headerName: "S.NO", 
+      field: "id", 
+      editable: false
+    },
     {
       headerName: "Characteristic",
       field: "characteristicName",
-      filter: "agTextColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Characteristic" },
+      cellRenderer: (params) => {
+        if (params.data.isSection) return "";
+        if (params.data.isNewRow) {
+          return (
+            <Input 
+              value={params.value || ''} 
+              onChange={(e) => {
+                params.setValue(e.target.value);
+                params.data.changed = true;
+                params.data.isNewRow = false;
+              }}
+              title="Enter the characteristic name for this measurement"
+              autoFocus
+            />
+          );
+        }
+        return params.value || '';
+      },
     },
     {
-  headerName: "SPEC/UNIT",
-  field: "specUnit",
-  filter: "agTextColumnFilter",
-  editable: false, // disable default editing
-  cellRenderer: (params) => <SpecUnitRenderer data={params.data} update={(val) => {
-    params.data.specUnit = val;
-    params.data.changed = true;
-  }} />,
-},
+      headerName: "SPEC",
+      field: "specUnit",
+      editable: false,
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "SPEC" },
+      cellRenderer: (params) => <SpecUnitRenderer data={params.data} update={(val) => {
+        params.data.specUnit = val;
+        params.data.changed = true;
+      }} />,
+    },
+    {
+      headerName: "UNIT",
+      field: "unit",
+      editable: false,
+      headerComponent: MandatoryHeaderComponent,
+      headerComponentParams: { displayName: "UNIT" },
+      cellRenderer: (params) => <UnitRenderer data={params.data} update={(val) => {
+        params.data.unit = val;
+        params.data.changed = true;
+      }} />,
+    },
     {
       headerName: "Measurement Tools",
       field: "mesurementType",
-      filter: "agTextColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Measurement Tools" },
     },
@@ -346,6 +489,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       headerName: "Status",
       field: "status",
       editable: true,
+      filter: false,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
       valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
@@ -356,9 +500,14 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   const handleAddRow = () => {
     if (!selectedLine || !selectedTool || !selectedOperat) { toast.error("Please fill all mandatory fields"); return; }
-    const emptyRow = { status: "1", isUpdate: "0", changed: true };
+    const nextId = masterList.length > 0 ? Math.max(...masterList.map(item => item.id || 0)) + 1 : 1;
+    const emptyRow = { id: nextId, status: "1", isUpdate: "0", changed: true, unit: "mm", isNewRow: true };
     const emptyCheck = masterList.filter((item) => !item.characteristicName);
-    if (emptyCheck.length === 0) { const updated = [...masterList, emptyRow]; setMasterList(updated); setOriginalList(updated); }
+    if (emptyCheck.length === 0) { 
+      const updated = [...masterList, emptyRow]; 
+      setMasterList(updated); 
+      setOriginalList(updated);
+    }
     else toast.error("Please fill all mandatory fields");
   };
 
@@ -415,7 +564,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       worksheet.mergeCells("C1:D2");
       const dateCell = worksheet.getCell("C1");
       dateCell.value = `Generated On: ${moment().format(
-        "DD/MM/YYYY HH:mm:ss"
+        "DD-MM-YYYY HH:mm:ss"
       )}`;
       dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
       dateCell.alignment = {
@@ -438,9 +587,9 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       const headers = [
         "S.NO",
         "Characteristic",
-        "SPEC/UNIT",
+        "SPEC",
+        "UNIT",
         "Measurement Tools",
-        "Sequence No",
         "Status",
       ];
       const headerRow = worksheet.addRow(headers);
@@ -466,8 +615,8 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
           item.id || "",
           item.characteristicName || "",
           item.specUnit || "",
+          item.unit || "mm",
           item.mesurementType || "",
-          item.seqNo || "",
           item.status === "1" ? "Active" : "Inactive",
         ]);
         row.eachCell((cell) => {
@@ -496,6 +645,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   return (
     <div>
+
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         <div className="card-header text-white fw-bold d-flex justify-content-between align-items-center" style={{ backgroundColor: "#00264d" }}>
           PM Checklist Master
@@ -545,7 +695,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         <div className="card-body p-3">
           {!selectedLine || !selectedTool || !selectedOperat ? (
             <div className="text-center p-4"><p className="text-muted">No data available</p></div>
-          ) : masterList.length > 0 ? (
+          ) : (
             <div style={{ position: "relative" }}>
               {isLoading && (
                 <div className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: "rgba(255,255,255,0.6)", zIndex: 2, borderRadius: "8px" }}>
@@ -565,15 +715,15 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
                 onCellEditingStarted={onCellEditingStarted}
                 onCellEditingStopped={onCellEditingStopped}
                 onCellValueChanged={onCellValueChanged}
+
               />
               <div className="text-center mt-4">
                 <button className="btn text-white me-2" style={{ backgroundColor: "#00264d", minWidth: "90px" }} onClick={createorUpdate}>Update</button>
                 <button type="button" onClick={handleCancel} className="btn text-white" style={{ backgroundColor: "#00264d", minWidth: "90px" }}>Cancel</button>
               </div>
             </div>
-          ) : (
-            <div className="text-center p-4"><p className="text-muted">No data available</p></div>
-          )}
+          )
+        }
         </div>
       </div>
     </div>

@@ -2,10 +2,6 @@ import React, { useRef, useEffect, useState,forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
-import { ModuleRegistry } from "ag-grid-community";
-import { SetFilterModule } from "ag-grid-enterprise";
-import { DateFilterModule } from "ag-grid-enterprise";
 import {Select} from "antd";
 import store from "store";
 import { toast } from "react-toastify";
@@ -14,8 +10,6 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import Loader from "../../../.././Utills/Loader";
-ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
-
 
 const { Option } = Select;
 
