@@ -23,6 +23,7 @@ const ToolChange = () => {
   const [remainingUsage, setRemainingUsage] = useState("55000");
   const [productDataList, setProductDataList] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
+  const [historyData, setHistoryData] = useState([])
   const tenantId = store.get('tenantId')
   const branchCode = store.get('branchCode')
   const empId = store.get('employeeId')
@@ -33,6 +34,21 @@ const ToolChange = () => {
     if (usage && max) {
       setRemainingUsage(max - usage);
     }
+  };
+
+  // Helper function to get color based on usage percentage (usageTillDate/maxUsage)
+  const getUsageColor = (usageTillDate, maximum) => {
+    if (!usageTillDate || !maximum) return "#ffffff";
+    const percentage = (usageTillDate / maximum) * 100;
+    if (percentage >= 90) return "#ff4d4f"; // Red (90-100%)
+    if (percentage >= 80) return "#faad14"; // Yellow (80-90%)
+    return "#52c41a"; // Green (below 80%)
+  };
+
+  // Helper function to get percentage text based on usage
+  const getUsagePercentage = (usageTillDate, maximum) => {
+    if (!usageTillDate || !maximum) return "0%";
+    return `${Math.round((usageTillDate / maximum) * 100)}%`;
   };
 
   const getProductDropdown = useCallback(async () => {
@@ -99,7 +115,7 @@ const ToolChange = () => {
         requestPath: 'saveOrUpdateToolLogHdr',
         requestData: [{
           tenantId,
-          operation: formValues.operation,
+          operation: historyData?.operation,
           toolDesc: formValues.toolDesc,
           toolNo: formValues.toolNo,
           product: formValues.product,
@@ -141,10 +157,11 @@ const ToolChange = () => {
         if (response.responseCode === '200') {
           if (response.responseData !== null && response.responseData.length > 0) {
             const updatedData = response.responseData[0]
+            setHistoryData(updatedData)
             console.log(updatedData, "updatedData--------")
             form.setFieldsValue({
               toolDesc: updatedData.toolDesc,
-              operation: updatedData.operation,
+              operation: updatedData.operationDesc,
               maxUsage: updatedData.maxUseage || '',
               usageTillDate: updatedData.usageTillDate || '0',
               remainUseage: updatedData.remainUseage == null ? updatedData.maxUseage : updatedData.remainUseage
@@ -197,12 +214,44 @@ const ToolChange = () => {
 
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: "20px", position: "relative" }}>
+      {/* Usage Color Guide */}
+      <div style={{ 
+        textAlign: "right", 
+        marginBottom: "10px", 
+        padding: "8px", 
+        fontSize: "12px"
+      }}>
+        <span style={{ 
+          backgroundColor: "#52c41a", 
+          padding: "3px 6px", 
+          marginRight: "5px", 
+          borderRadius: "3px",
+          color: "white",
+          fontWeight: "bold"
+        }}>Below 80%</span>
+        <span style={{ 
+          backgroundColor: "#faad14", 
+          padding: "3px 6px", 
+          marginRight: "5px", 
+          borderRadius: "3px",
+          color: "white",
+          fontWeight: "bold"
+        }}>80-90%</span>
+        <span style={{ 
+          backgroundColor: "#ff4d4f", 
+          padding: "3px 6px", 
+          borderRadius: "3px",
+          color: "white",
+          fontWeight: "bold"
+        }}>90-100%</span>
+      </div>
+
       {/* Tool Life Log Card */}
       <Card
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
-        title="Tool Life Log"
-        style={{ marginTop: "20px", borderRadius: "8px" }}
+        title="Tool Change"
+        style={{ borderRadius: "8px" }}
       >
         <Form
           form={form}
@@ -216,8 +265,7 @@ const ToolChange = () => {
               <Form.Item
                 label="Scan Tool No."
                 name="toolNo"
-                // initialValue="T001"
-                rules={[{ required: true, message: "Tool ID is required" }]}
+                rules={[{ required: true, message: "Please choose Scan Tool No." }]}
               >
                 <Input placeholder="Scan Tool" onBlur={handleQrBlur} style={{ backgroundColor: "#ffffff", }} />
               </Form.Item>
@@ -225,9 +273,12 @@ const ToolChange = () => {
 
             {/* Tool Name */}
             <Col span={4}>
-              <Form.Item label="Tool Desc" name="toolDesc">
+              <Form.Item 
+                label="Tool Desc" 
+                name="toolDesc"
+                rules={[{ required: true, message: "Please choose Tool Desc" }]}
+              >
                 <Input
-                  // value="1st Top Tool"
                   readOnly
                   style={{ backgroundColor: "#ffffff", }}
                 />
@@ -239,10 +290,9 @@ const ToolChange = () => {
               <Form.Item
                 label="Operation"
                 name="operation"
-                rules={[{ required: true, message: "Select Operation" }]}
+                rules={[{ required: true, message: "Please choose Operation" }]}
               >
                 <Input
-                  // value="1st Top Tool"
                   readOnly
                   style={{ backgroundColor: "#ffffff", }}
                 />
@@ -254,7 +304,7 @@ const ToolChange = () => {
               <Form.Item
                 label="Product"
                 name="product"
-                rules={[{ required: true, message: "Select Product" }]}
+                rules={[{ required: true, message: "Please choose Product" }]}
               >
                 <Select
                   placeholder="Select Product"
@@ -275,8 +325,7 @@ const ToolChange = () => {
               <Form.Item
                 label="Usage Till Date (Nos.)"
                 name="usageTillDate"
-              // initialValue="45000"
-              // rules={[{ required: true, message: "Enter usage till date" }]}
+                rules={[{ required: true, message: "Please choose Usage Till Date" }]}
               >
                 <Input
                   type="number"
@@ -291,8 +340,7 @@ const ToolChange = () => {
               <Form.Item
                 label="Maximum Usage (Nos.)"
                 name="maxUsage"
-              // initialValue="100000"
-              // rules={[{ required: true, message: "Enter maximum usage" }]}
+                rules={[{ required: true, message: "Please choose Maximum Usage" }]}
               >
                 <Input
                   type="number"
@@ -307,17 +355,20 @@ const ToolChange = () => {
               <Form.Item
                 label="Remaining Usage (Nos.)"
                 name="remainUseage"
-              // initialValue={remainingUsage}
-              // rules={[{ required: true, message: "Required field" }]}
+                rules={[{ required: true, message: "Please choose Remaining Usage" }]}
               >
                 <Input
                   readOnly
-                  // value={remainingUsage}
-                  style={{ backgroundColor: "#90EE90", }}
+                  style={{ 
+                    backgroundColor: getUsageColor(form.getFieldValue("usageTillDate"), form.getFieldValue("maxUsage")),
+                    fontWeight: "bold"
+                  }}
                 />
               </Form.Item>
             </Col>
           </Row>
+
+
 
           {/* Buttons */}
           <div style={{ textAlign: "center", marginTop: "10px" }}>

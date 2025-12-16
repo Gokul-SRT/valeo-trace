@@ -102,6 +102,13 @@ const ToolHistoryLog = () => {
       filter: "agTextColumnFilter",
     },
     {
+      headerName: "Customer",
+      field: "custName",
+      flex: 2,
+      sortable: true,
+      filter: "agTextColumnFilter",
+    },
+    {
       headerName: "Defects noticed",
       field: "defectsNoticed",
       flex: 2,
@@ -116,7 +123,7 @@ const ToolHistoryLog = () => {
       filter: "agTextColumnFilter",
     },
     {
-      headerName: "Rectified By T/M",
+      headerName: "Rectified By",
       field: "rectifiedBy",
       flex: 1.5,
       sortable: true,
@@ -153,12 +160,13 @@ const ToolHistoryLog = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Tool History Report");
 
-      // --- Set column widths ---
-      worksheet.getColumn(1).width = 35; // Customer Logo / Date
-      worksheet.getColumn(2).width = 50; // Middleware Screen / Components produced
-      worksheet.getColumn(3).width = 35; // Company Logo / Defects noticed
-      worksheet.getColumn(4).width = 35; // Rectification Done
-      worksheet.getColumn(5).width = 25; // Rectified By T/M
+      // --- Set column widths to match table width ---
+      worksheet.getColumn(1).width = 20; // Date
+      worksheet.getColumn(2).width = 35; // Components produced
+      worksheet.getColumn(3).width = 20; // Customer
+      worksheet.getColumn(4).width = 30; // Defects noticed
+      worksheet.getColumn(5).width = 30; // Rectification Done
+      worksheet.getColumn(6).width = 20; // Rectified By
 
       // --- Row 1 height for logos ---
       worksheet.getRow(1).height = 65;
@@ -173,10 +181,11 @@ const ToolHistoryLog = () => {
       });
       worksheet.addImage(customerImageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 1 } });
 
-      // --- Middleware Screen Name in B1 ---
-      const toolDesc = form.getFieldValue("toolNo");
-      const year = form.getFieldValue("year") ? form.getFieldValue("year").format("YYYY") : ""; // Format year
-
+      // --- Merge cells B1:E1 for title ---
+      worksheet.mergeCells('B1:E1');
+      const toolNo = form.getFieldValue("toolNo");
+      const toolDesc = toolData.find(tool => tool.key === toolNo)?.value || toolNo;
+      const year = form.getFieldValue("year") ? form.getFieldValue("year").format("YYYY") : "";
 
       const middlewareCell = worksheet.getCell("B1");
 
@@ -184,7 +193,7 @@ const ToolHistoryLog = () => {
       middlewareCell.value = {
         richText: [
           { text: "Tool History Report\n", font: { bold: true, size: 14 } }, // main title
-          { text: `Tool: ${toolDesc} | Year: ${year}`, font: { size: 10 } }, // subtitle smaller
+          { text: `Tool Desc: ${toolDesc} | Year: ${year}`, font: { size: 10 } }, // subtitle smaller
         ],
       };
 
@@ -196,7 +205,7 @@ const ToolHistoryLog = () => {
         right: { style: "thin" },
       };
 
-      // --- Company Logo in C1 ---
+      // --- Company Logo in F1 ---
       const companyLogoResp = await fetch("/smartrunLogo.png");
       const companyBlob = await companyLogoResp.blob();
       const companyBuffer = await companyBlob.arrayBuffer();
@@ -204,16 +213,17 @@ const ToolHistoryLog = () => {
         buffer: companyBuffer,
         extension: "png",
       });
-      worksheet.addImage(companyImageId, { tl: { col: 2, row: 0 }, br: { col: 3, row: 1 } });
+      worksheet.addImage(companyImageId, { tl: { col: 5, row: 0 }, br: { col: 6, row: 1 } });
 
       // --- Table header at row 3 ---
       const startRow = 3;
       const headers = [
         "Date",
         "Components produced in the last run (in Nos.)",
+        "Customer",
         "Defects noticed",
         "Rectification Done",
-        "Rectified By T/M",
+        "Rectified By",
       ];
       const headerRow = worksheet.getRow(startRow);
       headers.forEach((header, i) => {
@@ -235,6 +245,7 @@ const ToolHistoryLog = () => {
         worksheet.addRow([
           row.createdDateTime ? moment(row.createdDateTime).format("DD-MMM-YYYY") : "",
           row.usageTillDate || "",
+          row.custName || "",
           row.defectsNoticed || "",
           row.rectificationDone || "",
           row.rectifiedBy || "",
