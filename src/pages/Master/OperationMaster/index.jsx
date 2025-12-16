@@ -275,11 +275,11 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       field: "operationId",
       filter: "agTextColumnFilter",
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
-      headerComponent: () => (
-        <span>
-          Operation Id <span style={{ color: "red" }}>*</span>
-        </span>
-      ),
+      // headerComponent: () => (
+      //   <span>
+      //     Operation Id <span style={{ color: "red" }}>*</span>
+      //   </span>
+      // ),
     },
     {
       headerName: "Operation Code",
@@ -524,87 +524,74 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
   const onExportExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Operation Master Report");
+      const worksheet = workbook.addWorksheet("Operation Master");
 
-      // === Row Height for header ===
-      worksheet.getRow(1).height = 60;
-
-      // === Define Columns ===
+      // ===== Column Setup =====
       worksheet.columns = [
-        { header: "Operation ID", key: "operationId", width: 20 },
-        { header: "Operation Code", key: "operationUniquecode", width: 25 },
-        { header: "Operation Description", key: "operationDesc", width: 35 },
-        { header: "Child Part Code", key: "childPartId", width: 25 },
-        { header: "Status", key: "isActive", width: 15 },
+        { width: 20 }, // Column A - Operation ID
+        { width: 25 }, // Column B - Operation Code
+        { width: 35 }, // Column C - Operation Description
+        { width: 25 }, // Column D - Child Part Code
+        { width: 15 }, // Column E - Status
       ];
 
-      // === Insert Left Logo (Valeo) ===
+      // ===== Logo Row =====
+      worksheet.getRow(1).height = 50;
+
+      // Left Logo in Column A
       try {
-        const imgResponse = await fetch("/pngwing.com.png");
-        const imgBlob = await imgResponse.blob();
-        const arrayBuffer = await imgBlob.arrayBuffer();
-        const imageId = workbook.addImage({
-          buffer: arrayBuffer,
+        const imgUrl = `${window.location.origin}/pngwing.com.png`; 
+        const logo1 = await fetch(imgUrl);
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
           extension: "png",
         });
-        worksheet.addImage(imageId, {
+        worksheet.addImage(imageId1, {
           tl: { col: 0, row: 0 },
-          br: { col: 1, row: 1 },
-          editAs: "oneCell",
+          ext: { width: 120, height: 40 },
         });
       } catch {
-        console.warn("Logo not found — skipping image insert.");
+        console.warn("Left logo not found");
       }
 
-      // === Title Cell ===
-      worksheet.mergeCells("B1:D2");
+      // Title in Column B-D
+      worksheet.mergeCells("B1:D1");
       const titleCell = worksheet.getCell("B1");
-      titleCell.value = "Operation Master Report";
-      titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
-      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      titleCell.value = `Operation Master\nGenerated: ${moment().format("DD/MM/YYYY HH:mm")}`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
-      // === Date (top right) ===
-      worksheet.mergeCells("E1:F2");
-      const dateCell = worksheet.getCell("E1");
-      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
-      dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
-      dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-
-      // === Insert Right Logo (SmartRun) ===
+      // Right Logo in Column E
       try {
-        const secondImgResponse = await fetch("/smartrunLogo.png");
-        const secondImgBlob = await secondImgResponse.blob();
-        const secondArrayBuffer = await secondImgBlob.arrayBuffer();
-        const secondImageId = workbook.addImage({
-          buffer: secondArrayBuffer,
+        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+        const logo2 = await fetch(imgUrl1);
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
           extension: "png",
         });
-        worksheet.mergeCells("G1:H2");
-        worksheet.addImage(secondImageId, {
-          tl: { col: 6, row: 0 },
-          br: { col: 8, row: 2 },
-          editAs: "oneCell",
+        worksheet.addImage(imageId2, {
+          tl: { col: 4, row: 0 },
+          ext: { width: 80, height: 40 },
         });
       } catch {
-        console.warn("SmartRun logo not found — skipping right logo insert.");
+        console.warn("Right logo not found");
       }
 
-      // === Header Row ===
-      const headerRow = worksheet.addRow([
-        "Operation ID",
-        "Operation Code",
-        "Operation Description",
-        "Child Part Code",
-        "Status",
-      ]);
-      headerRow.eachCell((cell) => {
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
-        };
-        cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      // ===== Table Headers (Row 3) =====
+      const headerRow = 3;
+      const headers = ["Operation ID", "Operation Code", "Operation Description", "Child Part Code", "Status"];
+      
+      worksheet.getRow(headerRow).height = 25;
+      headers.forEach((header, idx) => {
+        const cell = worksheet.getCell(headerRow, idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -612,27 +599,23 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
           right: { style: "thin" },
         };
       });
-      headerRow.height = 25;
 
-      // === AutoFilter ===
-      worksheet.autoFilter = {
-        from: { row: headerRow.number, column: 1 },
-        to: { row: headerRow.number, column: worksheet.columns.length },
-      };
+      // ===== Data Rows =====
+      masterList.forEach((item, index) => {
+        const rowIndex = headerRow + index + 1;
+        const row = worksheet.getRow(rowIndex);
+        row.height = 20;
 
-      // === Data Rows ===
-      masterList.forEach((item) => {
-        const newRow = worksheet.addRow({
-          operationId: item.operationId || "",
-          operationUniquecode: item.operationUniquecode || "",
-          operationDesc: item.operationDesc || "",
-          childPartId: item.childPartId || "",
-          isActive: item.isActive === "1" ? "Active" : "Inactive",
-        });
+        row.values = [
+          item.operationId || "",
+          item.operationUniquecode || "",
+          item.operationDesc || "",
+          item.childPartId || "",
+          item.isActive === "1" ? "Active" : "Inactive",
+        ];
 
-        newRow.eachCell((cell) => {
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          cell.font = { size: 10 };
+        row.eachCell((cell) => {
+          cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
           cell.border = {
             top: { style: "thin" },
             left: { style: "thin" },
@@ -642,15 +625,23 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         });
       });
 
-      // === Save File ===
+      // ===== AutoFilter =====
+      if (masterList.length > 0) {
+        worksheet.autoFilter = {
+          from: { row: headerRow, column: 1 },
+          to: { row: headerRow + masterList.length, column: headers.length },
+        };
+      }
+
+      // ===== Export =====
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(
-        new Blob([buffer], { type: "application/octet-stream" }),
-        `Operation_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+        new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+        `Operation_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
       );
     } catch (error) {
       console.error("Excel export error:", error);
-      toast.error("Error exporting to Excel. Please try again.");
+      toast.error("Error exporting Operation Master.");
     }
   };
 

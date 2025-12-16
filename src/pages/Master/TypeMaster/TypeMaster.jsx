@@ -340,17 +340,147 @@ if (invalidTypeDesc) {
     }
   };
 
-  // Export Excel function (keep your existing implementation, just add loading if needed)
   const onExportExcel = async () => {
     try {
-      // Your existing Excel export code...
       const workbook = new ExcelJS.Workbook();
-      // ... rest of your Excel export code
+      const worksheet = workbook.addWorksheet("Type Master");
 
-      toast.success("Excel exported successfully!");
+      // ===== Column Widths =====
+      const columnWidths = [25, 35, 25, 18];
+      columnWidths.forEach((w, i) => {
+        worksheet.getColumn(i + 1).width = w;
+      });
+
+      // ===== Title Row Height =====
+      worksheet.getRow(1).height = 65;
+
+      // ===== Left Logo =====
+      try {
+        const imgUrl = `${window.location.origin}/pngwing.com.png`;
+        const logo1 = await fetch(imgUrl);
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
+          extension: "png",
+        });
+        worksheet.addImage(imageId1, {
+          tl: { col: 0, row: 0 },
+          br: { col: 1, row: 1 },
+        });
+      } catch {
+        console.warn("Left logo not found");
+      }
+
+      // ===== Title Cell =====
+      worksheet.mergeCells("B1:C1");
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = `Type Master\nGenerated On: ${moment().format(
+        "DD/MM/YYYY HH:mm:ss"
+      )}`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+      titleCell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+
+      // ===== Right Logo =====
+      try {
+        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+        const logo2 = await fetch(imgUrl1);
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
+          extension: "png",
+        });
+        worksheet.addImage(imageId2, {
+          tl: { col: 3, row: 0 },
+          br: { col: 4, row: 1 },
+        });
+      } catch {
+        console.warn("Right logo not found");
+      }
+
+      // ===== Header Row =====
+      const startRow = 3;
+      const headers = [
+        "Type Code",
+        "Type Description",
+        "Bin Quantity",
+        "Status",
+      ];
+
+      const headerRow = worksheet.getRow(startRow);
+      headers.forEach((header, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      // ===== Data Rows =====
+      masterList.forEach((item, index) => {
+        const rowNumber = startRow + index + 1;
+        const row = worksheet.getRow(rowNumber);
+
+        row.values = [
+          item.typeCode || "",
+          item.typeDescription || "",
+          item.stantardQuantity ? Number(item.stantardQuantity).toLocaleString() : "",
+          item.isActive === "1" ? "Active" : "Inactive",
+        ];
+
+        row.eachCell((cell, colNumber) => {
+          cell.alignment = {
+            horizontal: colNumber === 3 ? "right" : "center", // Right align Bin Quantity
+            vertical: "middle",
+            wrapText: true,
+          };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+
+      // ===== AutoFilter =====
+      worksheet.autoFilter = {
+        from: { row: startRow, column: 1 },
+        to: { row: startRow, column: headers.length },
+      };
+
+      // ===== Save File =====
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Type_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+      
+      // toast.success("Excel exported successfully!");
     } catch (error) {
       console.error("Excel export error:", error);
-      toast.error("Error exporting Excel. Please try again.");
+      // toast.error("Error exporting Type Master.");
     }
   };
 

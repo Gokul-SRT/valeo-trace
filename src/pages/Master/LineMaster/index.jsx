@@ -205,14 +205,14 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       headerName: "Line Code",
       field: "lineMstCode",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader,
+      // headerComponent: RequiredHeader,
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Line Description",
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader,
+      // headerComponent: RequiredHeader,
     },
   
    /* {
@@ -244,7 +244,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   field: "productCode",
   filter: "agTextColumnFilter",
   editable: true,
-  headerComponent: RequiredHeader,
+  // headerComponent: RequiredHeader,
   cellEditor: MultiSelectEditor,
   cellEditorParams: { values: productData },
   valueSetter: (params) => {
@@ -477,70 +477,95 @@ if (missingProduct) {
   //   }
   // };
 
- const onExportExcel = async () => {
+const onExportExcel = async () => {
   try {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Line Master");
 
-    // === Header Row Height ===
-    worksheet.getRow(1).height = 60;
+    // ===== Column Widths (similar style) =====
+    const columnWidths = [25, 35, 40, 18];
+    columnWidths.forEach((w, i) => {
+      worksheet.getColumn(i + 1).width = w;
+    });
 
-    // === Set Columns ===
-    worksheet.columns = [
-      { header: "Line Code", key: "lineMstCode", width: 20 },
-      { header: "Line Description", key: "lineMstDesc", width: 30 },
-      { header: "Product Code(s)", key: "productCode", width: 30 },
-      { header: "Status", key: "isActive", width: 15 },
-    ];
+    // ===== Title Row Height =====
+    worksheet.getRow(1).height = 65;
 
-    // === Insert Logo (Optional) ===
+    // ===== Left Logo =====
     try {
-      const imgResponse = await fetch("/pngwing.com.png");
-      const imgBlob = await imgResponse.blob();
-      const arrayBuffer = await imgBlob.arrayBuffer();
-      const imageId = workbook.addImage({
-        buffer: arrayBuffer,
+      const imgUrl = `${window.location.origin}/pngwing.com.png`;
+      const logo1 = await fetch(imgUrl);
+      const blob1 = await logo1.blob();
+      const arr1 = await blob1.arrayBuffer();
+      const imageId1 = workbook.addImage({
+        buffer: arr1,
         extension: "png",
       });
-      worksheet.addImage(imageId, {
+      worksheet.addImage(imageId1, {
         tl: { col: 0, row: 0 },
         br: { col: 1, row: 1 },
-        editAs: "oneCell",
       });
-    } catch (err) {
-      console.warn("Logo image not found, skipping logo insert.");
+    } catch {
+      console.warn("Left logo not found");
     }
 
-    // === Title Cell ===
-    worksheet.mergeCells("B1:D2");
+    // ===== Title Cell =====
+    worksheet.mergeCells("B1:C1");
     const titleCell = worksheet.getCell("B1");
-    titleCell.value = "Line Master Report";
-    titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
-    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    titleCell.value = `Line Master\nGenerated On: ${moment().format(
+      "DD/MM/YYYY HH:mm:ss"
+    )}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+    titleCell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
 
-    // === Date Cell (Top-Right) ===
-    worksheet.mergeCells("E1:F2");
-    const dateCell = worksheet.getCell("E1");
-    dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
-    dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
-    dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    // ===== Right Logo =====
+    try {
+      const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+      const logo2 = await fetch(imgUrl1);
+      const blob2 = await logo2.blob();
+      const arr2 = await blob2.arrayBuffer();
+      const imageId2 = workbook.addImage({
+        buffer: arr2,
+        extension: "png",
+      });
+      worksheet.addImage(imageId2, {
+        tl: { col: 3, row: 0 },
+        br: { col: 4, row: 1 },
+      });
+    } catch {
+      console.warn("Right logo not found");
+    }
 
-    // === Header Row ===
-    const headerRow = worksheet.addRow([
+    // ===== Header Row =====
+    const startRow = 3;
+    const headers = [
       "Line Code",
       "Line Description",
       "Product Code(s)",
       "Status",
-    ]);
+    ];
 
-    headerRow.eachCell((cell) => {
+    const headerRow = worksheet.getRow(startRow);
+    headers.forEach((header, idx) => {
+      const cell = headerRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
         fgColor: { argb: "FF4472C4" },
       };
-      cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
-      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -549,26 +574,24 @@ if (missingProduct) {
       };
     });
 
-    headerRow.height = 25;
+    // ===== Data Rows =====
+    masterList.forEach((item, index) => {
+      const rowNumber = startRow + index + 1;
+      const row = worksheet.getRow(rowNumber);
 
-    // === AutoFilter for Header ===
-    worksheet.autoFilter = {
-      from: { row: headerRow.number, column: 1 },
-      to: { row: headerRow.number, column: worksheet.columns.length },
-    };
+      row.values = [
+        item.lineMstCode || "",
+        item.lineMstDesc || "",
+        item.productCode || "",
+        item.isActive === "1" ? "Active" : "Inactive",
+      ];
 
-    // === Data Rows ===
-    masterList.forEach((row) => {
-      const newRow = worksheet.addRow({
-        lineMstCode: row.lineMstCode || "",
-        lineMstDesc: row.lineMstDesc || "",
-        productCode: row.productCode || "",
-        isActive: row.isActive === "1" ? "Active" : "Inactive",
-      });
-
-      newRow.eachCell((cell) => {
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.font = { size: 10 };
+      row.eachCell((cell) => {
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
+        };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -578,17 +601,24 @@ if (missingProduct) {
       });
     });
 
-    // === Save Excel File ===
+    // ===== AutoFilter =====
+    worksheet.autoFilter = {
+      from: { row: startRow, column: 1 },
+      to: { row: startRow, column: headers.length },
+    };
+
+    // ===== Save File =====
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(
       new Blob([buffer], { type: "application/octet-stream" }),
-      `Line_Master_Report_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      `Line_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
     );
   } catch (error) {
     console.error("Excel export error:", error);
-    toast.error("Error exporting to Excel. Please try again.");
+    toast.error("Error exporting Line Master.");
   }
 };
+
 
 
   return (
