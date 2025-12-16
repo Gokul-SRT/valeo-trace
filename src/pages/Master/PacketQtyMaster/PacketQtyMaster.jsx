@@ -137,7 +137,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
           textAlign: "right",
         }}
       >
-        <span style={{ color: "red" }}>*</span>
+        {/* <span style={{ color: "red" }}>*</span> */}
         <span>{props.displayName}</span>
       </div>
     );
@@ -145,7 +145,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     {
-      headerName: "Child Part Code",
+      headerName: "Child Part Code *",
       field: "childPartId",
       editable: true,
       cellEditor: "agSelectCellEditor",
@@ -176,10 +176,10 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       },
     },
     {
-      headerName: "Packet Qty",
+      headerName: "Packet Qty(Nos) *",
       field: "packetsQtys",
       filter: "agTextColumnFilter",
-      // headerComponent: RequiredHeaderRight,
+       headerComponent: RequiredHeaderRight,
       cellStyle: { textAlign: "right" },
     },
   ];
@@ -312,11 +312,11 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       } else if (response.data && response.data === "DUBLICATE") {
         toast.error("Do Not Allow Duplicate PacketId!");
       } else {
-        toast.error("Add/Update failed");
+        toast.error("No Data To Save/Update");
       }
     } catch (error) {
       console.error("Error saving PacketMaster data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
     } finally {
       setLoading(false);
     }
@@ -517,6 +517,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
                 updatedList[params.rowIndex] = { ...params.data };
                 setMasterList(updatedList);
               }}
+              overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
             />
           )}
 

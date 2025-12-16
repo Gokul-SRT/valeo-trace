@@ -162,7 +162,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     {
-      headerName: "Child Part Code",
+      headerName: "Child Part Code *",
       field: "childPartId",
       editable: true,
       cellEditor: "agSelectCellEditor",
@@ -190,7 +190,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     },
 
     {
-      headerName: "Operation Code",
+      headerName: "Operation Code *",
       field: "operationId",
       editable: true,
       cellEditor: "agSelectCellEditor",
@@ -218,7 +218,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     },
 
     {
-      headerName: "Offset",
+      headerName: "Offset(Nos) *",
       field: "offset",
       editable: true,
       filter: "agNumberColumnFilter",
@@ -355,13 +355,13 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
 
       if (response.data && response.data === "SUCCESS") {
         toast.success("Add/Update successfully!");
-        await loadOptionsAndData(); // 🔥 Reload everything properly
+        await loadOptionsAndData(); //  Reload everything properly
       } else {
-        toast.error("Add/Update failed");
+        toast.error("No Data To Save/Update");
       }
     } catch (error) {
       console.error("Error saving data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
     } finally {
       setLoading(false);
     }
@@ -550,7 +550,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
         </div>
 
         <div className="card-body p-3" style={{ position: "relative" }}>
-          {/* 🔥 Only render grid when options are loaded */}
+          {/*  Only render grid when options are loaded */}
           {optionsLoaded && (
             <AgGridReact
               ref={gridRef}
@@ -568,6 +568,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
                 updatedList[params.rowIndex] = { ...params.data };
                 setMasterList(updatedList);
               }}
+              overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
             />
           )}
 

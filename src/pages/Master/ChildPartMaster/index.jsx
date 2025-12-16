@@ -125,7 +125,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     { 
-      headerName: "Child Part Code", 
+      headerName: "Child Part Code *", 
       field: "childPartCode", 
       filter: "agTextColumnFilter",
       // headerComponent: () => (
@@ -134,7 +134,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       //   </span>
       // ),
     },
-    { headerName: "Child Part Desc", field: "childPartDesc", filter: "agTextColumnFilter" },
+    { headerName: "Child Part Desc *", field: "childPartDesc", filter: "agTextColumnFilter" },
     {
       headerName: "Status",
       field: "status",

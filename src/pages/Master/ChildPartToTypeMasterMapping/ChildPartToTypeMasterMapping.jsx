@@ -182,7 +182,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       filter: true,
     },
     {
-      headerName: "*Child Part Code",
+      headerName: "Child Part Code *",
       field: "childPartId",
       filter: "agTextColumnFilter",
       editable: true,
@@ -211,7 +211,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       },
     },
     {
-      headerName: "*Type Code",
+      headerName: "Type Code *",
       field: "typeId",
       filter: "agTextColumnFilter",
       editable: true,

@@ -330,14 +330,14 @@ const GroupCodeDropdownEditor = (props) => {
 
   const columnDefs = [
     {
-      headerName: "Product Code",
+      headerName: "Product Code *",
       field: "productCode",
       filter: "agTextColumnFilter",
       // headerComponent: RequiredHeader,
       editable: (params) => params.data.isUpdate === 0,
     },
     {
-      headerName: "Product Description",
+      headerName: "Product Description *",
       field: "productDesc",
       filter: "agTextColumnFilter",
       // headerComponent: RequiredHeader,
@@ -348,7 +348,7 @@ const GroupCodeDropdownEditor = (props) => {
     //   filter: "agTextColumnFilter",
     // },
     {
-      headerName: "Group Code",
+      headerName: "Group Code *",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
       // headerComponent: RequiredHeader,
@@ -356,7 +356,7 @@ const GroupCodeDropdownEditor = (props) => {
       cellRenderer: GroupCodeCellRenderer,
     },
     {
-      headerName: "Operations",
+      headerName: "Operations *",
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
@@ -626,11 +626,11 @@ const hasChanges = () => {
       } else if (response === "DUBLICATE") {
         toast.warning("Duplicate Product Code not allowed!");
       } else {
-        toast.error("Add/Update failed");
+        toast.error("No Data To Save/Update");
       }
     } catch (error) {
       console.error("Error saving product data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
     }finally {
       setLoading(false); // ✅ Stop loader
     }
@@ -875,6 +875,7 @@ const hasChanges = () => {
               updatedList[params.rowIndex] = { ...params.data }; // copy updated row
               setMasterList(updatedList);
             }}
+            overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
            {loading && (
             <div

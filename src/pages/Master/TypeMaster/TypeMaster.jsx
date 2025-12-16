@@ -101,20 +101,20 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     {
-      headerName: "Type Code",
+      headerName: "Type Code *",
       field: "typeCode",
       filter: "agTextColumnFilter",
    //   headerComponent: RequiredHeader, // Add required indicator
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
-      headerName: "Type Description",
+      headerName: "Type Description *",
       field: "typeDescription",
       filter: "agTextColumnFilter",
     //  headerComponent: RequiredHeader, // Add required indicator
     },
     {
-      headerName: "Bin Quantity",
+      headerName: "Bin Quantity(Nos) *",
       field: "stantardQuantity",
       filter: "agTextColumnFilter",
       headerComponent: RequiredHeaderRight,
@@ -311,11 +311,11 @@ if (invalidTypeDesc) {
       } else if (response.data && response.data === "DUBLICATE") {
         toast.error("Do Not Allow Duplicate Type Code!");
       } else {
-        toast.error("SaveOrUpdate failed.");
+        toast.error("No Data To Save/Update.");
       }
     } catch (error) {
       console.error("Error saving TypeMaster data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
     } finally {
       setLoading(false);
     }
@@ -556,6 +556,7 @@ if (invalidTypeDesc) {
               updatedList[params.rowIndex] = { ...params.data };
               setMasterList(updatedList);
             }}
+            overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
 
           <div className="text-center mt-4">

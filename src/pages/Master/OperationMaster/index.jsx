@@ -271,7 +271,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     {
-      headerName: "Operation Id",
+      headerName: "Operation Id *",
       field: "operationId",
       filter: "agTextColumnFilter",
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
@@ -282,7 +282,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       // ),
     },
     {
-      headerName: "Operation Code",
+      headerName: "Operation Code *",
       field: "operationUniquecode",
       filter: "agTextColumnFilter",
       // headerComponent: () => (
@@ -294,7 +294,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       // editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
-      headerName: "Operation Description",
+      headerName: "Operation Description *",
       field: "operationDesc",
       filter: "agTextColumnFilter",
     },
@@ -413,7 +413,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     
     */
     {
-      headerName: "Child Part Code",
+      headerName: "Child Part Code *",
       field: "childPartId", // holds childPartId(s) as string
       filter: "agTextColumnFilter",
       editable: true,

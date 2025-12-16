@@ -202,14 +202,14 @@ const LineMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
     {
-      headerName: "Line Code",
+      headerName: "Line Code *",
       field: "lineMstCode",
       filter: "agTextColumnFilter",
       // headerComponent: RequiredHeader,
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
-      headerName: "Line Description",
+      headerName: "Line Description *",
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
       // headerComponent: RequiredHeader,
@@ -240,7 +240,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
 
 
 {
-  headerName: "Product Code",
+  headerName: "Product Code *",
   field: "productCode",
   filter: "agTextColumnFilter",
   editable: true,
@@ -435,15 +435,15 @@ if (missingProduct) {
 
         toast.success("Do Not Allow Dublicate LineCode!");
       } else {
-        toast.error("Unable to save data. Please try again later.");
+        toast.error("No Data To Save/Update. Please try again later.");
         fetchData();
       }
     } catch (error) {
       console.error("Error saving product data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
       fetchData();
     }finally {
-      setLoading(false); // ✅ Stop loader
+      setLoading(false); //  Stop loader
     }
   };
 
@@ -680,6 +680,7 @@ const onExportExcel = async () => {
       updatedList[params.rowIndex] = { ...params.data }; // copy updated row
       setMasterList(updatedList);
     }}
+    overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
 
      {loading && (
