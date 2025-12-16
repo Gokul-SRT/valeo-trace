@@ -103,6 +103,10 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
   const fetchData = async (e) => {
     setIsLoading(true);
+            getLineDropDownData()
+        getOperationDropDownData()
+        getProductDropDownData()
+        getCustomerDropDownData()
     try {
       const response = await backendService({requestPath:"gettoolmasterdtl", 
         requestData: {
@@ -118,10 +122,6 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         }));
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
-        getLineDropDownData()
-        getOperationDropDownData()
-        getProductDropDownData()
-        getCustomerDropDownData()
       } else {
         setMasterList([]);
         setOriginalList([]);
@@ -210,7 +210,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       const OperationEmpty = masterList.filter((item) => !item.operation || item.operation.trim() === "");
       const ProductCodeEmpty = masterList.filter((item) => !item.modelId || (Array.isArray(item.modelId) ? item.modelId.length === 0 : item.modelId.toString().trim() === ""));
       const InvalidToolNo = masterList.filter((item) => item.toolNo && item.toolNo.length > 20);
-      const InvalidMaxShots = masterList.filter((item) => item.maxShots && item.maxShots.toString().trim() !== "" && (isNaN(item.maxShots) || parseInt(item.maxShots) < 0 || item.maxShots.toString().length > 8));
+      const InvalidMaxShots = masterList.filter((item) => item.maxShots && item.maxShots.toString().trim() !== "" && (isNaN(item.maxShots) || parseInt(item.maxShots) < 0 || parseInt(item.maxShots) > 100000000));
       
       // Check for any mandatory field missing
       if (ToolNoEmpty?.length > 0 || ToolDescEmpty?.length > 0 || MaxShotsEmpty?.length > 0 || LineEmpty?.length > 0 || OperationEmpty?.length > 0 || ProductCodeEmpty?.length > 0) {
@@ -224,7 +224,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       }
       
       if (InvalidMaxShots && InvalidMaxShots?.length > 0) {
-        toast.error("Maximum Shot Count must be a valid positive number with maximum 8 digits.");
+        toast.error("Maximum Shot Count must be a valid positive number and cannot exceed 100000000.");
         return;
       }
       
@@ -363,6 +363,18 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       getValue() {
         return value;
       },
+      isCancelBeforeStart() {
+        return false;
+      },
+      isCancelAfterEnd() {
+        return false;
+      },
+      afterGuiAttached() {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }
     }));
   
     const handleKeyDown = (e) => {
@@ -381,11 +393,12 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         const digit = e.keyCode >= 96 ? e.keyCode - 96 : e.keyCode - 48;
         const newValue = value + digit;
         const numericValue = parseInt(newValue) || 0;
+        console.log('ncenec');
         
-        if (numericValue > 100000000) {
+        if (numericValue > 1000000) {
           e.preventDefault();
           setTimeout(() => {
-            toast.error("Maximum 100000000 reached");
+            toast.error("Maximum 1000000 reached");
           }, 0);
           return;
         }
@@ -396,20 +409,32 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         e.preventDefault();
       }
     };
+    
   
     const handleChange = (e) => {
       const newValue = e.target.value.replace(/[^0-9]/g, '');
       const numericValue = parseInt(newValue) || 0;
       
-      if (numericValue > 100000000) {
+      if (numericValue > 1000000) {
+        setValue("1000000");
+        // Update the row data immediately
+        if (props.data && props.colDef) {
+          props.data[props.colDef.field] = "1000000";
+          props.data.changed = true;
+        }
         setTimeout(() => {
-          toast.error("Maximum 100000000 reached");
+          toast.error("Maximum 1000000 reached");
         }, 0);
         return;
       }
       
-      if (newValue.length <= 8) {
+      if (newValue.length <= 7) {
         setValue(newValue);
+        // Update the row data immediately
+        if (props.data && props.colDef) {
+          props.data[props.colDef.field] = newValue;
+          props.data.changed = true;
+        }
       }
     };
   
@@ -421,7 +446,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         style={{ width: "100%", border: "none", outline: "none", padding: "4px" }}
-        maxLength={8}
+        maxLength={7}
       />
     );
   });
@@ -516,7 +541,7 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
     {
       headerName: "Maximum Shot Count (Nos.)",
       field: "maxShots",
-      cellEditor: "agTextCellEditor",
+      cellEditor: NumberOnlyEditor,
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Maximum Shot Count (Nos.)" },
       valueSetter: (params) => {
@@ -674,6 +699,15 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
             const lastPage = Math.floor((totalRows - 1) / pageSize);
             api.paginationGoToPage(lastPage);
             api.ensureIndexVisible(totalRows - 1, "bottom");
+            
+            // Auto-focus on the first cell of the new row (Tool No.)
+            setTimeout(() => {
+              api.setFocusedCell(totalRows - 1, "toolNo");
+              api.startEditingCell({
+                rowIndex: totalRows - 1,
+                colKey: "toolNo"
+              });
+            }, 200);
           }
         }, 100);
         return updated;
@@ -907,9 +941,20 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
 
 
 
+  // Check if update button should be disabled
+  const isUpdateDisabled = () => {
+    return masterList.some(item => 
+      item.maxShots && 
+      item.maxShots.toString().trim() !== "" && 
+      parseInt(item.maxShots) > 1000000
+    );
+  };
+
   const onCellValueChanged = (params) => {
     const { colDef, newValue, oldValue, data } = params;
     const field = colDef.field;
+
+     console.log("iceiec")
 
     if ((newValue ?? "") === (oldValue ?? "")) return;
 
@@ -961,14 +1006,21 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
       }
     }
 
+    
+
     // Validation for max shots
     if (field === "maxShots") {
+     
       // Remove any non-numeric characters
       const numericValue = newValue ? newValue.toString().replace(/[^0-9]/g, '') : '';
       
-      // Check if length exceeds 8 digits (100000000)
-      if (numericValue.length > 8) {
-        toast.error("Maximum Shot Count cannot exceed 8 digits (100000000).");
+      if(numericValue === ""){
+        params.node.setDataValue(field, oldValue || "10000000");
+      }
+
+      // Check if value exceeds 100000000
+      if (parseInt(numericValue) > 10000000) {
+        toast.error("Maximum Shot Count cannot exceed 10000000.");
         params.node.setDataValue(field, oldValue || "");
         return;
       }
@@ -1102,8 +1154,14 @@ const ToolMaster = ({ modulesprop, screensprop }) => {
             <button
               type="submit"
               className="btn text-white me-2"
-              style={{ backgroundColor: "#00264d", minWidth: "90px" }}
+              style={{ 
+                backgroundColor: isUpdateDisabled() ? "#6c757d" : "#00264d", 
+                minWidth: "90px",
+                cursor: isUpdateDisabled() ? "not-allowed" : "pointer"
+              }}
               onClick={createorUpdate}
+              disabled={isUpdateDisabled()}
+              title={isUpdateDisabled() ? "Please correct Maximum Shot Count values (must be ≤ 1000000)" : "Update"}
             >
               Update
             </button>

@@ -235,12 +235,19 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
   const MandatoryHeaderComponent = (props) => {
     const buttonRef = React.useRef(null);
     
+    const handleFilterClick = () => {
+      if (props.showColumnMenu) {
+        props.showColumnMenu(buttonRef.current);
+      }
+    };
+    
     return (
       <div className="ag-cell-label-container" role="presentation">
         <span 
           ref={buttonRef}
           className="ag-header-icon ag-header-cell-filter-button" 
-          onClick={() => props.showColumnMenu(buttonRef.current)}
+          onClick={handleFilterClick}
+          style={{ cursor: 'pointer' }}
         >
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
@@ -269,7 +276,6 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
       field: "customerId",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      filter: "agSetColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Customer" },
       cellEditorParams: {
@@ -279,13 +285,17 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
         const customer = customerData.find(item => item.customerId === params.value);
         return customer ? customer.customerName : params.value;
       },
+      valueSetter: (params) => {
+        params.data.customerId = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Product Code",
       field: "productId",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      filter: "agSetColumnFilter",
       headerComponent: MandatoryHeaderComponent,
       headerComponentParams: { displayName: "Product Code" },
       cellEditorParams: {
@@ -295,6 +305,11 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
         const product = productData.find(item => item.productCode === params.value);
         return product ? `${product.productName}` : params.value;
       },
+      valueSetter: (params) => {
+        params.data.productId = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Status",
@@ -339,6 +354,15 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
           const lastPage = Math.floor((totalRows - 1) / pageSize);
           api.paginationGoToPage(lastPage);
           api.ensureIndexVisible(totalRows - 1, "bottom");
+          
+          // Auto-focus on the Customer column of the new row
+          setTimeout(() => {
+            api.setFocusedCell(totalRows - 1, "customerId");
+            api.startEditingCell({
+              rowIndex: totalRows - 1,
+              colKey: "customerId"
+            });
+          }, 200);
         }
       }, 100);
       return updated;

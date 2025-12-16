@@ -8,6 +8,7 @@ import { backendService } from "../../../../service/ToolServerApi";
 import store from "store";
 import { toast } from "react-toastify";
 import moment from "moment";
+import Loader from "../../../.././Utills/Loader";
 
 const { Option } = Select;
 
@@ -18,6 +19,7 @@ const ToolHistoryLog = () => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [toolData, setToolData] = useState([])
   const [historyData, setHistoryData] = useState([])
+  const [isLoading, setIsLoading] = useState(false);
   const gridRef = useRef(null);
   const tenantId = store.get('tenantId')
   const branchCode = store.get('branchCode')
@@ -28,6 +30,7 @@ const ToolHistoryLog = () => {
 
   const toolDropDownData = async (e) => {
     try {
+      setIsLoading(true);
       const response = await backendService({
         requestPath: "gettoolmasterdtl",
         requestData: {
@@ -46,20 +49,30 @@ const ToolHistoryLog = () => {
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleToolHistoryLog = async () => {
     const formValues = form.getFieldsValue()
     console.log(formValues, 'formValues---')
+    
+    // Validate mandatory fields
+    if (!formValues.toolNo || !formValues.year) {
+      toast.error("Please fill all mandatory fields");
+      return;
+    }
+    
     try {
+      setIsLoading(true);
       const response = await backendService({
         requestPath: 'getToolHistoryLogHdr',
         requestData: {
           toolNo: formValues.toolNo,
           tenantId,
           branchCode,
-          year: formValues.year ? moment(formValues.year, "YYYY") : null,
+          year: formValues.year ? formValues.year.format("YYYY") : null,
         }
       })
       if (response) {
@@ -70,15 +83,15 @@ const ToolHistoryLog = () => {
             setHistoryData(updatedData)
           }
         } else {
-          toast.error(response.responseMessage)
           setHistoryData([])
           form.resetFields()
         }
       }
     } catch (err) {
       console.error(err)
+    } finally {
+      setIsLoading(false);
     }
-
   }
 
 
@@ -381,16 +394,31 @@ const ToolHistoryLog = () => {
             </Button>
           </div>
 
-          <div className="ag-theme-alpine" style={{ height: 300, width: "100%" }}>
-            <AgGridReact
-              ref={gridRef}
-              rowData={historyData}
-              columnDefs={columnDefs}
-              pagination={true}
-              paginationPageSize={10}
-              suppressCellFocus={true}
-              domLayout="autoHeight"
-            />
+          <div style={{ position: "relative" }}>
+            {isLoading && (
+              <div
+                className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.6)",
+                  zIndex: 2,
+                  borderRadius: "8px",
+                }}
+              >
+                <Loader />
+              </div>
+            )}
+            <div className="ag-theme-alpine" style={{ height: 300, width: "100%" }}>
+              <AgGridReact
+                ref={gridRef}
+                rowData={historyData}
+                columnDefs={columnDefs}
+                pagination={true}
+                paginationPageSize={10}
+                suppressCellFocus={true}
+                domLayout="autoHeight"
+                overlayNoRowsTemplate="No Data Available"
+              />
+            </div>
           </div>
         </Card>
       )}

@@ -24,6 +24,7 @@ serverApi.interceptors.request.use(
     const employeeId = getCookie('empID')
     const branchCode = getCookie('branchCode')
     const orgCode = getCookie('orgCode')
+    const roleId=getCookie('roleId');
     if (accessToken) {
       request.headers.Authorization = `Bearer ${accessToken}`;
       request.headers.AccessToken = accessToken;
@@ -32,6 +33,7 @@ serverApi.interceptors.request.use(
       store.set("branchCode", branchCode)
       store.set("tenantId", tenantId)
       store.set("orgCode", orgCode)
+      store.set("roleId", roleId)
     }
     return request;
   },

@@ -109,6 +109,15 @@ const ToolChange = () => {
   const createorUpdate = async () =>{
      const formValues = form.getFieldsValue()
      console.log(formValues,"formValues-------------")
+     
+     // Validate mandatory fields
+     if (!formValues.toolNo || !formValues.toolDesc || !formValues.operation || 
+         !formValues.product || !formValues.usageTillDate || !formValues.maxUsage || 
+         !formValues.remainUseage) {
+       toast.error("Please fill all mandatory fields");
+       return;
+     }
+     
      try{
           
       const response = await backendService({
@@ -123,6 +132,7 @@ const ToolChange = () => {
           remainUseage: formValues.remainUseage,
           maxUseage: formValues.maxUsage,
           enteredBy: empId,
+          branchCode : branchCode
         }]
       })
       if (response) {

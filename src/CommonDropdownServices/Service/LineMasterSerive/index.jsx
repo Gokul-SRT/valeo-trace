@@ -1,15 +1,20 @@
 // src/Service/LineMasterService.js
 import serverApi from "../../../CommonserverApi";
+import store from "store"; 
 
 const LineMstdropdown = async () => {
   try {
     const tenantId = JSON.parse(localStorage.getItem("tenantId"));
     const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+    const roleId=store.get("roleId");
+    const empId=store.get("employeeId");
 
     const payload = {
       tenantId,
       branchCode,
       isActive: "1",
+      userRoleId : roleId,
+      empId
     };
 
     const response = await serverApi.post("getCommonMstdtl", payload, {

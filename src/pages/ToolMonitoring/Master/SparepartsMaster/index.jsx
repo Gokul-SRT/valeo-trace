@@ -11,6 +11,7 @@ import store from 'store'
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
+import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 
 const USED_IDS_STORAGE_KEY = "criticalSpare_usedIds_v1";
 
@@ -59,10 +60,10 @@ const CriticalSpareMaster = () => {
   const fetchLineDropdown = async () => {
     try {
       const payload = { isActive: "1", tenantId, branchCode };
-      const res = await CommonserverApi.post("getCommonMstdtl", payload);
-      const data = Array.isArray(res?.data)
-        ? res.data
-        : res?.data?.responseData || [];
+      const res = await LineMstdropdown();
+      const data = Array.isArray(res)
+        ? res
+        : res || [];
       setLineOptions(data);
     } catch {
       toast.error("No data available");
