@@ -476,7 +476,7 @@ const handleScan = async (scanned) => {
   );
 
   if (!matchedChildPart) {
-    toast.error("Child part not found");
+    toast.error("Incorrect child part scanned");
     return;
   }
 
@@ -834,7 +834,7 @@ const inputRef = useRef(null);
           dataSource={data}
           pagination={{ pageSize: 10 }}
           bordered
-          locale={{ emptyText: "No data available in table" }}
+          locale={{ emptyText: "No data available" }}
         />
       </Card>
     </div>
@@ -846,7 +846,7 @@ const inputRef = useRef(null);
     <>
       {/* MAIN PAGE */}
       <Card
-        title="Pick List"
+        title="PickList"
         headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
         style={{marginBottom:"10px"}}
       >
@@ -862,7 +862,7 @@ const inputRef = useRef(null);
            
            
             <Col span={6}>
-            <Form.Item label="Date" name="date" rules={[{ required: true }]}>
+            <Form.Item label="Date" name="date" rules={[{ required: true,message: "Please select Date", }]}>
               <DatePicker
                 style={{ width: "100%" }}
                 defaultValue={todays}
@@ -872,7 +872,7 @@ const inputRef = useRef(null);
               </Form.Item>
             </Col>
             <Col span={6}>
-            <Form.Item label="Line" name="line" rules={[{ required: true }]}>
+            <Form.Item label="Line" name="line" rules={[{ required: true,message: "Please select line", }]}>
                 <Select placeholder="Select a line"   onChange={handleLineChange}>
                  {lineList.map((linelis)=>(
                   <Option key={linelis.lineMstCode} value={linelis.lineMstCode || linelis.lineMstDesc} >
@@ -883,7 +883,7 @@ const inputRef = useRef(null);
               </Form.Item>
             </Col>
             <Col span={6}>
-            <Form.Item label="Product" name="product" rules={[{ required: true }]}>
+            <Form.Item label="Product" name="product" rules={[{ required: true,message: "Please select Product", }]}>
                 <Select placeholder="Select a Product" disabled={!selectedLine || productList.length === 0}>
                 {productList.map((productLis) => (
                 <Option key={productLis.productCode} value={productLis.productCode}>
@@ -896,7 +896,7 @@ const inputRef = useRef(null);
             </Col>
 
             <Col span={6}>
-            <Form.Item label="Status" name="status" rules={[{ required: true }]}>
+            <Form.Item label="Status" name="status" rules={[{ required: true,message: "Please select Status", }]}>
                 <Select placeholder="Select a Status">
                 {statusList.map((statuslis)=>(
                   <Option key={statuslis.statusId} value={statuslis.statusId || statuslis.statusDesc} >
@@ -940,7 +940,7 @@ const inputRef = useRef(null);
 
           {/* Show Line Feeder below Pending Picklist */}
           {showLineFeeder && (
-            <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title="Picklist Verification">
+            <Card headStyle={{ backgroundColor: "#00264d", color: "white" }} title={`Picklist Verification - ${plksCode}`}>
                <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
                <Form form={form} autoComplete="off">
       <div

@@ -190,29 +190,46 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   };
 
 
+  // const RequiredHeader = (props) => {
+  //   return (
+  //     <span>
+  //       <span style={{ color: "red" }}>*</span> {props.displayName}
+  //     </span>
+  //   );
+  // };
   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
     );
   };
 
 
-
   const columnDefs = [
     {
-      headerName: "Line Code *",
+      headerName: "Line Code",
       field: "lineMstCode",
       filter: "agTextColumnFilter",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
-      headerName: "Line Description *",
+      headerName: "Line Description",
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
     },
   
    /* {
@@ -240,11 +257,11 @@ const LineMaster = ({ modulesprop, screensprop }) => {
 
 
 {
-  headerName: "Product Code *",
+  headerName: "Product Code",
   field: "productCode",
   filter: "agTextColumnFilter",
   editable: true,
-  // headerComponent: RequiredHeader,
+   headerComponent: RequiredHeader,
   cellEditor: MultiSelectEditor,
   cellEditorParams: { values: productData },
   valueSetter: (params) => {

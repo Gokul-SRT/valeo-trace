@@ -106,11 +106,30 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+  // const RequiredHeader = (props) => {
+  //   return (
+  //     <span>
+  //       <span style={{ color: "red" }}>*</span> {props.displayName}
+  //     </span>
+  //   );
+  // };
+
   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
     );
   };
 
@@ -182,12 +201,12 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       filter: true,
     },
     {
-      headerName: "Child Part Code *",
+      headerName: "Child Part Code",
       field: "childPartId",
       filter: "agTextColumnFilter",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      //headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
       //headerClass: "required-header", // Add red * via CSS
       cellEditorParams: (params) => ({
         values: childPartData.map((p) => p.childPartId),
@@ -211,12 +230,12 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       },
     },
     {
-      headerName: "Type Code *",
+      headerName: "Type Code",
       field: "typeId",
       filter: "agTextColumnFilter",
       editable: true,
       cellEditor: "agSelectCellEditor",
-    //  headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
      // headerClass: "required-header", 
   //    headerComponent: RequiredHeader,
   // headerComponentParams: { displayName: "Type Code" },

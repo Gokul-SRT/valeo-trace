@@ -142,31 +142,49 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
-  const RequiredHeader = (props) => {
-    return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
-    );
-  };
+  // const RequiredHeader = (props) => {
+  //   return (
+  //     <span>
+  //       <span style={{ color: "red" }}>*</span> {props.displayName}
+  //     </span>
+  //   );
+  // };
 
-  const RequiredHeaderRight = (props) => {
+  // const RequiredHeaderRight = (props) => {
+  //   return (
+  //     <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", textAlign: "right" }}>
+  //       <span style={{ color: "red" }}>*</span>
+  //       <span>{props.displayName}</span>
+  //     </div>
+  //   );
+  // };
+
+  const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", textAlign: "right" }}>
-        <span style={{ color: "red" }}>*</span>
-        <span>{props.displayName}</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
 
-
   const columnDefs = [
     {
-      headerName: "Child Part Code *",
+      headerName: "Child Part Code ",
       field: "childPartId",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       cellEditorParams: (params) => ({
         values: childPartOptions.map((p) => p.childPartId),
       }),
@@ -190,11 +208,11 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     },
 
     {
-      headerName: "Operation Code *",
+      headerName: "Operation Code",
       field: "operationId",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       cellEditorParams: {
         values: operationOptions.map((p) => p.operationId),
       },
@@ -218,12 +236,12 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     },
 
     {
-      headerName: "Offset(Nos) *",
+      headerName: "Offset(Nos)",
       field: "offset",
       editable: true,
       filter: "agNumberColumnFilter",
       cellEditor: "agNumberCellEditor",
-      // headerComponent: RequiredHeaderRight,
+       headerComponent: RequiredHeader,
       cellEditorParams: {
         step: 1,
         min: 0,

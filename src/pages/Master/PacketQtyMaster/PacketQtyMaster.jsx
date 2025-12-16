@@ -120,36 +120,69 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
-    );
-  };
-
-  const RequiredHeaderRight = (props) => {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          width: "100%",
-          textAlign: "right",
-        }}
-      >
-        {/* <span style={{ color: "red" }}>*</span> */}
-        <span>{props.displayName}</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
 
+//   const RequiredHeaderRight = (props) => {
+//     const buttonRef = React.useRef(null);
+    
+//     return (
+//       <div className="ag-cell-label-container" role="presentation" style={{ justifyContent: 'flex-end' }}>
+//         <div className="ag-header-cell-label" role="presentation" style={{ textAlign: 'right', flex: 1 }}>
+//           <span className="ag-header-cell-text">
+//             {props.displayName} <span style={{color: 'red'}}>*</span>
+//           </span>
+//         </div>
+//         <span 
+//           ref={buttonRef}
+//           className="ag-header-icon ag-header-cell-filter-button" 
+//           onClick={() => props.showColumnMenu(buttonRef.current)}
+//         >
+//           <span className="ag-icon ag-icon-filter" role="presentation"></span>
+//         </span>
+//       </div>
+//     );
+// };
+
+
+  // const RequiredHeaderRight = (props) => {
+  //   return (
+  //     <div
+  //       style={{
+  //         display: "flex",
+  //         justifyContent: "flex-end",
+  //         width: "100%",
+  //         textAlign: "right",
+  //       }}
+  //     >
+  //       {/* <span style={{ color: "red" }}>*</span> */}
+  //       <span>{props.displayName}</span>
+  //     </div>
+  //   );
+  // };
+
   const columnDefs = [
     {
-      headerName: "Child Part Code *",
+      headerName: "Child Part Code",
       field: "childPartId",
       editable: true,
       cellEditor: "agSelectCellEditor",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       cellEditorParams: (params) => ({
         values: childPartOptions.map((p) => p.childPartId),
       }),
@@ -176,10 +209,10 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       },
     },
     {
-      headerName: "Packet Qty(Nos) *",
+      headerName: "Packet Qty(Nos)",
       field: "packetsQtys",
       filter: "agTextColumnFilter",
-       headerComponent: RequiredHeaderRight,
+       headerComponent: RequiredHeader,
       cellStyle: { textAlign: "right" },
     },
   ];

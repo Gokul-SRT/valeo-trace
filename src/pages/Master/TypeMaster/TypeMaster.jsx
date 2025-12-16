@@ -82,42 +82,61 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
   };
 
   // Add Required Header Component
-  const RequiredHeader = (props) => {
-    return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
-    );
-  };
+  // const RequiredHeader = (props) => {
+  //   return (
+  //     <span>
+  //       <span style={{ color: "red" }}>*</span> {props.displayName}
+  //     </span>
+  //   );
+  // };
 
-  const RequiredHeaderRight = (props) => {
+  // const RequiredHeaderRight = (props) => {
+  //   return (
+  //     <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", textAlign: "right" }}>
+  //       {/* <span style={{ color: "red" }}>*</span> */}
+  //       <span>{props.displayName}</span>
+  //     </div>
+  //   );
+  // };
+
+  const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <div style={{ display: "flex", justifyContent: "flex-end", width: "100%", textAlign: "right" }}>
-        {/* <span style={{ color: "red" }}>*</span> */}
-        <span>{props.displayName}</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
 
   const columnDefs = [
     {
-      headerName: "Type Code *",
+      headerName: "Type Code",
       field: "typeCode",
       filter: "agTextColumnFilter",
-   //   headerComponent: RequiredHeader, // Add required indicator
+      headerComponent: RequiredHeader, // Add required indicator
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
-      headerName: "Type Description *",
+      headerName: "Type Description",
       field: "typeDescription",
       filter: "agTextColumnFilter",
-    //  headerComponent: RequiredHeader, // Add required indicator
+      headerComponent: RequiredHeader, // Add required indicator
     },
     {
-      headerName: "Bin Quantity(Nos) *",
+      headerName: "Bin Quantity(Nos)",
       field: "stantardQuantity",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeaderRight,
+      headerComponent: RequiredHeader,
       cellStyle: { textAlign: "right" },
       valueFormatter: (params) => {
         return params.value ? Number(params.value).toLocaleString() : "";

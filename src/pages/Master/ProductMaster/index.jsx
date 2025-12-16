@@ -320,27 +320,47 @@ const GroupCodeDropdownEditor = (props) => {
     setEditingRow(null);
   };
 
+  // const RequiredHeader = (props) => {
+  //   return (
+  //     <span>
+  //       <span style={{ color: "red" }}>*</span> {props.displayName}
+  //     </span>
+  //   );
+  // };
+
+
   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <span>
-        <span style={{ color: "red" }}>*</span> {props.displayName}
-      </span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
     );
   };
 
   const columnDefs = [
     {
-      headerName: "Product Code *",
+      headerName: "Product Code",
       field: "productCode",
-      filter: "agTextColumnFilter",
-      // headerComponent: RequiredHeader,
+       filter: "agTextColumnFilter",
+       headerComponent: RequiredHeader,
       editable: (params) => params.data.isUpdate === 0,
     },
     {
-      headerName: "Product Description *",
+      headerName: "Product Description",
       field: "productDesc",
       filter: "agTextColumnFilter",
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
     },
     // {
     //   headerName: "UOM",
@@ -348,19 +368,19 @@ const GroupCodeDropdownEditor = (props) => {
     //   filter: "agTextColumnFilter",
     // },
     {
-      headerName: "Group Code *",
+      headerName: "Group Code",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       cellEditor: GroupCodeDropdownEditor,
       cellRenderer: GroupCodeCellRenderer,
     },
     {
-      headerName: "Operations *",
+      headerName: "Operations",
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
-      // headerComponent: RequiredHeader,
+       headerComponent: RequiredHeader,
       cellRenderer: OperationIdCellRenderer,
       cellStyle: { cursor: "pointer" },
     },
