@@ -3,7 +3,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
 
 const SupplierMaster = ({ modulesprop, screensprop }) => {
   console.log("Modules Props:", modulesprop);

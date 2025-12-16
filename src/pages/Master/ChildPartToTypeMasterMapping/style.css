@@ -1,0 +1,47 @@
+/* .ag-header-cell.required-header .ag-header-cell-text::after {
+    content: " *";
+    color: red;
+    font-weight: bold;
+  } */
+
+  /* .ag-header-cell.required-header .ag-header-cell-text::after {
+    content: " *" !important;
+    color: red !important;
+    font-weight: bold !important;
+    display: inline !important;
+} */
+
+/* .ag-header-cell.required-header .ag-header-cell-text {
+  color: #000; 
+} */
+
+/* Add red asterisk before Type Code header */
+/* [col-id="typeId"] .ag-header-cell-text::before {
+  content: "* ";
+  color: red !important;
+  font-weight: bold;
+} */
+/* .ag-header-cell[col-id="typeId"] .ag-header-cell-text::before {
+  content: "* ";
+  color: red;
+  font-weight: bold;
+} */
+
+/* Add red asterisk before Child Part Code header */
+/* .ag-header-cell[col-id="childPartId"] .ag-header-cell-text::before {
+  content: "* ";
+  color: red;
+  font-weight: bold;
+} */
+
+/* .ag-header-cell.required-field-header .ag-header-cell-text::before {
+  content: "* ";
+  color: red !important;
+  font-weight: bold !important;
+  display: inline !important;
+} */
+
+.ag-header-cell.required-header .ag-header-cell-text::first-letter {
+  color: red;
+  font-weight: bold;
+}

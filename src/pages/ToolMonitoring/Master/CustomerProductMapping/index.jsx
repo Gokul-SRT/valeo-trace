@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
 import store from "store";
 import { toast } from "react-toastify";
 import { backendService, commonBackendService } from "../../../../service/ToolServerApi";
@@ -16,7 +15,8 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
   const [originalList, setOriginalList] = useState([]);
   const [customerData, setCustomerData] = useState([]);
   const [productData, setProductData] = useState([]);
-  const [selectedStatus, setSelectedStatus] = useState("GetAll");
+  const [selectedCustomer, setSelectedCustomer] = useState("GetAll");
+  const [selectedProduct, setSelectedProduct] = useState("GetAll");
   const [loading, setLoading] = useState(false);
   const gridRef = useRef(null);
 
@@ -127,7 +127,7 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
         return;
       }
 
-      // Check for duplicates
+      // Check for duplicates (same customer-product combination)
       const duplicates = [];
       const seen = new Set();
       mappingList.forEach((row, index) => {
@@ -141,6 +141,40 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
       
       if (duplicates.length > 0) {
         toast.error("Duplicate entry");
+        return;
+      }
+
+      // Check if same product is assigned to multiple customers
+      const productCustomerMap = new Map();
+      mappingList.forEach((row, index) => {
+        if (row.productId && row.customerId) {
+          if (productCustomerMap.has(row.productId)) {
+            const existingCustomer = productCustomerMap.get(row.productId);
+            if (existingCustomer !== row.customerId) {
+              toast.error("Product already assigned to a customer. Record not saved.");
+              return;
+            }
+          } else {
+            productCustomerMap.set(row.productId, row.customerId);
+          }
+        }
+      });
+      
+      // Check if any product assignment conflict was found
+      let hasConflict = false;
+      const productMap = new Map();
+      for (const row of mappingList) {
+        if (row.productId && row.customerId) {
+          if (productMap.has(row.productId) && productMap.get(row.productId) !== row.customerId) {
+            hasConflict = true;
+            break;
+          }
+          productMap.set(row.productId, row.customerId);
+        }
+      }
+      
+      if (hasConflict) {
+        toast.error("Product already assigned to a customer. Record not saved.");
         return;
       }
 
@@ -199,9 +233,20 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
   };
 
   const MandatoryHeaderComponent = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <div>
-        {props.displayName} <span style={{color: 'red'}}>*</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
@@ -254,7 +299,7 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
     {
       headerName: "Status",
       field: "isActive",
-      filter: true,
+      filter: false,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
@@ -302,22 +347,35 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
 
   const handleCancel = () => {
     setMappingList(originalList);
-    setSelectedStatus("GetAll");
+    setSelectedCustomer("GetAll");
+    setSelectedProduct("GetAll");
     fetchData();
   };
 
-  const handleFilterChange = (value) => {
-    setSelectedStatus(value);
-    
-    let filteredList = originalList;
-    
-    if (value === "Active") {
-      filteredList = filteredList.filter((item) => item.isActive === "1");
-    } else if (value === "Inactive") {
-      filteredList = filteredList.filter((item) => item.isActive === "0");
+  const handleFilterChange = (type, value) => {
+    if (type === 'customer') {
+      setSelectedCustomer(value);
+    } else if (type === 'product') {
+      setSelectedProduct(value);
     }
     
-    setMappingList(filteredList);
+    setTimeout(() => {
+      let filteredList = originalList;
+      
+      // Apply Customer Filter
+      const customerFilter = type === 'customer' ? value : selectedCustomer;
+      if (customerFilter !== "GetAll") {
+        filteredList = filteredList.filter((item) => item.customerId === customerFilter);
+      }
+      
+      // Apply Product Filter
+      const productFilter = type === 'product' ? value : selectedProduct;
+      if (productFilter !== "GetAll") {
+        filteredList = filteredList.filter((item) => item.productId === productFilter);
+      }
+      
+      setMappingList(filteredList);
+    }, 100);
   };
 
   const updateCellValue = (params) => {
@@ -484,15 +542,33 @@ const CustomerProductMapping = ({ modulesprop, screensprop }) => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Status</label>
+              <label className="form-label fw-bold">Customer</label>
               <select
                 className="form-select"
-                value={selectedStatus}
-                onChange={(e) => handleFilterChange(e.target.value)}
+                value={selectedCustomer}
+                onChange={(e) => handleFilterChange('customer', e.target.value)}
               >
                 <option value="GetAll">Get All</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                {customerData.map((customer) => (
+                  <option key={customer.customerId} value={customer.customerId}>
+                    {customer.customerName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Product Code</label>
+              <select
+                className="form-select"
+                value={selectedProduct}
+                onChange={(e) => handleFilterChange('product', e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                {productData.map((product) => (
+                  <option key={product.productCode} value={product.productCode}>
+                    {product.productName}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

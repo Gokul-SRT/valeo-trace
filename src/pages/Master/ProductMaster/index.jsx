@@ -320,17 +320,27 @@ const GroupCodeDropdownEditor = (props) => {
     setEditingRow(null);
   };
 
+  const RequiredHeader = (props) => {
+    return (
+      <span>
+        <span style={{ color: "red" }}>*</span> {props.displayName}
+      </span>
+    );
+  };
+
   const columnDefs = [
     {
-      headerName: "Product Code",
+      headerName: "Product Code *",
       field: "productCode",
       filter: "agTextColumnFilter",
+      // headerComponent: RequiredHeader,
       editable: (params) => params.data.isUpdate === 0,
     },
     {
-      headerName: "Product Description",
+      headerName: "Product Description *",
       field: "productDesc",
       filter: "agTextColumnFilter",
+      // headerComponent: RequiredHeader,
     },
     // {
     //   headerName: "UOM",
@@ -338,17 +348,19 @@ const GroupCodeDropdownEditor = (props) => {
     //   filter: "agTextColumnFilter",
     // },
     {
-      headerName: "Group Code",
+      headerName: "Group Code *",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
+      // headerComponent: RequiredHeader,
       cellEditor: GroupCodeDropdownEditor,
       cellRenderer: GroupCodeCellRenderer,
     },
     {
-      headerName: "Operations",
+      headerName: "Operations *",
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
+      // headerComponent: RequiredHeader,
       cellRenderer: OperationIdCellRenderer,
       cellStyle: { cursor: "pointer" },
     },
@@ -514,6 +526,32 @@ const hasChanges = () => {
       }
 
 
+      const invalidGroupCode = masterList.filter(
+        (item) =>
+          item.isUpdate === 0 && (!item.groupCode || item.groupCode.trim() === "")
+      );
+
+      if (invalidGroupCode.length > 0) {
+        toast.error(
+          "Please fill GroupCode for all new rows."
+        );
+        return;
+      }
+
+      const invalidOperation = masterList.filter(
+        (item) =>
+          item.isUpdate === 0 && (!item.operationDescription || item.operationDescription.trim() === "")
+      );
+
+      if (invalidOperation.length > 0) {
+        toast.error(
+          "Please fill Operations for all new rows."
+        );
+        return;
+      }
+
+
+
       const productCodes=masterList.map((item)=> item.productCode.trim());
       const duplicateCodes=productCodes.filter((code,index)=> productCodes.indexOf(code) !== index);
 
@@ -581,18 +619,18 @@ const hasChanges = () => {
       });
 
       if (response === "SUCCESS") {
-        toast.success("Data saved successfully!");
+        toast.success("Add/Update successfully!");
 
         // Refresh data after successful save
         fetchData();
       } else if (response === "DUBLICATE") {
         toast.warning("Duplicate Product Code not allowed!");
       } else {
-        toast.error("Save or Update failed.");
+        toast.error("No Data To Save/Update");
       }
     } catch (error) {
       console.error("Error saving product data:", error);
-      toast.error("Error while saving data!");
+      toast.error("No Data To Save/Update!");
     }finally {
       setLoading(false); // ✅ Stop loader
     }
@@ -611,113 +649,126 @@ const hasChanges = () => {
   };
 
   const onExportExcelProductMaster = async () => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Product Master");
+
+    // ===== Column Setup =====
+    worksheet.columns = [
+      { width: 20 }, // Product Code
+      { width: 30 }, // Product Description
+      { width: 15 }, // Group Code
+      { width: 40 }, // Operation Description
+      { width: 15 }, // Status
+    ];
+
+    // ===== Logo + Title Row =====
+    worksheet.getRow(1).height = 50;
+
+    // Left Logo
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Product Master");
+      const logo1 = await fetch("/pngwing.com.png");
+      const blob1 = await logo1.blob();
+      const arr1 = await blob1.arrayBuffer();
+      const imageId1 = workbook.addImage({
+        buffer: arr1,
+        extension: "png",
+      });
+      worksheet.addImage(imageId1, {
+        tl: { col: 0, row: 0 },
+        ext: { width: 120, height: 40 },
+      });
+    } catch {
+      console.warn("Left logo not found");
+    }
 
-      // === Column widths ===
-      worksheet.getColumn(1).width = 20; // Product Code
-      worksheet.getColumn(2).width = 30; // Product Description
-      // worksheet.getColumn(3).width = 15; // UOM
-      worksheet.getColumn(3).width = 15; // Group Code
-      worksheet.getColumn(4).width = 40; // Operation Description
-      worksheet.getColumn(5).width = 12; // Is Active
+    // Title
+    worksheet.mergeCells("B1:D1");
+    const titleCell = worksheet.getCell("B1");
+    titleCell.value = `Product Master\nGenerated: ${moment().format(
+      "DD/MM/YYYY HH:mm"
+    )}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
 
-      worksheet.getRow(1).height = 65;
+    // Right Logo
+    try {
+      const logo2 = await fetch("/smartrunLogo.png");
+      const blob2 = await logo2.blob();
+      const arr2 = await blob2.arrayBuffer();
+      const imageId2 = workbook.addImage({
+        buffer: arr2,
+        extension: "png",
+      });
+       worksheet.addImage(imageId2, {
+          tl: { col: 2, row: 0 },
+          br: { col: 5, row: 1.6 },
+      });
+    } catch {
+      console.warn("Right logo not found");
+    }
 
-      // === Valeo logo (left) ===
-      try {
-        const logo1 = await fetch("/pngwing.com.png");
-        const blob1 = await logo1.blob();
-        const arr1 = await blob1.arrayBuffer();
-        const imageId1 = workbook.addImage({
-          buffer: arr1,
-          extension: "png",
-        });
-        worksheet.addImage(imageId1, {
-          tl: { col: 0, row: 0 },
-          br: { col: 1, row: 1 },
-        });
-      } catch (error) {
-        console.warn("Left logo not found, continuing without it");
-      }
+    // ===== Table Header =====
+    const headerRowIndex = 3;
+    const headers = [
+      "Product Code",
+      "Product Description",
+      "Group Code",
+      "Operation Description",
+      "Status",
+    ];
 
-      // === Title (center cell) ===
-      worksheet.mergeCells("B1:D2");
-      const titleCell = worksheet.getCell("B1");
+    worksheet.getRow(headerRowIndex).height = 25;
 
-      // Filter data based on current selection from ORIGINAL LIST
-      const currentFilter = "GetAll"; // You might want to track this state like in the previous example
-      const dataToExport =
-        currentFilter === "GetAll"
-          ? originalList
-          : currentFilter === "1"
-          ? originalList.filter(
-              (item) => item.isActive === "1" || item.isActive === 1
-            )
-          : originalList.filter(
-              (item) => item.isActive === "0" || item.isActive === 0
-            );
-
-      const filterText =
-        currentFilter === "GetAll"
-          ? "All Records"
-          : currentFilter === "1"
-          ? "Active Records"
-          : "Inactive Records";
-
-      titleCell.value = `Product Master \n(${filterText})`;
-      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-      titleCell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-        wrapText: true,
+    headers.forEach((header, index) => {
+      const cell = worksheet.getCell(headerRowIndex, index + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
       };
-      titleCell.border = {
+      cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
         right: { style: "thin" },
       };
+    });
 
-      // === SmartRun logo (right) ===
-      try {
-        const logo2 = await fetch("/smartrunLogo.png");
-        const blob2 = await logo2.blob();
-        const arr2 = await blob2.arrayBuffer();
-        const imageId2 = workbook.addImage({
-          buffer: arr2,
-          extension: "png",
-        });
-        worksheet.addImage(imageId2, {
-          tl: { col: 4, row: 0 },
-          br: { col: 5, row: 1 },
-        });
-      } catch (error) {
-        console.warn("Right logo not found, continuing without it");
-      }
+    // ===== Filtered Data =====
+    const dataToExport =
+      currentFilter === "GetAll"
+        ? originalList
+        : currentFilter === "1"
+        ? originalList.filter((i) => i.isActive === "1")
+        : originalList.filter((i) => i.isActive === "0");
 
-      // === Table Header ===
-      const startRow = 3;
-      const headers = [
-        "Product Code",
-        "Product Description",
-        // "UOM",
-        "Group Code",
-        "Operation Description",
-        "Status",
+    // ===== Data Rows =====
+    dataToExport.forEach((item, index) => {
+      const rowIndex = headerRowIndex + index + 1;
+      const row = worksheet.getRow(rowIndex);
+      row.height = 20;
+
+      row.values = [
+        item.productCode || "",
+        item.productDesc || "",
+        item.groupCode || "",
+        item.operationDescription || "",
+        item.isActive === "1" ? "Active" : "Inactive",
       ];
 
-      const headerRow = worksheet.getRow(startRow);
-      headers.forEach((header, idx) => {
-        const cell = headerRow.getCell(idx + 1);
-        cell.value = header;
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF305496" },
+      row.eachCell((cell) => {
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
         };
         cell.border = {
           top: { style: "thin" },
@@ -726,55 +777,34 @@ const hasChanges = () => {
           right: { style: "thin" },
         };
       });
+    });
 
-      // === Add Data Rows ===
-      dataToExport.forEach((item, index) => {
-        const rowNumber = startRow + index + 1;
-        const row = worksheet.getRow(rowNumber);
-
-        row.getCell(1).value = item.productCode || "";
-        row.getCell(2).value = item.productDesc || "";
-       // row.getCell(3).value = item.productUomCode || "";
-        row.getCell(3).value = item.groupCode || "";
-        row.getCell(4).value = item.operationDescription || "";
-        row.getCell(5).value =
-          item.isActive === 1 || item.isActive === "1" || item.isActive === true
-            ? "Active"
-            : "Inactive";
-
-        row.eachCell((cell) => {
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          cell.border = {
-            top: { style: "thin" },
-            left: { style: "thin" },
-            bottom: { style: "thin" },
-            right: { style: "thin" },
-          };
-        });
-      });
-
-      // === AutoFilter ===
-      if (dataToExport.length > 0) {
-        worksheet.autoFilter = {
-          from: { row: startRow, column: 1 },
-          to: { row: startRow + dataToExport.length, column: headers.length },
-        };
-      }
-
-      // === Save File ===
-      const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(
-        new Blob([buffer], { type: "application/octet-stream" }),
-        `Product_Master_${filterText.replace(/\s+/g, "_")}_${new Date()
-          .toISOString()
-          .replace(/[-T:.Z]/g, "")
-          .slice(0, 14)}.xlsx`
-      );
-    } catch (err) {
-      console.error("Excel export error:", err);
-      toast.error("Error exporting Product Master report. Please try again.");
+    // ===== AutoFilter =====
+    if (dataToExport.length > 0) {
+      worksheet.autoFilter = {
+        from: { row: headerRowIndex, column: 1 },
+        to: {
+          row: headerRowIndex + dataToExport.length,
+          column: headers.length,
+        },
+      };
     }
-  };
+
+    // ===== Export File =====
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      `Product_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+    );
+  } catch (error) {
+    console.error("Excel export error:", error);
+    toast.error("Error exporting Product Master.");
+  }
+};
+
 
   const handlecellclicked = (params) => {
     console.log("cell clicked", params);
@@ -845,6 +875,7 @@ const hasChanges = () => {
               updatedList[params.rowIndex] = { ...params.data }; // copy updated row
               setMasterList(updatedList);
             }}
+            overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
            {loading && (
             <div

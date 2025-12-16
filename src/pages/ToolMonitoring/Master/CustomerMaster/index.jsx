@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-import "ag-grid-enterprise";
 import store from "store";
 import { backendService } from "../../../../service/ToolServerApi";
 import { toast } from "react-toastify";
@@ -75,37 +74,59 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
         gridRef.current.api.stopEditing();
       }
 
-      const CustNoEmpty = masterList.filter((item) => !item.custId);
-      if (CustNoEmpty && CustNoEmpty?.length === 0) {
-        // Check for changes
-        const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
-        const rowsToUpdate = masterList.filter(row => row.changed === true);
+      // Check for empty mandatory fields
+      const emptyFields = masterList.filter((item) => !item.custId || !item.custName);
+      if (emptyFields.length > 0) {
+        toast.error("Please fill all mandatory(*) fields");
+        return;
+      }
 
-        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
-          toast.info("No data available");
+      // Check for duplicate Customer No
+      const custIdMap = new Map();
+      for (const item of masterList) {
+        if (custIdMap.has(item.custId)) {
+          toast.error("Duplicate record");
           return;
         }
-
-        const updatedList = masterList.map((item) => ({
-          isUpdate: item.isUpdate,
-          custId: item.custId,
-          custName: item.custName,
-          status: item.status,
-          tenantId,
-          branchCode,
-        }));
-        const response = await backendService({requestPath: "custDtlsaveOrUpdate", 
-          requestData: updatedList});
-
-        if (response?.responseCode === '200') {
-          toast.success("Add/Update successful");
-        } else {
-          toast.error("Add/Update failed");
-        }
-        fetchData();
-      } else {
-        toast.error("Please fill all mandatory fields");
+        custIdMap.set(item.custId, true);
       }
+
+      // Check for duplicate Customer Name
+      const custNameMap = new Map();
+      for (const item of masterList) {
+        if (custNameMap.has(item.custName)) {
+          toast.error("Duplicate record");
+          return;
+        }
+        custNameMap.set(item.custName, true);
+      }
+
+      // Check for changes
+      const rowsToInsert = masterList.filter(row => row.isUpdate === "0");
+      const rowsToUpdate = masterList.filter(row => row.changed === true);
+
+      if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+        toast.error("No records to save/update");
+        return;
+      }
+
+      const updatedList = masterList.map((item) => ({
+        isUpdate: item.isUpdate,
+        custId: item.custId,
+        custName: item.custName,
+        status: item.status,
+        tenantId,
+        branchCode,
+      }));
+      const response = await backendService({requestPath: "custDtlsaveOrUpdate", 
+        requestData: updatedList});
+
+      if (response?.responseCode === '200') {
+        toast.success("Add/Update successful");
+      } else {
+        toast.error("Add/Update failed");
+      }
+      fetchData();
     } catch (error) {
       console.error("Error saving data:", error);
       toast.error("Add/Update failed");
@@ -115,6 +136,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   const defaultColDef = {
     sortable: true,
     filter: true,
+    resizable: true,
     editable: true,
     flex: 1,
   };
@@ -140,9 +162,20 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
   };
 
   const MandatoryHeaderComponent = (props) => {
+    const buttonRef = React.useRef(null);
+    
     return (
-      <div>
-        {props.displayName} <span style={{color: 'red'}}>*</span>
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
       </div>
     );
   };
@@ -154,14 +187,16 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
       filter: "agTextColumnFilter",
       editable: (params) => (params.data.isUpdate === "0" ? true : false),
       headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Customer No." }
+      headerComponentParams: { displayName: "Customer No." },
+      menuTabs: ['filterMenuTab']
     },
     {
       headerName: "Customer Name",
       field: "custName",
       filter: "agTextColumnFilter",
       headerComponent: MandatoryHeaderComponent,
-      headerComponentParams: { displayName: "Customer Name" }
+      headerComponentParams: { displayName: "Customer Name" },
+      menuTabs: ['filterMenuTab']
     },
     // {
     //   headerName: "Status",
@@ -179,7 +214,7 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     {
       headerName: "Status",
       field: "status",
-      filter: true,
+      filter: false,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
       cellEditor: "agCheckboxCellEditor",
@@ -242,15 +277,40 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
     if ((newValue ?? "") === (oldValue ?? "")) return;
 
-    // Check for duplicate customer ID
+    // Validate Customer Name - only alphanumeric characters and hyphen
+    if (field === "custName" && newValue) {
+      const alphanumericRegex = /^[a-zA-Z0-9\s\-]+$/;
+      if (!alphanumericRegex.test(newValue)) {
+        toast.error("Customer Name should contain only alphabetic, numeric characters and hyphen (-)");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+    }
+
+    // Check for duplicate Customer No
     if (field === "custId" && newValue) {
-      const isDuplicate = masterList.some(item => 
-        item.custId === newValue && item.isUpdate != '0'
+      const isDuplicateCustId = masterList.some((item, index) => 
+        index !== params.rowIndex &&
+        item.custId === newValue
       );
       
-      if (isDuplicate) {
-        toast.error("Duplicate entry");
-        params.node.setDataValue(field, "");
+      if (isDuplicateCustId) {
+        toast.error("Duplicate record");
+        params.node.setDataValue(field, oldValue || "");
+        return;
+      }
+    }
+
+    // Check for duplicate Customer Name
+    if (field === "custName" && newValue) {
+      const isDuplicateCustName = masterList.some((item, index) => 
+        index !== params.rowIndex &&
+        item.custName === newValue
+      );
+      
+      if (isDuplicateCustName) {
+        toast.error("Duplicate record");
+        params.node.setDataValue(field, oldValue || "");
         return;
       }
     }
@@ -261,7 +321,6 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
     const updatedList = [...masterList];
     updatedList[params.rowIndex] = params.data;
     setMasterList(updatedList);
-    setOriginalList(updatedList);
   };
 
   const onExportExcel = async () => {
@@ -380,94 +439,84 @@ const CustomerMaster = ({ modulesprop, screensprop }) => {
 
             {/* Card Body */}
             <div className="card-body p-3">
-              {masterList.length > 0 ? (
-                <>
-                  {/* Filter Dropdown */}
-                  <div className="row mb-3">
-                    <div className="col-md-3">
-                      <label className="form-label fw-bold">Status</label>
-                      <select
-                        className="form-select"
-                        onChange={(e) => handleFilterChange(e.target.value)}
-                      >
-                        <option value="GetAll">Get All</option>
-                        <option value="1">Active</option>
-                        <option value="0">Inactive</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Grid */}
-                  <div style={{ position: "relative" }}>
-                    {isLoading && (
-                      <div
-                        className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
-                        style={{
-                          backgroundColor: "rgba(255,255,255,0.6)",
-                          zIndex: 2,
-                          borderRadius: "8px",
-                        }}
-                      >
-                        <Loader />
-                      </div>
-                    )}
-                    <AgGridReact
-                    ref={gridRef}
-                    rowData={masterList}
-                    columnDefs={columnDefs}
-                    defaultColDef={defaultColDef}
-                    paginationPageSize={100}
-                    pagination={true}
-                    domLayout="autoHeight"
-                    singleClickEdit={true}
-                    onFirstDataRendered={autoSizeAllColumns}
-                    onCellValueChanged={onCellValueChanged}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="text-center p-4">
-                  <p className="text-muted">No data available</p>
+              {/* Filter Dropdown - Always visible */}
+              <div className="row mb-3">
+                <div className="col-md-3">
+                  <label className="form-label fw-bold">Status</label>
+                  <select
+                    className="form-select"
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                  >
+                    <option value="GetAll">Get All</option>
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                  </select>
                 </div>
-              )}
+              </div>
+
+              {/* Grid */}
+              <div style={{ position: "relative" }}>
+                {isLoading && (
+                  <div
+                    className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.6)",
+                      zIndex: 2,
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <Loader />
+                  </div>
+                )}
+                <AgGridReact
+                  ref={gridRef}
+                  rowData={masterList}
+                  columnDefs={columnDefs}
+                  defaultColDef={defaultColDef}
+                  paginationPageSize={100}
+                  pagination={true}
+                  domLayout="autoHeight"
+                  singleClickEdit={true}
+                  onFirstDataRendered={autoSizeAllColumns}
+                  onCellValueChanged={onCellValueChanged}
+                />
+              </div>
 
               {/* Buttons */}
-              {masterList.length > 0 && (
-                <div className="text-center mt-4">
-                  <button
-                    onClick={onExportExcel}
-                    className="btn text-white me-2"
-                    style={{
-                      backgroundColor: "#00264d",
-                      minWidth: "90px",
-                    }}
-                  >
-                    Excel Export
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn text-white me-2"
-                    style={{
-                      backgroundColor: "#00264d",
-                      minWidth: "90px",
-                    }}
-                    onClick={createorUpdate}
-                  >
-                    Update
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="btn text-white"
-                    style={{
-                      backgroundColor: "#00264d",
-                      minWidth: "90px",
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
+              <div className="text-center mt-4">
+                <button
+                  onClick={onExportExcel}
+                  className="btn text-white me-2"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                >
+                  Excel Export
+                </button>
+                <button
+                  type="submit"
+                  className="btn text-white me-2"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                  onClick={createorUpdate}
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="btn text-white"
+                  style={{
+                    backgroundColor: "#00264d",
+                    minWidth: "90px",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
