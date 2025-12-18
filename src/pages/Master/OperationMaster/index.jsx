@@ -125,6 +125,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response?.data?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         // setOriginalList(updatedResponseData);
@@ -221,13 +222,54 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     const normOriginal = normalizeList(originalList);
     return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
   };
+  
   const createorUpdate = async () => {
     try {
+      gridRef.current.api.stopEditing();
 
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   return;
+      // }
+
+       const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+        const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+
+        console.log("masterList:", masterList);
+        console.log("rowsToInsert:", rowsToInsert);
+        console.log("rowsToUpdate:", rowsToUpdate);
+
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("Change any one field before saving.");
+          return;
+        }
+
+
+    //   const OpeEmpty = masterList.filter((item) => !item.operationId || item.operationId.trim() === "");
+    // const OpeCodeEmpty = masterList.filter((item) => !item.operationUniquecode || item.operationUniquecode.trim() === "");
+    //  const OpeDescEmpty = masterList.filter((item) => !item.operationDesc || item.operationDesc.trim() === "");
+    //   // const ChildpardcodeEmpty = masterList.filter((item) => !item.childPartId || item.childPartId.trim() === "");
+
+
+    // if (OpeEmpty && OpeEmpty?.length > 0) {
+    //   toast.error("Please fill all mandatory fields");
+    //   return;
+    // }
+
+    //  if (OpeCodeEmpty && OpeCodeEmpty?.length > 0) {
+    //   toast.error("Please fill all mandatory fields");
+    //   return;
+    // }
+
+    //  if (OpeDescEmpty && OpeDescEmpty?.length > 0) {
+    //   toast.error("Please fill all mandatory fields");
+    //   return;
+    // }
+
+    //  if (ChildpardcodeEmpty && ChildpardcodeEmpty?.length > 0) {
+    //   toast.error("Please fill all mandatory fields");
+    //   return;
+    // }
 
       const updatedList = masterList.map(item => ({
         isUpdate: item.isUpdate,
@@ -239,7 +281,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         updatedBy: employeeId,
         branchCode,
-        childPartCode: item.childPartId,
+        // childPartCode: item.childPartId,
         //productCode:item.productCode,
         // lineCode:item.lineMstCode,
       }));
@@ -269,34 +311,76 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
+    return (
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
+    );
+  };
+
   const columnDefs = [
     {
-      headerName: "Operation Id *",
+      headerName: "Operation Id ",
       field: "operationId",
       filter: "agTextColumnFilter",
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
-      // headerComponent: () => (
-      //   <span>
-      //     Operation Id <span style={{ color: "red" }}>*</span>
-      //   </span>
-      // ),
+       valueSetter: (params) => {
+              const newValue = params.newValue?.trim();
+              if (!newValue) {
+                toast.error("Child Part Code is required!");
+                return false;
+              }
+              const isDuplicate = masterList.some(
+                (item) =>
+                  item.operationId &&
+                  item.operationId.toString().toLowerCase() ===
+                    newValue.toLowerCase()
+              );
+      
+              if (isDuplicate) {
+                toast.error(`"${newValue}" already exists!`);
+                return false;
+              }
+              params.data.operationId = newValue;
+              params.data.changed = true;
+              return true;
+            },
+      headerComponent: RequiredHeader,
     },
     {
-      headerName: "Operation Code *",
+      headerName: "Operation Code",
       field: "operationUniquecode",
       filter: "agTextColumnFilter",
-      // headerComponent: () => (
-      //   <span>
-      //     Operation Code <span style={{ color: "red" }}>*</span>
-      //   </span>
-      // ),
-      //editable: (params) => !params.data || !params.data.operationCode, 
-      // editable: (params) => (params.data.isUpdate === 0 ? true : false),
+       valueSetter: (params) => {
+        params.data.operationUniquecode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
+      headerComponent: RequiredHeader,
+      
     },
     {
-      headerName: "Operation Description *",
+      headerName: "Operation Description",
       field: "operationDesc",
       filter: "agTextColumnFilter",
+      valueSetter: (params) => {
+        params.data.operationDesc = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
+      headerComponent: RequiredHeader,
     },
     /*  {
        headerName: "Production Parameter Count",
@@ -412,24 +496,30 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
     },
     
     */
-    {
-      headerName: "Child Part Code *",
-      field: "childPartId", // holds childPartId(s) as string
-      filter: "agTextColumnFilter",
-      editable: true,
-      cellEditor: MultiSelectEditor,
-      cellEditorParams: { values: childPartMastOptions || [] }, // pass API data
-      valueFormatter: (params) => {
-        if (!params.value) return "";
-        const ids = typeof params.value === "string" ? params.value.split(",") : params.value;
-        return ids
-          .map((id) => {
-            const option = (childPartMastOptions || []).find((item) => item.key === id);
-            return option ? option.value : id; // display childPartCode
-          })
-          .join(", ");
-      },
-    },
+    // {
+    //   headerName: "Child Part Code",
+    //   field: "childPartId", // holds childPartId(s) as string
+    //   filter: "agTextColumnFilter",
+    //   editable: true,
+    //   cellEditor: MultiSelectEditor,
+    //   headerComponent: RequiredHeader,
+    //   cellEditorParams: { values: childPartMastOptions || [] }, // pass API data
+    //   valueFormatter: (params) => {
+    //     if (!params.value) return "";
+    //     const ids = typeof params.value === "string" ? params.value.split(",") : params.value;
+    //     return ids
+    //       .map((id) => {
+    //         const option = (childPartMastOptions || []).find((item) => item.key === id);
+    //         return option ? option.value : id; // display childPartCode
+    //       })
+    //       .join(", ");
+    //   },
+    //   valueSetter: (params) => {
+    //     params.data.childPartId = params.newValue;
+    //     params.data.changed = true;
+    //     return true;
+    //   }
+    // },
 
 
 
@@ -479,6 +569,10 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
       isUpdate: 0,
       isActive: 1,
     };
+    
+    
+
+
     const emptyRowss = masterList.filter((item) => !item.operationId && !item.operationUniquecode);
 
     if (emptyRowss && emptyRowss?.length === 0) {

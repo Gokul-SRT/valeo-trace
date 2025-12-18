@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Card, Col, Row, Select, DatePicker, Form } from "antd";
+import { Card, Col, Row, Select, Form } from "antd";
 import { ToolOutlined } from "@ant-design/icons";
 import serverApi from "../../../serverAPI";
-import ProductDropdown from "../../../CommonDropdownServices/Service/ProductDropdownService";
+import commonServerApi from "../../../CommonserverApi";
 import LineMstdropdown from "../../../CommonDropdownServices/Service/LineMasterSerive";
 import moment from "moment/moment";
 import store from "store";
@@ -17,86 +17,76 @@ const gradientColors = [
 
 const LineDashboard = () => {
   const [dataCard, setDataCard] = useState([]);
-  const [productDataList, setProductDataList] = useState([]);
   const [lineData, setLineData] = useState([]);
-
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [shiftData, setShiftData] = useState([]);
   const [selectedLine, setSelectedLine] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const tenantId = store.get('tenantId');
-  const branchCode = store.get('branchCode');
+  const [selectedShift, setSelectedShift] = useState(null);
 
-
-  // Set default product
-  useEffect(() => {
-    if (productDataList.length > 0 && !selectedProduct) {
-      setSelectedProduct(productDataList[0].productCode);
-    }
-  }, [productDataList, selectedProduct]);
-
-  // Set default line
-  useEffect(() => {
-    if (lineData.length > 0 && !selectedLine) {
-      setSelectedLine(lineData[0].key);
-    }
-  }, [lineData, selectedLine]);
-
-  // Default date = today
-  useEffect(() => {
-    if (!selectedDate) {
-      setSelectedDate(moment());
-    }
-  }, [selectedDate]);
-
-  // Fetch product dropdown
-  const getProductDropdown = useCallback(async () => {
-    try {
-      const response = await ProductDropdown();
-      const returnData = response || [];
-      setProductDataList(
-        returnData.map((item) => ({
-          productCode: item.productCode,
-          productDesc: item.productDesc,
-        }))
-      );
-
-      if (returnData.length > 0) {
-        setSelectedProduct(returnData[0].productCode);
-      }
-    } catch (error) {
-      console.error("Error fetching product dropdown:", error);
-    }
-  }, []);
+  const tenantId = store.get("tenantId");
 
   // Fetch line dropdown
-  const getLineDropDownData = useCallback(async () => {
-    try {
-      const response = await LineMstdropdown();
-      const returnData = response || [];
-      setLineData(
-        returnData.map((item) => ({
-          key: item.lineMstCode,
-          value: item.lineMstDesc,
-        }))
-      );
+ const getLineDropDownData = useCallback(async () => {
+  try {
+    const response = await LineMstdropdown();
+    const returnData = response || [];
 
-      if (returnData.length > 0) {
-        setSelectedLine(returnData[0].key);
+    const mappedData = returnData.map((item) => ({
+      key: item.lineMstCode,
+      value: item.lineMstDesc,
+    }));
+
+    setLineData(mappedData);
+
+    // Set default selected line (index 0)
+    if (mappedData.length > 0) {
+      setSelectedLine(mappedData[0].key);
+    }
+  } catch (error) {
+    console.error("Error fetching line dropdown:", error);
+  }
+}, []);
+
+  // Fetch shift dropdown from backend API
+ const fetchShiftData = useCallback(
+  async (dateStr) => {
+    try {
+      const response = await commonServerApi.post("shiftlogShiftMst", {
+        tenantId: tenantId,
+        date: dateStr,
+      });
+
+      // Correct response handling
+      const shiftList =
+        response?.data?.responseData && Array.isArray(response.data.responseData)
+          ? response.data.responseData
+          : [];
+
+      setShiftData(shiftList);
+
+      if (shiftList.length > 0) {
+        setSelectedShift(shiftList[0].hdrId);
       }
     } catch (error) {
-      console.error("Error fetching line dropdown:", error);
+      console.error("Error fetching shift data:", error);
     }
-  }, []);
+  },
+  [tenantId]
+);
+
+
+  // Fetch shifts on mount with today's date
+  useEffect(() => {
+    const today = moment().format("YYYY-MM-DD");
+    fetchShiftData(today);
+  }, [fetchShiftData]);
 
   // Dashboard API
-  const fetchLineDashboard = async (prod, line, date) => {
+  const fetchLineDashboard = async (line) => {
     try {
       const payload = {
         tenantId: tenantId,
-        productCode: prod || "",
         lineCode: line || "",
-        branchCode:branchCode,
-        date: date ? date.format("YYYY-MM-DD") : "",
+        shiftHdrId: selectedShift,
       };
 
       const response = await serverApi.post("getTraceDashBoard", payload);
@@ -116,82 +106,71 @@ const LineDashboard = () => {
     }
   };
 
-  // Load dashboard
+  // Load dashboard data on line change
   const onLoadDashboard = async () => {
-    if (!selectedProduct || !selectedLine || !selectedDate) return;
+    if (!selectedLine) return;
 
-    const data = await fetchLineDashboard(
-      selectedProduct,
-      selectedLine,
-      selectedDate
-    );
+    const data = await fetchLineDashboard(selectedLine);
     setDataCard(data);
   };
 
-  // Initial data load
+  // Initial load for line dropdown
   useEffect(() => {
-    getProductDropdown();
     getLineDropDownData();
-  }, []);
+  }, [getLineDropDownData]);
 
-  // Reload dashboard when filters change
+  // Reload dashboard when selected line changes
   useEffect(() => {
-    if (selectedProduct && selectedLine && selectedDate) {
+    if (selectedLine && selectedShift) {
       onLoadDashboard();
     }
-  }, [selectedProduct, selectedLine, selectedDate]);
+  }, [selectedLine,selectedShift]);
 
   return (
     <>
-      {/* Filters */}
-      <div>
-        <Row gutter={16} style={{ width: "auto" }}>
-          {/* Product */}
-          <Col span={6}>
-            <Form.Item label="Product">
-              <Select
-                style={{ width: "100%" }}
-                value={selectedProduct}
-                onChange={(v) => setSelectedProduct(v)}
-              >
-                {productDataList.map((item, idx) => (
-                  <Option key={idx} value={item.productCode}>
-                    {item.productDesc}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+      {/* Filters Row */}
+      <Row
+        gutter={16}
+        justify="end"
+        style={{ width: "auto", marginBottom: 16 }}
+      >
+        
 
-          {/* Line */}
-          <Col span={6}>
-            <Form.Item label="Line">
-              <Select
-                style={{ width: "100%" }}
-                value={selectedLine}
-                onChange={(v) => setSelectedLine(v)}
-              >
-                {lineData.map((item, idx) => (
-                  <Option key={idx} value={item.key}>
-                    {item.value}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+        {/* Line Dropdown */}
+        <Col span={4}>
+          <Form.Item label="Line">
+            <Select
+              style={{ width: "100%" }}
+              value={selectedLine}
+              onChange={(v) => setSelectedLine(v)}
+            >
+              {lineData.map((item, idx) => (
+                <Option key={idx} value={item.key}>
+                  {item.value}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
 
-          {/* Date */}
-          <Col span={6}>
-            <Form.Item label="Select Date">
-              <DatePicker
-                style={{ width: "100%" }}
-                value={selectedDate}
-                onChange={(date) => setSelectedDate(date)}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-      </div>
+        {/* Shift Dropdown Top Right */}
+        <Col span={4}>
+          <Form.Item label="Shift">
+            <Select
+              style={{ width: "100%" }}
+              value={selectedShift}
+              onChange={(val) => setSelectedShift(val)}
+              placeholder="Select Shift"
+            >
+              {shiftData.map((shift) => (
+                <Option key={shift.hdrId} value={shift.hdrId}>
+                  {shift.shiftName}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
+      </Row>
 
       {/* Cards */}
       <div style={{ padding: "0px" }}>
@@ -220,9 +199,7 @@ const LineDashboard = () => {
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600 }}>
-                        Operation-{item.op}
-                      </div>
+                      <div style={{ fontWeight: 600 }}>Operation-{item.op}</div>
                       <div style={{ fontSize: "12px" }}>{item.opDesc}</div>
                     </div>
                     <ToolOutlined style={{ fontSize: 20, opacity: 0.9 }} />

@@ -7,8 +7,8 @@ import { PlusOutlined } from "@ant-design/icons";
 // import { SetFilterModule } from "ag-grid-enterprise";
 // import { DateFilterModule } from "ag-grid-enterprise";
 import { toast } from "react-toastify";
-import serverApi from '../../../serverAPI';
-import { gettypeMasterdtl } from "../../../services/ChildPartMasterService"
+import serverApi from "../../../serverAPI";
+import { gettypeMasterdtl } from "../../../services/ChildPartMasterService";
 import store from "store";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -21,44 +21,44 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
   const [originalList, setOriginalList] = useState([]);
-  const [typeListResp, setTypeList] = useState([])
+  const [typeListResp, setTypeList] = useState([]);
   const gridRef = useRef(null);
 
-  const tenantId = store.get("tenantId")
-  const branchCode = store.get('branchCode');
-  const employeeId = store.get("employeeId")
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get("branchCode");
+  const employeeId = store.get("employeeId");
 
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
-    const allColumnIds = params.columnApi.getAllColumns().map((col) => col.getId());
+    const allColumnIds = params.columnApi
+      .getAllColumns()
+      .map((col) => col.getId());
     params.api.autoSizeColumns(allColumnIds);
   };
 
   useEffect(() => {
     setSelectedModule(modulesprop);
     setSelectedScreen(screensprop);
-  }, [modulesprop, screensprop])
+  }, [modulesprop, screensprop]);
 
   useEffect(() => {
     if (selectedModule && selectedScreen) {
       fetchData();
       fetchType();
     }
-  }, [selectedModule, selectedScreen])
+  }, [selectedModule, selectedScreen]);
 
   const fetchType = async () => {
     let typeList = [];
-    const responseList = await gettypeMasterdtl(tenantId, branchCode)
+    const responseList = await gettypeMasterdtl(tenantId, branchCode);
     if (responseList.responseCode == "200") {
-      console.log(responseList.responseData, "typeList")
-      typeList = responseList.responseData
-      setTypeList(typeList)
+      console.log(responseList.responseData, "typeList");
+      typeList = responseList.responseData;
+      setTypeList(typeList);
     } else {
-      setTypeList(typeList)
+      setTypeList(typeList);
     }
-  }
-
-
+  };
 
   const fetchData = async (e) => {
     try {
@@ -67,18 +67,21 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         branchCode,
       });
-      if (response?.data?.responseCode === '200') {
-        console.log(response)
-        const updatedResponseData = response?.data?.responseData.map((item) => ({
-          ...item,
-          isUpdate: 1,
-        }));
+      if (response?.data?.responseCode === "200") {
+        console.log(response);
+        const updatedResponseData = response?.data?.responseData.map(
+          (item) => ({
+            ...item,
+            isUpdate: 1,
+            changed: false,
+          })
+        );
         setMasterList(updatedResponseData);
         setOriginalList(updatedResponseData);
       } else {
         setMasterList([]);
         setOriginalList([]);
-        toast.error(response.data.responseMessage)
+        toast.error(response.data.responseMessage);
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
@@ -86,13 +89,63 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
+  const normalizeList = (list) => {
+    return list.map((item) => ({
+      ...item,
+      isUpdate:
+        item.isUpdate === "1" || item.isUpdate === 1 || item.isUpdate === true
+          ? "1"
+          : "0",
+    }));
+  };
+
+  const hasChanges = () => {
+    const normMaster = normalizeList(masterList);
+    const normOriginal = normalizeList(originalList);
+    console.log("normMaster", normMaster);
+    console.log("normOriginal", normOriginal);
+    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  };
+
   const createorUpdate = async () => {
+      // Check for changes
+        gridRef.current.api.stopEditing();
+
+        const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+        const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+
+        console.log("masterList:", masterList);
+        console.log("rowsToInsert:", rowsToInsert);
+        console.log("rowsToUpdate:", rowsToUpdate);
+
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("Change any one field before saving.");
+          return;
+        }
+
+
+        const ChildpartEmpty = masterList.filter((item) => !item.childPartCode || item.childPartCode.trim() === "");
+        const ChildpartDescEmpty = masterList.filter((item) => !item.childPartDesc || item.childPartDesc.trim() === "");
+
+
+
+         if (ChildpartEmpty && ChildpartEmpty?.length > 0) {
+              toast.error("Please fill childPartCode mandatory fields");
+              return;
+            }
+
+          if (ChildpartDescEmpty && ChildpartDescEmpty?.length > 0) {
+              toast.error("Please fill childPartDesc mandatory fields");
+              return;
+            }
+
     try {
-      const updatedList = masterList.map(item => ({
+     
+      const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
         childPartCode: item.childPartCode,
         childPartDesc: item.childPartDesc,
-        type:item.type,
+        type: item.type,
         product: item.product,
         line: item.line,
         tenantId,
@@ -101,21 +154,26 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         branchCode,
       }));
       console.log();
-      const response = await serverApi.post("insertupdatechildpartmaster", updatedList);
+      const response = await serverApi.post(
+        "insertupdatechildpartmaster",
+        updatedList
+      );
 
-      if (response?.data?.responseCode === '200') {
-        toast.success(response.data.responseMessage)
+      if (response?.data?.responseCode === "200") {
+        toast.success(response.data.responseMessage);
       } else {
-        toast.error(response.data.responseMessage)
+        toast.error(response.data.responseMessage);
       }
       fetchData();
     } catch (error) {
       console.error("Error saving data:", error);
       toast.error("Error while saving data!");
     }
-  }
+  };
 
-  const handleUpdateRow = async (rowData) => { console.log(rowData, "rowDatarowDatarowDatarowData") }
+  const handleUpdateRow = async (rowData) => {
+    console.log(rowData, "rowDatarowDatarowDatarowData");
+  };
   const defaultColDef = {
     sortable: true,
     filter: true,
@@ -123,29 +181,83 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     flex: 1,
   };
 
+   const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+    
+    return (
+      <div className="ag-cell-label-container" role="presentation">
+        <span 
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button" 
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+        </div>
+      </div>
+    );
+  };
+
   const columnDefs = [
-    { 
-      headerName: "Child Part Code *", 
-      field: "childPartCode", 
+    {
+      headerName: "Child Part Code ",
+      field: "childPartCode",
       filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
+      valueSetter: (params) => {
+        const newValue = params.newValue?.trim();
+        if (!newValue) {
+          toast.error("Child Part Code is required!");
+          return false;
+        }
+        const isDuplicate = masterList.some(
+          (item) =>
+            item.childPartCode &&
+            item.childPartCode.toString().toLowerCase() ===
+              newValue.toLowerCase()
+        );
+
+        if (isDuplicate) {
+          toast.error(`"${newValue}" already exists!`);
+          return false;
+        }
+        params.data.childPartCode = newValue;
+        params.data.changed = true;
+        return true;
+      },
       // headerComponent: () => (
       //   <span>
       //     Child Part Code <span style={{ color: "red" }}>*</span>
       //   </span>
       // ),
     },
-    { headerName: "Child Part Desc *", field: "childPartDesc", filter: "agTextColumnFilter" },
+    {
+      headerName: "Child Part Desc",
+      field: "childPartDesc",
+      filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
+       valueSetter: (params) => {
+        params.data.childPartDesc = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
+    },
     {
       headerName: "Status",
       field: "status",
       filter: true,
       editable: true,
       cellRenderer: "agCheckboxCellRenderer",
+      headerComponent: RequiredHeader,
       cellEditor: "agCheckboxCellEditor",
-      valueGetter: (params) => params.data.status === "1" || params.data.status === 1,
+      valueGetter: (params) =>
+        params.data.status === "1" || params.data.status === 1,
       valueSetter: (params) => {
         // when checkbox is clicked, set 1 for true, 0 for false
         params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -157,15 +269,16 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     const emptyRow = {
       isUpdate: 0,
       status: 1,
-      
     };
-    const childPartCodeEmpty = masterList.filter((item) => !item.childPartCode && !item.product);
+    const childPartCodeEmpty = masterList.filter(
+      (item) => !item.childPartCode && !item.product
+    );
 
     if (childPartCodeEmpty && childPartCodeEmpty?.length === 0) {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
       setOriginalList(updated);
-       setTimeout(() => {
+      setTimeout(() => {
         const api = gridRef?.current?.api;
         if (api && api.paginationGetTotalPages) {
           const totalPages = api.paginationGetTotalPages();
@@ -184,7 +297,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
     setSelectedScreen("");
     setMasterList([]);
     setOriginalList([]);
-    fetchData()
+    fetchData();
   };
 
   // Filter change
@@ -232,9 +345,15 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
 
       // Title in Column B
       const titleCell = worksheet.getCell("B1");
-      titleCell.value = `Child Part Master\nGenerated: ${moment().format("DD/MM/YYYY HH:mm")}`;
+      titleCell.value = `Child Part Master\nGenerated: ${moment().format(
+        "DD/MM/YYYY HH:mm"
+      )}`;
       titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-      titleCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
 
       // Right Logo in Column C
       try {
@@ -256,14 +375,18 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       // ===== Table Headers (Row 3) =====
       const headerRow = 3;
       const headers = ["Child Part Code", "Child Part Description", "Status"];
-      
+
       worksheet.getRow(headerRow).height = 25;
       headers.forEach((header, idx) => {
         const cell = worksheet.getCell(headerRow, idx + 1);
         cell.value = header;
         cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -285,7 +408,11 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         ];
 
         row.eachCell((cell) => {
-          cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true,
+          };
           cell.border = {
             top: { style: "thin" },
             left: { style: "thin" },
@@ -306,7 +433,9 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       // ===== Export =====
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(
-        new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
         `Child_Part_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
       );
     } catch (error) {
@@ -314,7 +443,6 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
       toast.error("Error exporting Child Part Master.");
     }
   };
-
 
   return (
     <div>
@@ -336,7 +464,10 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
           <div className="row">
             <div className="col-md-3">
               <label className="form-label fw-bold">Status</label>
-              <select className="form-select" onChange={(e) => handleFilterChange(e.target.value)}>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
                 <option value="GetAll">Get All</option>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
@@ -356,7 +487,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
             pagination
             domLayout="autoHeight"
             singleClickEdit={true}
-             overlayNoRowsTemplate="<span style='padding:10px; color:#555; font-size:14px;'>No data available</span>"
+            overlayNoRowsTemplate="<span style='padding:10px; color:#555; font-size:14px;'>No data available</span>"
             onFirstDataRendered={autoSizeAllColumns}
             onCellValueChanged={(params) => {
               const updatedList = [...masterList];

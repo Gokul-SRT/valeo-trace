@@ -179,6 +179,33 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
   };
 
   const columnDefs = [
+     {
+      headerName: "Operation Code",
+      field: "operationId",
+      editable: true,
+      cellEditor: "agSelectCellEditor",
+       headerComponent: RequiredHeader,
+      cellEditorParams: {
+        values: operationOptions.map((p) => p.operationId),
+      },
+      valueGetter: (params) => {
+        return params.data.operationId;
+      },
+      valueSetter: (params) => {
+        params.data.operationId = params.newValue;
+        return true;
+      },
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const found = operationOptions.find((p) => p.operationId === params.value);
+        return found ? found.operationDesc : params.value;
+      },
+      filter: "agTextColumnFilter",
+      filterValueGetter: (params) => {
+        const found = operationOptions.find((p) => p.operationId === params.data.operationId);
+        return found ? found.operationDesc : "";
+      },
+    },
     {
       headerName: "Child Part Code ",
       field: "childPartId",
@@ -204,34 +231,6 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       filterValueGetter: (params) => {
         const found = childPartOptions.find((p) => p.childPartId === params.data.childPartId);
         return found ? found.childPartDesc : "";
-      },
-    },
-
-    {
-      headerName: "Operation Code",
-      field: "operationId",
-      editable: true,
-      cellEditor: "agSelectCellEditor",
-       headerComponent: RequiredHeader,
-      cellEditorParams: {
-        values: operationOptions.map((p) => p.operationId),
-      },
-      valueGetter: (params) => {
-        return params.data.operationId;
-      },
-      valueSetter: (params) => {
-        params.data.operationId = params.newValue;
-        return true;
-      },
-      valueFormatter: (params) => {
-        if (!params.value) return "";
-        const found = operationOptions.find((p) => p.operationId === params.value);
-        return found ? found.operationDesc : params.value;
-      },
-      filter: "agTextColumnFilter",
-      filterValueGetter: (params) => {
-        const found = operationOptions.find((p) => p.operationId === params.data.operationId);
-        return found ? found.operationDesc : "";
       },
     },
 
@@ -275,7 +274,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
             rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
           });
 
-          const firstColId = "childPartId";
+          const firstColId = "operationId";
           api.setFocusedCell(lastRowIndex, firstColId);
           api.startEditingCell({
             rowIndex: lastRowIndex,
@@ -313,16 +312,16 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       }
 
       // Duplicate ChildPartId check
-      const childPartIds = masterList.map((item) => item.childPartId);
+      const childPartIds = masterList.map((item) => item.operationId);
       const duplicateChildPartIds = childPartIds.filter(
         (id, index) => id && childPartIds.indexOf(id) !== index
       );
 
       if (duplicateChildPartIds.length > 0) {
         const duplicateId = duplicateChildPartIds[0];
-        const dupObj = childPartOptions.find((item) => item.childPartId === duplicateId);
-        const desc = dupObj ? dupObj.childPartDesc : duplicateId;
-        toast.error(`Already Mapped This ChildPart: ${desc}`);
+        const dupObj = operationOptions.find((item) => item.operationId === duplicateId);
+        const desc = dupObj ? dupObj.operationDesc : duplicateId;
+        toast.error(`Already Mapped This OperationDesc: ${desc}`);
         setLoading(false);
         return;
       }
