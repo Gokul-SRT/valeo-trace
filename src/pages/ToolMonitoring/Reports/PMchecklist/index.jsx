@@ -458,7 +458,7 @@ const PreventiveMaintenanceCheckList = () => {
         form.setFieldsValue({
           customerSearch: "",
         });
-        toast.error("There is no Customer for this corresponding Product");
+        toast.error("There is no Customer for this corresponding Product pls alot in Customer Product Mapping");
       }
     } catch (error) {
       console.error("Error fetching customer by product", error);
@@ -466,7 +466,7 @@ const PreventiveMaintenanceCheckList = () => {
       form.setFieldsValue({
         customerSearch: "",
       });
-      toast.error("There is no Customer for this corresponding Product");
+      toast.error("There is no Customer for this corresponding Product pls alot in Customer Product Mapping");
     }
   };
 
@@ -498,6 +498,12 @@ const PreventiveMaintenanceCheckList = () => {
         name: field,
         errors: errors[field]
       })));
+      return;
+    }
+    
+    // Check if customer exists for the selected product
+    if (!customer) {
+      toast.error("There is no Customer for this Product. Please enter Customer for that Product in Customer Product Mapping");
       return;
     }
     
@@ -849,32 +855,19 @@ const PreventiveMaintenanceCheckList = () => {
             >
               <Loader />
             </div>
-          ) : searchResults.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                width: "100%",
-                padding: "60px 0",
-                fontSize: "18px",
-                color: "#999",
-              }}
-            >
-              No data to show
-            </div>
           ) : (
-            searchResults.length > 0 && (
-              <div
-                className="ag-theme-alpine"
-                style={{ height: 400, width: "100%" }}
-              >
-                <AgGridReact
-                  columnDefs={agColumns}
-                  rowData={searchResults}
-                  pagination={true}
-                  paginationPageSize={10}
-                />
-              </div>
-            )
+            <div
+              className="ag-theme-alpine"
+              style={{ height: 400, width: "100%" }}
+            >
+              <AgGridReact
+                columnDefs={agColumns}
+                rowData={searchResults}
+                pagination={true}
+                paginationPageSize={10}
+                overlayNoRowsTemplate="No data available"
+              />
+            </div>
           )}
         </Card>
       )}
