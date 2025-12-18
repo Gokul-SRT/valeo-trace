@@ -11,6 +11,8 @@ import ChildPartToTypeMasterMapping from "../ChildPartToTypeMasterMapping/ChildP
 import ProductChildPartGrid from "../ProductToChildpartMap";
 import CycleTimeMaster from "../CycleTimeMaster/CycleTimeMaster";
 import GatewayMaster from "../../Master/GatewayMaster";
+import VendorMaster from "../../Master/VendorMaster";
+import ChildPartToVendorMapping from "../ChildPartToVendorMapping";
 import { Select } from "antd";
 
 const Traceability = () => {
@@ -46,6 +48,8 @@ const Traceability = () => {
     ProductChildPartGrid,
     CycleTimeMaster,
     GatewayMaster,
+    VendorMaster,
+    ChildPartToVendorMapping,
   };
 
   const moduleScreens = Array.isArray(traceabilityMaster)
