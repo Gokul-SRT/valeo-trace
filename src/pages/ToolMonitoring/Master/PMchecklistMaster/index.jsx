@@ -338,13 +338,27 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
         const missingCharacteristic = !item.characteristicName?.trim();
         const missingSpec = !item.specUnit?.trim();
         const missingUnit = !item.unit?.trim();
+        const missingMeasurementTools = !item.mesurementType?.trim();
         
         // Check for incomplete SPEC values when checkbox is checked
         const incompleteSpec = item.specValidation?.isSplit && 
           (!item.specValidation.hasBase || !item.specValidation.hasTolerance);
         
-        return missingCharacteristic || missingSpec || missingUnit || incompleteSpec;
+        return missingCharacteristic || missingSpec || missingUnit || missingMeasurementTools || incompleteSpec;
       });
+
+      // Check for duplicate Characteristic names
+      const characteristicNames = [...rowsToInsert, ...rowsToUpdate]
+        .map(item => item.characteristicName?.trim().toLowerCase())
+        .filter(name => name);
+      const duplicateCharacteristics = characteristicNames.filter((name, index) => 
+        characteristicNames.indexOf(name) !== index
+      );
+      
+      if (duplicateCharacteristics.length > 0) {
+        toast.error("Duplicate record: Characteristic names must be unique");
+        return;
+      }
       
       if (rowsToInsert.length > 0 && (!selectedLine || !selectedTool || !selectedOperat)) {
         toast.error("Please fill all mandatory fields");
@@ -352,7 +366,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
       }
       
       if (missingFields) {
-        toast.error("Please fill all mandatory fields: Characteristic, SPEC, and UNIT are required");
+        toast.error("Please fill all mandatory fields: Characteristic, SPEC, UNIT, and Measurement Tools are required");
         return;
       }
 
@@ -396,9 +410,12 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
 
   const onCellValueChanged = (params) => {
     params.data.changed = true;
-    setMasterList((prevList) =>
-      prevList.map((item) => (item === params.data ? { ...item, changed: true } : item))
-    );
+    // Don't trigger state update for new rows to prevent blinking
+    if (!params.data.isNewRow) {
+      setMasterList((prevList) =>
+        prevList.map((item) => (item === params.data ? { ...item, changed: true } : item))
+      );
+    }
   };
 
   const onCellEditingStarted = (params) => (params.data.changed = true);
@@ -447,6 +464,8 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
               onChange={(e) => {
                 params.setValue(e.target.value);
                 params.data.changed = true;
+              }}
+              onBlur={() => {
                 params.data.isNewRow = false;
               }}
               title="Enter the characteristic name for this measurement"

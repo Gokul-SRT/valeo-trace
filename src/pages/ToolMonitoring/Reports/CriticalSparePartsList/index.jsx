@@ -10,6 +10,7 @@ import Loader from "../../../.././Utills/Loader";
 import store from 'store';
 import axios from 'axios';
 // import "./style.css";
+import LineMstdropdown from "../../../../CommonDropdownServices/Service/LineMasterSerive";
 
 const { Option } = Select;
 
@@ -75,6 +76,7 @@ const CriticalSparePartsList = () => {
 
   const tenantId = JSON.parse(localStorage.getItem("tenantId"));
   const branchCode = JSON.parse(localStorage.getItem("branchCode"));
+  const employeeId = store.get("employeeId");
 
   // ================= LINE DROPDOWN FETCH =================
   const fetchLineDropdown = async () => {
@@ -85,10 +87,10 @@ const CriticalSparePartsList = () => {
         branchCode,
       };
 
-      const res = await CommonserverApi.post("getCommonMstdtl", payload);
-      const rawData = Array.isArray(res?.data)
-        ? res.data
-        : res?.data?.responseData || [];
+      const res = await LineMstdropdown();
+      const rawData = Array.isArray(res)
+        ? res
+        : res || [];
 
       const formatted = rawData.map((item) => ({
         label: item.lineMstDesc,
@@ -253,6 +255,7 @@ const CriticalSparePartsList = () => {
         const formattedData = rawData.map((item, index) => ({
           key: item.id || index + 1, // Use actual database ID instead of array index
           line: item.lineDescription,
+          createdBy: item.employeeName,
           toolDescription: item.toolDescription,
           monthYear: item.createdDate,
           actualId: item.id, // Store the actual ID for reference
@@ -277,12 +280,21 @@ const CriticalSparePartsList = () => {
   };
 
   const handleCancel = () => {
-    form.resetFields();
-    addForm.resetFields();
-    setShowDetails(false);
-    setShowAddCard(false);
-    setAddCardData([]);
-    setIsViewMode(false);
+    if (isViewMode) {
+      // When closing view mode, go back to summary and preserve line selection
+      setShowAddCard(false);
+      setShowDetails(true);
+      setIsViewMode(false);
+      setAddCardData([]);
+    } else {
+      // Normal cancel - reset everything
+      form.resetFields();
+      addForm.resetFields();
+      setShowDetails(false);
+      setShowAddCard(false);
+      setAddCardData([]);
+      setIsViewMode(false);
+    }
   };
 
   const handleAddClick = () => {
@@ -404,7 +416,7 @@ const CriticalSparePartsList = () => {
           monthYear: result.date ? dayjs(result.date) : null,
         });
         
-        toast.success(`Loaded ${result.data.length} critical spare details`);
+        // Data loaded successfully
       } else {
         toast.error("No data found for this record");
       }
@@ -439,7 +451,7 @@ const CriticalSparePartsList = () => {
       headerName: "S.No",
       field: "key",
       width: 80,
-      cellStyle: { textAlign: "center" },
+      cellStyle: { textAlign: "left" },
     },
     {
       headerName: "Line",
@@ -460,7 +472,12 @@ const CriticalSparePartsList = () => {
       },
     },
     {
-      headerName: "Action",
+      headerName: "Created By",
+      field: "createdBy",
+      flex: 1,
+    },
+    {
+      headerName: "View",
       field: "action",
       width: 100,
       cellRenderer: ActionCellRenderer,
@@ -537,6 +554,7 @@ const CriticalSparePartsList = () => {
         toolNo: toolNo,
         tenantId,
         branchCode,
+        enteredBy: employeeId,
         sparePartsData,
       };
       
@@ -566,7 +584,7 @@ const CriticalSparePartsList = () => {
     try {
       const formValues = addForm.getFieldsValue();
       if (!formValues.line) {
-        toast.error("Please select Line");
+        toast.error("Please fill all mandatory(*) fields");
         return;
       }
 
@@ -585,12 +603,12 @@ const CriticalSparePartsList = () => {
     {
       headerName: "Tool Description",
       field: "toolDescription",
-      width: 180,
+      cellStyle: { backgroundColor: '#f5f5f5' },
     },
     {
       headerName: "Operation Description",
       field: "operationDescription",
-      width: 180,
+      cellStyle: { backgroundColor: '#f5f5f5' },
       rowSpan: (params) => {
         const value = params.value;
         const api = params.api;
@@ -636,48 +654,52 @@ const CriticalSparePartsList = () => {
     {
       headerName: "S.No",
       field: "sno",
-      width: 80,
+      cellStyle: { backgroundColor: '#f5f5f5' },
       cellRenderer: (params) => (params.data.isSection ? "" : params.value),
     },
     {
       headerName: "Critical spares",
       field: "criticalSpares",
-      width: 220,
+      cellStyle: { backgroundColor: '#f5f5f5' },
       cellRenderer: (params) =>
-        params.data.isSection ? "" : <Input value={params.value} />,
-    },
-    {
-      headerName: "Spare location",
-      field: "spareLocation",
-      width: 200,
-      editable: !isViewMode,
-      cellEditor: 'agTextCellEditor',
+        params.data.isSection ? "" : params.value,
     },
     {
       headerName: "Spares Min Qty",
       field: "minQty",
-      width: 180,
+      cellStyle: { backgroundColor: '#f5f5f5' },
       cellRenderer: (params) =>
-        params.data.isSection ? (
-          ""
-        ) : (
-          <Input type="number" value={params.value} />
-        ),
+        params.data.isSection ? "" : params.value,
+    },
+    {
+      headerName: "Spare location",
+      field: "spareLocation",
+      editable: !isViewMode,
+      cellEditor: 'agTextCellEditor',
     },
     {
       headerName: "Spares stock Qty",
       field: "availableQty",
-      width: 160,
       editable: !isViewMode,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
         min: 0,
       },
+      cellStyle: (params) => {
+        const availableQty = parseInt(params.value) || 0;
+        const minQty = parseInt(params.data.minQty) || 0;
+        if (availableQty < minQty) {
+          return {
+            border: '2px solid red',
+            color: 'black'
+          };
+        }
+        return null;
+      },
     },
     {
       headerName: "Need to order",
       field: "needToOrder",
-      width: 140,
       editable: !isViewMode,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
@@ -687,17 +709,9 @@ const CriticalSparePartsList = () => {
     {
       headerName: "Total Available",
       field: "totalAvailable",
-      width: 160,
+      cellStyle: { backgroundColor: '#f5f5f5' },
       cellRenderer: (params) =>
-        params.data.isSection ? (
-          ""
-        ) : (
-          <Input
-            value={params.data.availableQty || 0}
-            readOnly
-            style={{ backgroundColor: '#f5f5f5' }}
-          />
-        ),
+        params.data.isSection ? "" : params.data.availableQty || 0,
     },
   ];
 
@@ -873,13 +887,19 @@ const CriticalSparePartsList = () => {
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={16}>
             <Col span={4}>
-              <Form.Item label="Line" name="line" rules={[{ required: true }]}>
+              <Form.Item label="Line" name="line" rules={[{ required: true, message: "Please select Line" }]}>
                 <Select
                   placeholder="Select Line"
-                  options={lineList}
                   onChange={handleLineChange}
                   allowClear
-                />
+                >
+                  <Option value="getAll">Get All</Option>
+                  {lineList.map((line) => (
+                    <Option key={line.value} value={line.value}>
+                      {line.label}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
 
@@ -890,7 +910,6 @@ const CriticalSparePartsList = () => {
                 label="Month/Year"
                 name="monthYear"
                 initialValue={dayjs()}
-                rules={[{ required: true, message: "Select Month/Year" }]}
               >
                 <DatePicker
                   picker="month"
@@ -948,17 +967,20 @@ const CriticalSparePartsList = () => {
             )}
             <div
               className="ag-theme-alpine"
-              style={{ height: 300, width: "100%" }}
+              style={{ height: 400, width: "100%" }}
             >
               <AgGridReact
                 rowData={detailsData}
                 columnDefs={detailsColumns}
-                domLayout="autoHeight"
+                domLayout="normal"
+                pagination={true}
+                paginationPageSize={10}
                 defaultColDef={{
                   sortable: true,
                   filter: true,
                   resizable: true,
                 }}
+                overlayNoRowsTemplate="No Data Available"
               />
             </div>
           </div>
@@ -993,7 +1015,7 @@ const CriticalSparePartsList = () => {
             </style>
             <Row gutter={16}>
               <Col span={4}>
-                <Form.Item label="Line" name="line" rules={[{ required: true }]}>
+                <Form.Item label="Line" name="line" rules={[{ required: true, message: "Please select Line" }]}>
                   <Select
                     placeholder="Select Line"
                     options={addLineList}
@@ -1013,7 +1035,7 @@ const CriticalSparePartsList = () => {
               <Col span={4}>
                 <Form.Item label="Date" name="monthYear" initialValue={dayjs()}>
                   <DatePicker
-                    format="YYYY-MM-DD"
+                    format="DD-MMM-YYYY"
                     placeholder="Select Date"
                     style={{ 
                       width: "100%",
@@ -1050,8 +1072,21 @@ const CriticalSparePartsList = () => {
                   domLayout="normal"
                   getRowHeight={() => 48}
                   enableCellSpan={true}
+                  overlayNoRowsTemplate="No Data Available"
+                  defaultColDef={{
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                    flex: 1,
+                  }}
                   onGridReady={(params) => {
                     window.gridApi = params.api;
+                  }}
+                  onFirstDataRendered={(params) => {
+                    if (params.columnApi && params.columnApi.getAllColumns) {
+                      const allColumnIds = params.columnApi.getAllColumns().map((col) => col.getId());
+                      params.api.autoSizeColumns(allColumnIds);
+                    }
                   }}
                   onCellValueChanged={(params) => {
                     // Update the React state directly to ensure consistency
@@ -1110,13 +1145,16 @@ const CriticalSparePartsList = () => {
               </Button>
 
               {isViewMode && (
-                <Button 
+                <Button
                   type="primary"
-                  onClick={downloadExcel}
+                  disabled
                   style={{
+                    display: "none",
                     marginLeft: 10,
                     backgroundColor: "#00264d",
                     borderColor: "#00264d",
+                    cursor: "not-allowed",
+                    color: "white",
                   }}
                 >
                   Export
