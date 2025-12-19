@@ -350,21 +350,21 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       }
 
       // Duplicate ChildPartId check
-      const childPartIds = masterList.map((item) => item.childPartId);
-      const duplicateChildPartIds = childPartIds.filter(
-        (id, index) => id && childPartIds.indexOf(id) !== index
-      );
+      // const childPartIds = masterList.map((item) => item.childPartId);
+      // const duplicateChildPartIds = childPartIds.filter(
+      //   (id, index) => id && childPartIds.indexOf(id) !== index
+      // );
 
-      if (duplicateChildPartIds.length > 0) {
-        const duplicateId = duplicateChildPartIds[0];
-        const dupObj = childPartOptions.find(
-          (item) => item.childPartId === duplicateId
-        );
-        const desc = dupObj ? dupObj.childPartDesc : duplicateId;
-        toast.error(`Already Mapped This Child Part: ${desc}`);
-        setLoading(false);
-        return;
-      }
+      // if (duplicateChildPartIds.length > 0) {
+      //   const duplicateId = duplicateChildPartIds[0];
+      //   const dupObj = childPartOptions.find(
+      //     (item) => item.childPartId === duplicateId
+      //   );
+      //   const desc = dupObj ? dupObj.childPartDesc : duplicateId;
+      //   toast.error(`Already Mapped This Child Part: ${desc}`);
+      //   setLoading(false);
+      //   return;
+      // }
 
       // Validate required fields
       const invalidChildPart = masterList.filter((item) => !item.childPartId);
