@@ -100,7 +100,7 @@ const ReportModules = () => {
       </div>
 
       {SelectedReportComponent && submittedReport && (
-        <div className="mt-4">
+        <div style={{ marginTop: '20px' }}>
           <SelectedReportComponent 
             modulesprop="ReportModules"
             screensprop={submittedReport}

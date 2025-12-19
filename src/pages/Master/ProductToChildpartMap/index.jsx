@@ -11,8 +11,8 @@ import CommonserverApi from "../../../CommonserverApi";
 import ExcelJS from "exceljs";
 import moment from "moment";
 import { saveAs } from "file-saver";
-import {toast} from "react-toastify"
-
+import { toast } from "react-toastify";
+import Loader from "../../../Utills/Loader";
 
 // ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
@@ -72,6 +72,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const [isSaving, setIsSaving] = useState(false);
   const mappingGridRef = useRef(null);
   const [currentFilter, setCurrentFilter] = useState("GetAll");
+  const [loading, setLoading] = useState(false);
 
   // 🔹 Initialize dropdowns and fetch mapping
   useEffect(() => {
@@ -86,6 +87,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   // 🔹 Fetch Mapping Data
   const fetchMappingData = async () => {
     try {
+      setLoading(true);
       const payload = { tenantId };
       const response = await ServerApi.post(
         "getProductChildPartMapDetails",
@@ -100,12 +102,14 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
           productCode: item.productCode || "",
           childPartId: Array.isArray(item.childPartId)
             ? item.childPartId
-            : typeof item.childPartId === "string" && item.childPartId.length > 0
+            : typeof item.childPartId === "string" &&
+              item.childPartId.length > 0
             ? item.childPartId.split(",").map((i) => i.trim())
             : [],
           childPartDesc: Array.isArray(item.childPartDesc)
             ? item.childPartDesc
-            : typeof item.childPartDesc === "string" && item.childPartDesc.length > 0
+            : typeof item.childPartDesc === "string" &&
+              item.childPartDesc.length > 0
             ? item.childPartDesc.split(",").map((i) => i.trim())
             : [],
           isActive: item.isActive !== undefined ? item.isActive : 1,
@@ -122,6 +126,8 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       console.error("Error fetching mapping data:", error);
       setMappingList([]);
       setOriginalMappingList([]);
+    } finally {
+      setLoading(false); // ✅ stop loader
     }
   };
 
@@ -129,7 +135,10 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const getProductDropDown = async () => {
     try {
       const payload = { tenantId, branchCode, isActive: "1" };
-      const response = await CommonserverApi.post("getProductDropdown", payload);
+      const response = await CommonserverApi.post(
+        "getProductDropdown",
+        payload
+      );
 
       if (
         response?.data?.responseCode === "200" &&
@@ -153,7 +162,10 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const getChildPartDropDown = async () => {
     try {
       const payload = { tenantId, branchCode, isActive: "1" };
-      const response = await CommonserverApi.post("getChildPartDropDown", payload);
+      const response = await CommonserverApi.post(
+        "getChildPartDropDown",
+        payload
+      );
 
       if (
         response?.data?.responseCode === "200" &&
@@ -192,6 +204,29 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
     flex: 1,
   };
 
+  const RequiredHeader = (props) => {
+    const buttonRef = React.useRef(null);
+
+    return (
+      <div className="ag-cell-label-container" role="presentation">
+        <span
+          ref={buttonRef}
+          className="ag-header-icon ag-header-cell-filter-button"
+          onClick={() => props.showColumnMenu(buttonRef.current)}
+        >
+          <span className="ag-icon ag-icon-filter" role="presentation"></span>
+        </span>
+        <div className="ag-header-cell-label" role="presentation">
+          <span className="ag-header-cell-text">
+            {" "}
+            <span style={{ color: "red" }}>*</span>
+            {props.displayName}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const mappingColumnDefs = [
     {
       headerName: "Product Code",
@@ -206,6 +241,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         const option = productData.find((item) => item.key === params.value);
         return option ? option.value : params.value;
       },
+      headerComponent: RequiredHeader,
     },
     {
       headerName: "Child Part Code",
@@ -228,20 +264,21 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
           })
           .join(", ");
       },
+      headerComponent: RequiredHeader,
     },
-    {
-      headerName: "Is Active",
-      field: "isActive",
-      editable: true,
-      cellRenderer: "agCheckboxCellRenderer",
-      cellEditor: "agCheckboxCellEditor",
-      valueGetter: (params) => Number(params.data.isActive) === 1,
-      valueSetter: (params) => {
-        params.data.isActive = params.newValue ? 1 : 0;
-        return true;
-      },
-      cellStyle: { textAlign: "center" },
-    },
+    // {
+    //   headerName: "Status",
+    //   field: "isActive",
+    //   editable: true,
+    //   cellRenderer: "agCheckboxCellRenderer",
+    //   cellEditor: "agCheckboxCellEditor",
+    //   valueGetter: (params) => Number(params.data.isActive) === 1,
+    //   valueSetter: (params) => {
+    //     params.data.isActive = params.newValue ? 1 : 0;
+    //     return true;
+    //   },
+    //   cellStyle: { textAlign: "center" },
+    // },
   ];
 
   // 🔹 Add new mapping row
@@ -312,63 +349,89 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Product Child Part Mapping");
 
-      // === Row Height for header ===
-      worksheet.getRow(1).height = 60;
+      // ===== Column Widths =====
+      const columnWidths = [30, 50];
+      columnWidths.forEach((w, i) => {
+        worksheet.getColumn(i + 1).width = w;
+      });
 
-      // === Set column widths ===
-      worksheet.columns = [
-        { header: "Product Code", key: "productCode", width: 25 },
-        { header: "Child Part Codes", key: "childPartId", width: 40 },
-        { header: "Is Active", key: "isActive", width: 15 },
-      ];
+      // ===== Title Row Height =====
+      worksheet.getRow(1).height = 65;
 
-      // === Insert Logo (Optional) ===
+      // ===== Left Logo =====
       try {
-        const imgResponse = await fetch("/pngwing.com.png");
-        const imgBlob = await imgResponse.blob();
-        const arrayBuffer = await imgBlob.arrayBuffer();
-        const imageId = workbook.addImage({
-          buffer: arrayBuffer,
+        const imgUrl = `${window.location.origin}/pngwing.com.png`;
+        const logo1 = await fetch(imgUrl);
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
           extension: "png",
         });
-        worksheet.addImage(imageId, {
+        worksheet.addImage(imageId1, {
           tl: { col: 0, row: 0 },
           br: { col: 1, row: 1 },
-          editAs: "oneCell",
         });
-      } catch (err) {
-        console.warn("Logo image not found, skipping logo insert.");
+      } catch {
+        console.warn("Left logo not found");
       }
 
-      // === Title Cell ===
-      worksheet.mergeCells("B1:D2");
+      // ===== Title Cell =====
+      worksheet.mergeCells("B1");
       const titleCell = worksheet.getCell("B1");
-      titleCell.value = "Product to Child Part Mapping Report";
-      titleCell.font = { bold: true, size: 16, color: { argb: "FF00264D" } };
-      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      titleCell.value = `Product to Child Part Mapping Report\nGenerated On: ${moment().format(
+        "DD/MM/YYYY HH:mm:ss"
+      )}`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+      titleCell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
 
-      // === Date Cell (top right) ===
-      worksheet.mergeCells("E1:F2");
-      const dateCell = worksheet.getCell("E1");
-      dateCell.value = `Generated On: ${moment().format("DD/MM/YYYY HH:mm:ss")}`;
-      dateCell.font = { bold: true, size: 11, color: { argb: "FF00264D" } };
-      dateCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      // ===== Right Logo =====
+      try {
+        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+        const logo2 = await fetch(imgUrl1);
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
+          extension: "png",
+        });
+        worksheet.addImage(imageId2, {
+          tl: { col: 2, row: 0 },
+          br: { col: 3, row: 1.6 },
+        });
+      } catch {
+        console.warn("Right logo not found");
+      }
 
-      // === Header Row ===
-      const headerRow = worksheet.addRow([
+      // ===== Header Row =====
+      const startRow = 2;
+      const headers = [
         "Product Code",
         "Child Part Codes",
-        "Is Active",
-      ]);
+        // "Status",
+      ];
 
-      headerRow.eachCell((cell) => {
+      const headerRow = worksheet.getRow(startRow);
+      headers.forEach((header, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
           fgColor: { argb: "FF4472C4" },
         };
-        cell.font = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
@@ -377,27 +440,32 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         };
       });
 
-      headerRow.height = 25;
+      // ===== Data Rows =====
+      mappingList.forEach((item, index) => {
+        const rowNumber = startRow + index + 1;
+        const row = worksheet.getRow(rowNumber);
 
-      // === AutoFilter ===
-      worksheet.autoFilter = {
-        from: { row: headerRow.number, column: 1 },
-        to: { row: headerRow.number, column: worksheet.columns.length },
-      };
+        const childPartNames = Array.isArray(item.childPartId)
+          ? item.childPartId
+              .map((id) => {
+                const opt = childPartData.find((c) => c.key === id);
+                return opt ? opt.value : id;
+              })
+              .join(", ")
+          : "";
 
-      // === Data Rows ===
-      mappingList.forEach((row) => {
-        const newRow = worksheet.addRow({
-          productCode: row.productCode || "",
-          childPartId: Array.isArray(row.childPartId)
-            ? row.childPartId.join(", ")
-            : row.childPartId || "",
-          isActive: Number(row.isActive) === 1 ? "Active" : "Inactive",
-        });
+        row.values = [
+          item.productCode || "",
+          childPartNames,
+          // Number(item.isActive) === 1 ? "Active" : "Inactive",
+        ];
 
-        newRow.eachCell((cell) => {
-          cell.alignment = { horizontal: "center", vertical: "middle" };
-          cell.font = { size: 10 };
+        row.eachCell((cell) => {
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true,
+          };
           cell.border = {
             top: { style: "thin" },
             left: { style: "thin" },
@@ -407,7 +475,13 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         });
       });
 
-      // === Save File ===
+      // ===== AutoFilter =====
+      worksheet.autoFilter = {
+        from: { row: startRow, column: 1 },
+        to: { row: startRow, column: headers.length },
+      };
+
+      // ===== Save File =====
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(
         new Blob([buffer], { type: "application/octet-stream" }),
@@ -415,7 +489,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       );
     } catch (error) {
       console.error("Excel export error:", error);
-     toast.error("Error exporting Excel. Please try again.");
+      toast.error("Error exporting Product Child Part Mapping.");
     }
   };
 
@@ -423,6 +497,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const insertUpdateMapping = async () => {
     if (isSaving) return;
     setIsSaving(true);
+    setLoading(true);
 
     try {
       // Stop any ongoing editing
@@ -457,7 +532,8 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         // Compare all relevant fields
         return (
           currentRow.productCode !== originalRow.productCode ||
-          JSON.stringify(currentRow.childPartId) !== JSON.stringify(originalRow.childPartId) ||
+          JSON.stringify(currentRow.childPartId) !==
+            JSON.stringify(originalRow.childPartId) ||
           currentRow.isActive !== originalRow.isActive
         );
       });
@@ -491,21 +567,25 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       );
 
       if (response?.data?.responseCode === "200") {
-        toast.success(response.data.responseDataMessage || "Mapping data saved successfully!");
+        toast.success(
+          response.data.responseDataMessage ||
+            "Mapping data saved successfully!"
+        );
         fetchMappingData();
       } else {
-       toast.error("Failed to save records. Check console for details.");
+        toast.error("Failed to save records. Check console for details.");
       }
     } catch (error) {
       console.error("Error saving mapping data:", error);
-       toast.error("Error while saving data!");
+      toast.error("Error while saving data!");
     } finally {
       setIsSaving(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div >
+    <div>
       <div className="card shadow mt-4" style={{ borderRadius: "6px" }}>
         {/* ✅ Header */}
         <div
@@ -528,10 +608,10 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         </div>
 
         {/* 🔹 Filter Section */}
-        <div className="p-3">
+        {/* <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold">Search Filter</label>
+              <label className="form-label fw-bold">Status</label>
               <select
                 className="form-select"
                 onChange={(e) => handleMappingFilterChange(e.target.value)}
@@ -542,7 +622,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               </select>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* 🔹 AG Grid */}
         <div className="card-body p-3 ag-theme-alpine">
@@ -578,6 +658,24 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               }
             }}
           />
+          {loading && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(255,255,255,0.7)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 10,
+              }}
+            >
+              <Loader />
+            </div>
+          )}
 
           {/* 🔹 Action Buttons */}
           <div className="text-center mt-4">

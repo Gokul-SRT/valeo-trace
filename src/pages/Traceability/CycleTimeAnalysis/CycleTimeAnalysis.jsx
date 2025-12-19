@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { Card } from "antd";
 import * as am4core from "@amcharts/amcharts4/core";
 import * as am4charts from "@amcharts/amcharts4/charts";
@@ -31,46 +31,68 @@ const cycleData = [
   { category: "Intake Sub Assembly-1", start: "2025-10-15T17:30:46", end: "2025-10-15T17:30:50", text: "Intake Sub Assembly-1", color: "#6FC4F0" },
   { category: "End Of Line", start: "2025-10-15T17:31:14", end: "2025-10-15T17:31:20", text: "End Of Line", color: "#6FC4F0" },
 ];
+ 
 
-const SerpentineTimelineChart = () => {
+const SerpentineTimelineChart = ({ data }) => {
   const chartRef = useRef(null);
 
   useLayoutEffect(() => {
-    const chart = am4core.create(chartRef.current, am4plugins_timeline.SerpentineChart);
+    if (!data || data.length === 0) {
+      return;
+    }
+
+    // Map API data → chart data
+    const chartData = data.map((item) => ({
+      category: item.operationDescription,    // adjust these field names
+      start: item.startDateTime,              // to match your API response
+      end: item.endDateTime,
+      text: item.operationDescription,
+      color: item.colorCode || "#6FC4F0",
+    }));
+
+    const chart = am4core.create(
+      chartRef.current,
+      am4plugins_timeline.SerpentineChart
+    );
 
     chart.orientation = "vertical";
-    chart.levelCount = 5; // five serpentine lines
+    chart.levelCount = 5;
     chart.curveContainer.padding(40, 0, 40, 0);
     chart.yAxisRadius = am4core.percent(25);
     chart.yAxisInnerRadius = am4core.percent(0);
     chart.maskBullets = false;
     chart.logo.disabled = true;
 
-    chart.data = cycleData;
-    chart.dateFormatter.inputDateFormat = "yyyy-MM-ddTHH:mm:ss";
+    chart.data = chartData;
+    chart.dateFormatter.inputDateFormat = "yyyy-MM-dd'T'HH:mm:ss";
 
-    let categoryAxis = chart.yAxes.push(new am4charts.CategoryAxis());
+    const categoryAxis = chart.yAxes.push(new am4charts.CategoryAxis());
     categoryAxis.dataFields.category = "category";
     categoryAxis.renderer.grid.template.disabled = true;
     categoryAxis.renderer.labels.template.fontSize = 13;
     categoryAxis.renderer.labels.template.rotation = -15;
     categoryAxis.renderer.labels.template.dx = 12;
 
-    let dateAxis = chart.xAxes.push(new am4charts.DateAxis());
+    const dateAxis = chart.xAxes.push(new am4charts.DateAxis());
     dateAxis.baseInterval = { count: 1, timeUnit: "second" };
     dateAxis.dateFormats.setKey("second", "HH:mm:ss");
     dateAxis.periodChangeDateFormats.setKey("second", "HH:mm:ss");
-    dateAxis.renderer.labels.template.rotation = 0;  // no rotation for straight labels
-    dateAxis.renderer.labels.template.dy = 20;     // vertical offset for better spacing
+    dateAxis.renderer.labels.template.rotation = 0;
+    dateAxis.renderer.labels.template.dy = 20;
     dateAxis.renderer.inside = false;
-    dateAxis.min = new Date("2025-10-15T17:30:00").getTime();
-    dateAxis.max = new Date("2025-10-15T17:31:20").getTime();
 
-    // Align labels straight along the line (no slant)
-    dateAxis.renderer.labels.template.location = 0;
+    // optional: compute min/max from data instead of hard‑coding
+    dateAxis.min = Math.min(
+      ...chartData.map((d) => new Date(d.start).getTime())
+    );
+    dateAxis.max = Math.max(
+      ...chartData.map((d) => new Date(d.end).getTime())
+    );
 
-    let series = chart.series.push(new am4plugins_timeline.CurveColumnSeries());
-    series.columns.template.height = am4core.percent(600); // thick curves
+    const series = chart.series.push(
+      new am4plugins_timeline.CurveColumnSeries()
+    );
+    series.columns.template.height = am4core.percent(600);
     series.dataFields.openDateX = "start";
     series.dataFields.dateX = "end";
     series.dataFields.categoryY = "category";
@@ -81,7 +103,7 @@ const SerpentineTimelineChart = () => {
     series.columns.template.cornerRadiusTopLeft = 8;
     series.columns.template.cornerRadiusTopRight = 8;
 
-    let textBullet = series.bullets.push(new am4charts.LabelBullet());
+    const textBullet = series.bullets.push(new am4charts.LabelBullet());
     textBullet.label.text = "{text}";
     textBullet.label.fill = am4core.color("#00264d");
     textBullet.label.fontSize = 12;
@@ -91,18 +113,22 @@ const SerpentineTimelineChart = () => {
 
     chart.scrollbarX = new am4core.Scrollbar();
     chart.scrollbarX.marginBottom = 24;
-
     chart.paddingBottom = 20;
 
-    return () => chart && chart.dispose();
-  }, []);
+    return () => {
+      chart.dispose();
+    };
+  }, [data]); // depend directly on `data`
 
   return <div ref={chartRef} style={{ width: "100%", height: 480 }} />;
 };
 
-const CycleTimeSnackChart = () => (
-  <div className="cycle-time-container">
-    <Card
+
+const CycleTimeSnackChart = ({data}) => {
+  console.log("data",data)
+  return(
+ <div className="cycle-time-container">
+    {/* <Card
       title="Cycle Time Analysis"
       headStyle={{
         backgroundColor: "#00264d",
@@ -113,10 +139,12 @@ const CycleTimeSnackChart = () => (
       bodyStyle={{ padding: 22 }}
       bordered={false}
       style={{ maxWidth: 1320, margin: "0 auto" }}
-    >
-      <SerpentineTimelineChart />
-    </Card>
+    > */}
+      <SerpentineTimelineChart data={data}/>
+    {/* </Card> */}
   </div>
-);
+  )
+ 
+}
 
 export default CycleTimeSnackChart;
