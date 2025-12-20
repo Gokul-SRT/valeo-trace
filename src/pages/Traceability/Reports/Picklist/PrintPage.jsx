@@ -149,15 +149,57 @@ useEffect(() => {
   }
 }, [pickListQty]);
 
+useEffect(() => {
+  const formValues=printform.getFieldsValue();
+  const part = childPartOptions.find(item => item.childPartDesc === formValues.childPart) || {};
+  const intervalId = setInterval(() => {
+    getA2AndB2DetailsAgianstPlsCodeAndChildPartCode(formValues.pickListCode,part.childPartCode);
+  }, 2000); // every 5 seconds
+
+  // Cleanup when component unmounts
+  return () => clearInterval(intervalId);
+},);
+
+
 
 const handleBack = () => {
  
   printform.resetFields();
 
-  navigate("/picklist");
+  // navigate("/picklist");
+  navigate(-1);
 };
 
+const getA2AndB2DetailsAgianstPlsCodeAndChildPartCode = async (pickListCode,childPartCode) => {
+  setShowPrintDetails(true);
+  try {
+    const response = await serverApi.post("getA2AndB2DetailsAgianstPlsCodeAndChildPartCode", {
+      tenantId,
+      branchCode,
+      pickListCode: pickListCode,
+      childPartCode: childPartCode
+    });
 
+    const res = response.data;
+  //  console.log(response.data, "list")
+  //  console.log(response.responseData, "list1")
+    if (res.responseCode === '200') {
+      if (res.responseData !== null && res.responseData.length > 0) {
+        const updatedData = res.responseData.map((item, index) => ({
+          ...item,
+          sno: index + 1,
+        }));
+      //  console.log(updatedData, "updatedData--------")
+       setPrintB2Data(updatedData)
+      }
+    } else {
+      setPrintB2Data([])
+    }
+  } catch (error) {
+    setShowPrintDetails(false)
+    toast.error("Error fetching Data. Please try again later.");
+  }
+}
 
   const handleSubmitData = async (empty) => {
     const formValues = printform.getFieldsValue()
@@ -168,6 +210,50 @@ const handleBack = () => {
       console.log("Missing required fields for handleSubmitData");
       return;
     }
+    const labelQty = formValues.addQty;
+
+  // Validation 1: Empty check
+  if (!labelQty || String(labelQty).trim() === "") {
+    toast.warning("Label Qty cannot be empty!");
+    printform.resetFields(["addQty"]);
+   // setShowPrintDetails(false)
+    return;
+  }
+
+  // Validation 2: Convert and check value
+  const qty = Number(labelQty);
+       const bin=formValues.binQty;
+       const binQuantity=Number(bin);
+
+  if (isNaN(qty)) {
+    toast.warning("Please enter a valid number!");
+    printform.resetFields(["addQty"]);
+    //setShowPrintDetails(false)
+    return;
+  }
+
+  if (qty === 0) {
+    toast.warning("Label Qty cannot be zero!");
+    printform.resetFields(["addQty"]);
+   // setShowPrintDetails(false)
+    return;
+  }
+
+  if (qty < 0) {
+    toast.warning("Label Qty cannot be negative!");
+    printform.resetFields(["addQty"]);
+   // setShowPrintDetails(false)
+    return;
+  }
+
+  // Validation 4: Multiple of binQty check
+if (qty % binQuantity !== 0) {
+  toast.warning(`Label Qty must be a multiple of Bin Qty (${binQuantity})`);
+  printform.resetFields(["addQty"]);
+ // setShowPrintDetails(false)
+  return;
+}
+
     try {
       const response = await backendService({
         requestPath: 'insertAndUpdatePrintPage',
@@ -183,7 +269,8 @@ const handleBack = () => {
           deliveryDate: formValues.deliveryDate.format("YYYY-MM-DD"),
           manufacturingDate: formValues.manufacturingDate.format("YYYY-MM-DD"),
           scannedQuantity: formValues.scanQty,
-         inputQuantity: empty === "empty" ? "" : selectType === "A2" 
+        //  inputQuantity: empty === "empty" ? "" : selectType === "A2" 
+        inputQuantity: empty === "empty" ? "" : (selectType === "A2" || selectType === "B2") 
   ? Number(formValues.addQty || 0)
   : Number(formValues.scanQty || 0),
           binQuantity: formValues.binQty,
@@ -200,13 +287,17 @@ const handleBack = () => {
       if (response) {
         if (response.responseCode === '200') {
           if (response.responseData !== null && response.responseData.length > 0) {
+            
             const updatedData = response.responseData.map((item, index) => ({
               ...item,
               sno: index + 1,
             }));
-            console.log(updatedData, "updatedData--------")
-            setPrintB2Data(updatedData)
+          //  console.log(updatedData, "updatedData--------")
+          //  setPrintB2Data(updatedData)
+      
+
             fetchPickedAndStandardQty(part.childPartCode)
+            toast.success(response.responseMessage)
           }
         }else{
           toast.error(response.responseMessage)
@@ -308,10 +399,10 @@ const handleBack = () => {
   }
 
    // Expose handleSubmitData to parent
-  useImperativeHandle(ref, () => ({
-    handleSubmitData,
-    fetchPickedAndStandardQty
-  }));
+  // useImperativeHandle(ref, () => ({
+  //   handleSubmitData,
+  //   fetchPickedAndStandardQty
+  // }));
 
   return (
     <>
@@ -418,10 +509,10 @@ const handleBack = () => {
                 </Col>
 
                 <Col span={4}>
-                  <Form.Item name="addQty" label="Label Quantity">
+                  <Form.Item name="addQty" label="Supply Quantity">
                     <Input
                       type="number"
-                      placeholder="Enter Quantity"
+                      placeholder="Enter Supply Quantity"
                     //  disabled={selectType === "B2"}   // <-- disable
                       onChange={handleAddQtyChange}
                     />
@@ -471,9 +562,11 @@ const handleBack = () => {
           title={`Print Page - ${selectType}`}
           style={{ marginTop: "20px" }}
         >
+       {printB2Data.length !== 0 &&(
           <div style={{ textAlign: "right" }}>
           <Button type="primary" onClick={handlePrintAll}>Print All</Button>
         </div>
+         )}
           <Table
             columns={printB2Columns}
             dataSource={printB2Data}

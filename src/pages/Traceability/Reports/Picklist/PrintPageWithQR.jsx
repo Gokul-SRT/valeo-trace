@@ -126,7 +126,27 @@ const printB2Columns = [
 
   const handleViewQR = async (qrValue) => {
   const binCountQty=qrValue.binCountQty; 
-       const label=labelCode;
+      //  const label=labelCode;
+      const label=qrValue.scanQrCode;
+      
+
+      const prefix = label.substring(0, 1).trim();
+      const deliveryNoteNos = label.substring(1, 17).trim();      // 16 digits
+      const customerSnos = label.substring(17, 35).trim();         // 18 digits
+      const supplierCodes = label.substring(35, 42).trim();        // 7 digits
+      const quantityss = label.substring(42, 50).trim();            // 8 digits
+      const packageNos = label.substring(50, 68).trim();           // 18 digits
+      const batchNos = label.substring(68, 80).trim();             // 12 digits
+      const deliveryDates = label.substring(80, 88).trim();        // YYYYMMDD
+      const manufactureDates = label.substring(88, 96).trim();     // YYYYMMDD
+      const expirationDates = label.length >= 104 
+                              ? label.substring(96, 104).trim()   // optional
+                              : "";
+
+
+
+
+
        const start = 42;  
       const end = 50;   
 
@@ -135,16 +155,29 @@ const printB2Columns = [
 
       const updatedLabelCode = label.substring(0, start) + paddedValue + label.substring(end);
       
-       
+
+      const sNo=qrValue.psDtlId.toString();
+     const itemType=selectType;
+     const newPakNo="S"+itemType+sNo;
+
+      const pakNoPadVal=newPakNo.padEnd(18, " ");
+
+      const pakNoStart=50;
+      const pakNoEnd=68;
+      const updatedPakNo = updatedLabelCode.substring(0, pakNoStart) + pakNoPadVal + label.substring(pakNoEnd);
+      
        
   //printB2Data
     
     console.log("qrValue",qrValue);
 const updatedQrValue = {
   ...qrValue,
-  deliveryNoteNo,
-  batchNo,
-  updatedLabelCode
+  deliveryNoteNos,
+  deliveryDates,
+  manufactureDates,
+  batchNos,
+  updatedPakNo,
+  newPakNo
 };
 setSelectedQrData(updatedQrValue);
     setQrModalVisible(true);
@@ -163,6 +196,7 @@ const handlePrintAll = async () => {
 
   // 1️⃣ Update all label statuses
   const response = await handleUpdateLabel(null, true, printB2Data);
+  
 
   // 2️⃣ Generate PDF for all labels
   await downloadAllLabelsAsPDF(printB2Data);
@@ -181,7 +215,64 @@ const downloadAllLabelsAsPDF = async (allItems) => {
 
   for (const item of allItems) {
     // update DOM with the current item
-    setSelectedQrData(item);
+
+// const label=labelCode;
+const label=item.scanQrCode;
+
+ const prefix = label.substring(0, 1).trim();
+      const deliveryNoteNos = label.substring(1, 17).trim();      // 16 digits
+      const customerSnos = label.substring(17, 35).trim();         // 18 digits
+      const supplierCodes = label.substring(35, 42).trim();        // 7 digits
+      const quantityss = label.substring(42, 50).trim();            // 8 digits
+      const packageNos = label.substring(50, 68).trim();           // 18 digits
+      const batchNos = label.substring(68, 80).trim();             // 12 digits
+      const deliveryDates = label.substring(80, 88).trim();        // YYYYMMDD
+      const manufactureDates = label.substring(88, 96).trim();     // YYYYMMDD
+      const expirationDates = label.length >= 104 
+                              ? label.substring(96, 104).trim()   // optional
+                              : "";
+
+    const binCountQty=item.binCountQty; 
+    
+    const start = 42;  
+   const end = 50;   
+  
+   const newValue = item.binCountQty.toString();  // whatever dynamic value
+   const paddedValue = newValue.padEnd(8, " ");
+  
+   const updatedLabelCode = label.substring(0, start) + paddedValue + label.substring(end);
+   
+  
+   const sNo=item.psDtlId.toString();
+  const itemType=selectType;
+  const newPakNo="S"+itemType+sNo;
+  
+   const pakNoPadVal=newPakNo.padEnd(18, " ");
+  
+   const pakNoStart=50;
+   const pakNoEnd=68;
+   const updatedPakNo = updatedLabelCode.substring(0, pakNoStart) + pakNoPadVal + label.substring(pakNoEnd);
+   
+    
+  //printB2Data
+  
+  const updatedQrValue = {
+  ...item,
+  deliveryNoteNos,
+  batchNos,
+  deliveryDates,
+  manufactureDates,
+  updatedPakNo,
+  newPakNo
+  };
+  setSelectedQrData(updatedQrValue);
+  
+
+
+
+
+
+  //  setSelectedQrData(item);
     setQrModalVisible(true);
     // Wait for UI render
     await new Promise((res) => setTimeout(res, 300));

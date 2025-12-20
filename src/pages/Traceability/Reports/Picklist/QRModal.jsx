@@ -8,18 +8,19 @@ const QRModal = ({ qrModalVisible, setQrModalVisible, selectedQrData , setIsOver
   const data = {
     consignee: "Amalgamations Valeo Clutch Pvt - Chennai",
     unloadingPoint: "CH35 - -",
-    deliveryNoteNo: `${selectedQrData?.deliveryNoteNo}`,
+    deliveryNoteNo: `${selectedQrData?.deliveryNoteNos}`,
     itemNo: `${selectedQrData?.customerSno}`,
-    deliveryDate: `${selectedQrData?.deliveryDate?.replaceAll("-", "")}`,
-    manufactureDate:`${selectedQrData?.manufacturingDate?.replaceAll("-", "")}`,
+    deliveryDate: `${selectedQrData?.deliveryDates?.replaceAll("-", "")}`,
+    manufactureDate:`${selectedQrData?.manufactureDates?.replaceAll("-", "")}`,
     expirationDate: "",
     description: selectedQrData?.childPartDesc,
     quantityFilled: selectedQrData?.binCountQty,
     packageRefNo:  `-`,
     supplierNo: selectedQrData?.supplierCode,
-    pkgNo: selectedQrData?.packageNo,
-    batchNo: selectedQrData?.batchNo || 'N/A',
-    traceability: `${selectedQrData?.updatedLabelCode}`,
+    // pkgNo: selectedQrData?.packageNo,
+    pkgNo: selectedQrData?.newPakNo,
+    batchNo: selectedQrData?.batchNos || 'N/A',
+    traceability: `${selectedQrData?.updatedPakNo}`,
   };
 
   return (
