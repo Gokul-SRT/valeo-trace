@@ -33,6 +33,12 @@ const PickListPrintMain = () => {
   const [labelCode,SetLabelCode]= useState("");
   const [qrValue, setQrValue] = useState("");
   const [resetQrField, setResetQrField] = useState(false);
+
+  const [totalLabels, setTotalLabels] = useState(0);
+  const [remainingLabels, setRemainingLabels] = useState(0);
+  const [printedLabels, setPrintedLabels] = useState(0);
+
+
     const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
 
@@ -616,6 +622,12 @@ if (!customerSno.includes(childPartCodeValidation)) {
         pickListQty={planQty}
         inputRef={inputRef}
         resetQrField={resetQrField}
+        totalLabels={totalLabels}
+        remainingLabels={remainingLabels}
+        printedLabels={printedLabels}
+        setTotalLabels={setTotalLabels}
+        setRemainingLabels={setRemainingLabels}
+        setPrintedLabels={setPrintedLabels}
 
       />
 

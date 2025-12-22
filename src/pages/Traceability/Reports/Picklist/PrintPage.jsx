@@ -29,6 +29,12 @@ const PrintPage = forwardRef(({
   pickListQty,
   inputRef,
   resetQrField,
+  totalLabels,
+  remainingLabels,
+  printedLabels,
+  setTotalLabels,
+  setRemainingLabels,
+  setPrintedLabels,
 }, ref) => {
 
   const [addQty, setAddQty] = useState(0);
@@ -191,9 +197,15 @@ const getA2AndB2DetailsAgianstPlsCodeAndChildPartCode = async (pickListCode,chil
         }));
       //  console.log(updatedData, "updatedData--------")
        setPrintB2Data(updatedData)
+       setTotalLabels(res.totalLable)
+       setRemainingLabels(res.remaingLable)
+       setPrintedLabels(res.printedLabel)
       }
     } else {
       setPrintB2Data([])
+      setTotalLabels(0)
+      setRemainingLabels(0)
+      setPrintedLabels(0)
     }
   } catch (error) {
     setShowPrintDetails(false)
@@ -562,6 +574,22 @@ if (qty % binQuantity !== 0) {
           title={`Print Page - ${selectType}`}
           style={{ marginTop: "20px" }}
         >
+
+        {/* <div style={{ textAlign: "left", marginBottom: "12px" }}>
+  <Row gutter={16}>
+    <Col span={8}>
+      <b>Total Labels:</b> {totalLabels}
+    </Col>
+    <Col span={8}>
+      <b>Remaining Labels:</b> {remainingLabels}
+    </Col>
+    <Col span={8}>
+      <b>Printed Labels:</b> {printedLabels}
+    </Col>
+  </Row>
+</div> */}
+        
+
        {printB2Data.length !== 0 &&(
           <div style={{ textAlign: "right" }}>
           <Button type="primary" onClick={handlePrintAll}>Print All</Button>
