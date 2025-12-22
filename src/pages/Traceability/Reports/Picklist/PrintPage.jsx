@@ -420,7 +420,7 @@ if (qty % binQuantity !== 0) {
     <>
       <Card
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
-        title={`Print Page - ${selectType}`}
+        title={`Split Label Print  - ${childPartCode}-${selectedChildPart}`}
         style={{ marginTop: "20px" }}
       >
         <Form form={printform} layout="vertical">
@@ -571,7 +571,8 @@ if (qty % binQuantity !== 0) {
       {showPrintDetails && (
         <Card
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
-          title={`Print Page - ${selectType}`}
+          // title={`Print Page - ${childPartCode}`}
+          title={`Split Label Print  - ${childPartCode}-${selectedChildPart}`}
           style={{ marginTop: "20px" }}
         >
 
