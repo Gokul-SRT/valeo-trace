@@ -10,6 +10,7 @@ import {
   Table,
   DatePicker,
   message,
+  Empty,
 } from "antd";
 import moment from "moment";
 import PicklistWODropdown from "../../Traceability/Kitting/dropdownService";
@@ -17,6 +18,7 @@ import serverApi from "../../../serverAPI";
 import KittingQRModel from "../../Traceability/Reports/Picklist/KittingQRModel";
 import store from "store";
 import { toast } from "react-toastify";
+import Loader from "../../../Utills/Loader"; // Import your Loader component
 
 const { Option } = Select;
 
@@ -31,7 +33,7 @@ const ChildPartValidationCard = ({
   const [scannedValue, setScannedValue] = useState("");
   const [indicatorColor, setIndicatorColor] = useState("#d9d9d9");
   const [isVerified, setIsVerified] = useState(false);
-  
+  const [loading, setLoading] = useState(false); // Add loader state
 
   const handleScanChange = async (e) => {
     const scanned = e.target.value.trim();
@@ -48,6 +50,7 @@ const ChildPartValidationCard = ({
     const branchCode = store.get("branchCode");
 
     try {
+      setLoading(true); // Start loader
       const payload = {
         scannedCode: scanned,
         subChildPartCode: kitPartCode,
@@ -70,7 +73,8 @@ const ChildPartValidationCard = ({
         setIndicatorColor("green");
         setIsVerified(true);
         message.success("Child part successfully verified");
-        if (onValidationComplete) onValidationComplete(kitPartCode, true, scanned);
+        if (onValidationComplete)
+          onValidationComplete(kitPartCode, true, scanned);
 
         const insertResponse = await serverApi.post(
           "/insertSubChildPart",
@@ -88,13 +92,17 @@ const ChildPartValidationCard = ({
         setIndicatorColor("red");
         setIsVerified(false);
         message.error(verifyData.responseDataMessage || "Verification failed");
-        if (onValidationComplete) onValidationComplete(kitPartCode, false, scanned);
+        if (onValidationComplete)
+          onValidationComplete(kitPartCode, false, scanned);
       }
     } catch (error) {
       message.error("Error verifying or inserting scan");
       setIndicatorColor("red");
       setIsVerified(false);
-      if (onValidationComplete) onValidationComplete(kitPartCode, false, scanned);
+      if (onValidationComplete)
+        onValidationComplete(kitPartCode, false, scanned);
+    } finally {
+      setLoading(false); // Stop loader
     }
   };
 
@@ -107,8 +115,27 @@ const ChildPartValidationCard = ({
         color: "#001F3E",
         fontSize: "12px",
       }}
-      style={{ marginRight: 8 }}
+      style={{ marginRight: 8, position: "relative" }} // Add position relative
     >
+      {loading && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10,
+            borderRadius: "8px",
+          }}
+        >
+          <Loader />
+        </div>
+      )}
       <Form layout="vertical">
         <Form.Item label="PLS Code">
           <Input value={plsCode} disabled />
@@ -170,13 +197,12 @@ const ConsigneeDetailsCard = ({
   const [labelCount, setLabelCount] = useState(0);
   const [quantity, setQuantity] = useState(planQty || 0);
 
-  const[subAssemblyKittingList ,setSubAssemblyKittingList] = useState([]);
+  const [subAssemblyKittingList, setSubAssemblyKittingList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [qrModal, setQrModal] = useState(false);
   const [selectedObject, setSelectedObject] = useState(null);
-  
-  
+
   const getCurrentDate = () => moment();
 
   const calculateLabelCount = (planQtyValue, binQtyValue) => {
@@ -196,297 +222,264 @@ const ConsigneeDetailsCard = ({
     form.setFieldsValue({ labelCount: newLabelCount });
   };
 
-useEffect(()=>{
-  fetchPickedAndStandardQty(childPartCode);
-},[childPartCode]);
+  useEffect(() => {
+    fetchPickedAndStandardQty(childPartCode);
+  }, [childPartCode]);
 
-const fetchPickedAndStandardQty = async (childCode) => {
-  try {
-    const response = await serverApi.post("getPLSCodePickedQuantity", {
-      tenantId,
-      branchCode,
-      plsCode: plsCode,
-      itemType: "C",
-      childPartCode: childCode
-    });
-
-    const res = response.data;
-    if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-      console.log("Fetched PickedQty Details:", res.responseData);
-      const firstItem = res.responseData[0] || {};
-      form.setFieldsValue({
-        binQty: firstItem.standardQuantity || ""
+  const fetchPickedAndStandardQty = async (childCode) => {
+    try {
+      setLoading(true); // Start loader
+      const response = await serverApi.post("getPLSCodePickedQuantity", {
+        tenantId,
+        branchCode,
+        plsCode: plsCode,
+        itemType: "C",
+        childPartCode: childCode,
       });
-      setBinQty(firstItem.standardQuantity || "");
-    } else {
-      form.setFieldsValue({
-        binQty: "0"
-      });
+
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        console.log("Fetched PickedQty Details:", res.responseData);
+        const firstItem = res.responseData[0] || {};
+        form.setFieldsValue({
+          binQty: firstItem.standardQuantity || "",
+        });
+        setBinQty(firstItem.standardQuantity || "");
+      } else {
+        form.setFieldsValue({
+          binQty: "0",
+        });
+      }
+    } catch (error) {
+      toast.error("Error fetching picked quantity. Please try again later.");
+    } finally {
+      setLoading(false); // Stop loader
     }
-  } catch (error) {
-    toast.error("Error fetching picked quantity. Please try again later.");
-  }
-};
-
-
-
-/*
-  const handleQuantityChange = (e) => {
-    const value = e.target.value;
-    const quantitys = value ? Number(value) : 0;
-    const planQtyNum = Number(planQty) || 0;
-    
-    if (quantitys > planQtyNum) {
-      toast.error("Quantity cannot exceed plan quantity!");
-      setQuantity(""); // clear input
-      setLabelCount(0);
-      form.setFieldsValue({ quantity: "", labelCount: 0 }); // sync Form value
-      return;
-    }
-
-    if (quantitys % Number(binQty) !== 0) {
-      toast.error(`Quantity must be a multiple of ${binQty}`);
-      setQuantity(""); // clear input
-      setLabelCount(0);
-      form.setFieldsValue({ quantity: "", labelCount: 0 }); // sync Form value
-      return;
-    }
-
-    // valid quantity
-    setQuantity(quantitys);
-
-    const newLabelCount = calculateLabelCount(quantitys, binQty);
-    setLabelCount(newLabelCount);
-    form.setFieldsValue({ labelCount: newLabelCount });
   };
-*/
 
-
-const subAssemblyColumns = [
-  { title: "S.No", key: "sno", render: (text, record, index) => index + 1 },
-  {
-    title: "PicList Code",
-    dataIndex: "plsCode",
-    key: "plsCode",
-  },
-  {
-    title: "ChildPart Code",
-    dataIndex: "childPartCode",
-    key: "childPartCode",
-  },
-  {
-    title: "Quantity",
-    dataIndex: "qty",
-    key: "qty",
-    align: "right",
-    render: (value) =>
-      value !== null && value !== undefined && value !== "" ? value : 0,
-  },
-  {
-    title: "Label Code",
-    dataIndex: "labelCode",
-    key: "labelCode",
-    render: (text) => (
-      <div style={{ whiteSpace: "pre", fontFamily: "monospace" }}>
-        {text}
-      </div>
-    ),
-
-  },
-  {
-    title: "Action",
-    key: "printSts",
-    render: (_, record) => {
-      const val = record.printSts;  // 0 or 1
-  
-      return (
-        <>
-          {/* PRINT BUTTON */}
-          <Button
-            type="primary"
-            disabled={val === "1"}      // Disable when printSts = 1
-            style={{
-              marginRight: 8,
-              opacity: val === "1" ? 0.5 : 1,
-              cursor: val === "1" ? "not-allowed" : "pointer",
-            }}
-            onClick={() => handleSubAssemplyPrint(record)}
-          >
-            Print
-          </Button>
-  
-          {/* REPRINT BUTTON */}
-          <Button
-            type="default"
-            disabled={val === "0"}      // Disable when printSts = 0
-            style={{
-              opacity: val === "0" ? 0.5 : 1,
-              cursor: val === "0" ? "not-allowed" : "pointer",
-            }}
-          onClick={()=>handleSubAssemplyRePrint(record)}  
-          >
-            Reprint
-          </Button>
-        </>
-      );
+  const subAssemblyColumns = [
+    { title: "S.No", key: "sno", render: (text, record, index) => index + 1 },
+    {
+      title: "PicList Code",
+      dataIndex: "plsCode",
+      key: "plsCode",
     },
-  }
-  
-];
+    {
+      title: "ChildPart Code",
+      dataIndex: "childPartCode",
+      key: "childPartCode",
+    },
+    {
+      title: "Quantity",
+      dataIndex: "qty",
+      key: "qty",
+      align: "right",
+      render: (value) =>
+        value !== null && value !== undefined && value !== "" ? value : 0,
+    },
+    {
+      title: "Label Code",
+      dataIndex: "labelCode",
+      key: "labelCode",
+      render: (text) => (
+        <div style={{ whiteSpace: "pre", fontFamily: "monospace" }}>{text}</div>
+      ),
+    },
+    {
+      title: "Action",
+      key: "printSts",
+      render: (_, record) => {
+        const val = record.printSts; // 0 or 1
 
-const getItemById = (id) => {
-  return subAssemblyKittingList.find(item => item.id === id);
-};
+        return (
+          <>
+            {/* PRINT BUTTON */}
+            <Button
+              type="primary"
+              disabled={val === "1"} // Disable when printSts = 1
+              style={{
+                marginRight: 8,
+                opacity: val === "1" ? 0.5 : 1,
+                cursor: val === "1" ? "not-allowed" : "pointer",
+              }}
+              onClick={() => handleSubAssemplyPrint(record)}
+            >
+              Print
+            </Button>
 
+            {/* REPRINT BUTTON */}
+            <Button
+              type="default"
+              disabled={val === "0"} // Disable when printSts = 0
+              style={{
+                opacity: val === "0" ? 0.5 : 1,
+                cursor: val === "0" ? "not-allowed" : "pointer",
+              }}
+              onClick={() => handleSubAssemplyRePrint(record)}
+            >
+              Reprint
+            </Button>
+          </>
+        );
+      },
+    },
+  ];
 
+  const getItemById = (id) => {
+    return subAssemblyKittingList.find((item) => item.id === id);
+  };
 
-const updatePrintStatus = (id, newStatus) => {
-  setSubAssemblyKittingList((prevList) =>
-    prevList.map((item) =>
-      item.id === id ? { ...item, printSts: newStatus } : item
-    )
-  );
-};
+  const updatePrintStatus = (id, newStatus) => {
+    setSubAssemblyKittingList((prevList) =>
+      prevList.map((item) =>
+        item.id === id ? { ...item, printSts: newStatus } : item
+      )
+    );
+  };
 
-const handleSubAssemplyPrint = async (record) => {
-  try {
-    console.log("PRINT clicked row:", record);
+  const handleSubAssemplyPrint = async (record) => {
+    try {
+      console.log("PRINT clicked row:", record);
+      setLoading(true); // Start loader
 
-    const response = await serverApi.post("updateLabelSts", {
-      tenantId: tenantId,
-      branchCode: branchCode,
-      exeId: record.id,
-      sts:"1",
-    });
-         const res = response.data;
+      const response = await serverApi.post("updateLabelSts", {
+        tenantId: tenantId,
+        branchCode: branchCode,
+        exeId: record.id,
+        sts: "1",
+      });
+      const res = response.data;
       if (res.responseCode === "200") {
         //update new printStatus
-        console.log("setQrModal",qrModal)
-       
+        console.log("setQrModal", qrModal);
+
         toast.success("Printed successfully!");
-        updatePrintStatus(record.id,"1");
-        
+        updatePrintStatus(record.id, "1");
+
         // Example usage
         const itemObject = getItemById(record.id);
         setSelectedObject(itemObject);
         setQrModal(true);
-       
-       
-
-      }else{
+      } else {
         toast.error("Printed Failure!");
       }
+    } catch (err) {
+      message.error("Print failed");
+    } finally {
+      setLoading(false); // Stop loader
+    }
+  };
 
-  
-  } catch (err) {
-    message.error("Print failed");
-  }
-};
+  const handleSubAssemplyRePrint = async (record) => {
+    try {
+      const itemObject = getItemById(record.id);
+      setSelectedObject(itemObject);
+      setQrModal(true);
+      toast.success("RePrinted successfully!");
+    } catch (err) {
+      message.error("RePrint failed");
+    }
+  };
 
-const handleSubAssemplyRePrint = async (record) => {
-  try {
-  
-        const itemObject = getItemById(record.id);
-        setSelectedObject(itemObject);
-        setQrModal(true);
-        toast.success("RePrinted successfully!");
-  } catch (err) {
-    message.error("RePrint failed");
-  }
-};
+  const updateScannedCountForSubChildPart = async (
+    plsCode,
+    formattedValues
+  ) => {
+    try {
+      setLoading(true); // Start loader
 
+      const updatePayLoadList = childPartCountList.map((item) => ({
+        tenantId: tenantId,
+        branchCode: branchCode,
+        minimumCount: listTotalCount,
+        subChildParts: item.kittingChildPartCode,
+        plsCode: plsCode,
+        childPartCode: formattedValues.childPartCode,
+      }));
 
-const updateScannedCountForSubChildPart = async (plsCode,formattedValues) => {
-  try {
-
-    const updatePayLoadList=childPartCountList.map((item)=>({
-      tenantId: tenantId,
-      branchCode: branchCode,
-      minimumCount: listTotalCount,
-      subChildParts: item.kittingChildPartCode,
-      plsCode: plsCode,
-      childPartCode: formattedValues.childPartCode,
-    }))
-
-    const response = await serverApi.post("updateScannedCountForKittingDtl",updatePayLoadList);
-         const res = response.data;
+      const response = await serverApi.post(
+        "updateScannedCountForKittingDtl",
+        updatePayLoadList
+      );
+      const res = response.data;
       if (res.responseCode === "200") {
         toast.success("ScannedCount updated successfully!");
-       
-      }else{
+      } else {
         toast.error("ScannedCount updated Failure!");
       }
-  } catch (err) {
-    message.error("ScannedCount updated failed");
-  }
-};
+    } catch (err) {
+      message.error("ScannedCount updated failed");
+    } finally {
+      setLoading(false); // Stop loader
+    }
+  };
 
+  //search
+  const filteredData = subAssemblyKittingList.filter((item) =>
+    Object.values(item)
+      .join(" ")
+      .toLowerCase()
+      .includes(searchText.toLowerCase())
+  );
 
-//search
-const filteredData = subAssemblyKittingList.filter((item) =>
-Object.values(item)
-  .join(" ")
-  .toLowerCase()
-  .includes(searchText.toLowerCase())
-);
+  const insertSubAssemblyPartKittingDetails = async (
+    plsCode,
+    formattedValues
+  ) => {
+    console.log("date", formattedValues.expirationDate);
+    setLoading(true);
+    try {
+      const payload = {
+        tenantId: tenantId,
+        branchCode: branchCode,
+        employeeId: employeeId,
+        plsCode: plsCode,
+        childPartCode: formattedValues.childPartCode,
+        childPartDesc: formattedValues.childPartDesc,
+        consignee: formattedValues.consignee,
+        storageLocation: formattedValues.storageLocation,
+        deliveryNo: formattedValues.deliveryNo,
+        itemNoCustomer: formattedValues.itemNo,
+        deliveryDate: formattedValues.deliveryDate,
+        manufacturingDate: formattedValues.manufacturingDate,
+        expirationDate: formattedValues.expirationDate,
+        description: formattedValues.description,
+        quantity: formattedValues.quantity,
+        binQuantity: formattedValues.binQty,
+        labelCount: formattedValues.labelCount,
+        packageReferenceNo: formattedValues.packageReferenceNo,
+        supplierNumber: formattedValues.supplierNumber,
+        pkgNo: formattedValues.pkgNo,
+        batchNo: formattedValues.batchNo,
+      };
 
-const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
-  console.log("date",formattedValues.expirationDate)
-  setLoading(true);
-  try {
-    const payload = {
-      tenantId: tenantId,
-      branchCode: branchCode,
-      employeeId: employeeId,
-      plsCode: plsCode,
-      childPartCode: formattedValues.childPartCode,
-      childPartDesc: formattedValues.childPartDesc,
-      consignee: formattedValues.consignee,
-      storageLocation: formattedValues.storageLocation,
-      deliveryNo: formattedValues.deliveryNo,
-      itemNoCustomer: formattedValues.itemNo,
-      deliveryDate: formattedValues.deliveryDate,
-      manufacturingDate: formattedValues.manufacturingDate,
-      expirationDate: formattedValues.expirationDate,
-      description: formattedValues.description,
-      quantity: formattedValues.quantity,
-      binQuantity: formattedValues.binQty,
-      labelCount: formattedValues.labelCount,
-      packageReferenceNo: formattedValues.packageReferenceNo,
-      supplierNumber: formattedValues.supplierNumber,
-      pkgNo: formattedValues.pkgNo,
-      batchNo: formattedValues.batchNo,
-    };
-
-    const response = await serverApi.post("insertAndRetrieveSubAssemblyPartDetails", payload
+      const response = await serverApi.post(
+        "insertAndRetrieveSubAssemblyPartDetails",
+        payload
       );
 
-    const res = response.data;
-    if (res.responseCode === "200" && Array.isArray(res.responseData)) {
-      
-      toast.success(res.responseMessage);
-      setSubAssemblyKittingList(res.responseData);
-      console.log("setSubAssemblyKittingList",res.responseData)
-      console.log("setSubAssemblyKittingList",res.responseData[0].labelCode)
+      const res = response.data;
+      if (res.responseCode === "200" && Array.isArray(res.responseData)) {
+        toast.success(res.responseMessage);
+        setSubAssemblyKittingList(res.responseData);
+        console.log("setSubAssemblyKittingList", res.responseData);
+        console.log("setSubAssemblyKittingList", res.responseData[0].labelCode);
 
-      updateScannedCountForSubChildPart(plsCode,formattedValues);
-      
-    } else {
-      setSubAssemblyKittingList([]);
-      toast.error(res.responseMessage);
+        updateScannedCountForSubChildPart(plsCode, formattedValues);
+      } else {
+        setSubAssemblyKittingList([]);
+        toast.error(res.responseMessage);
+      }
+    } catch (error) {
+      toast.error("Error fetching SubAssembly. Please try again later.");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-   
-    toast.error("Error fetching SubAssembly. Please try again later.");
-  }finally{
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const handlePrint = () => {
-    form.validateFields()
+    form
+      .validateFields()
       .then((values) => {
         if (onPrint) {
           const formattedValues = {
@@ -496,22 +489,16 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
                 ? values.deliveryDate.format("YYYY-MM-DD")
                 : null,
             manufacturingDate:
-              values.manufacturingDate && moment.isMoment(values.manufacturingDate)
+              values.manufacturingDate &&
+              moment.isMoment(values.manufacturingDate)
                 ? values.manufacturingDate.format("YYYY-MM-DD")
                 : null,
-            // expirationDate:
-            //   values.expirationDate && moment.isMoment(values.expirationDate)
-            //     ? values.expirationDate.format("YYYY-MM-DD")
-            //     : null,
             binQty: binQty,
             labelCount: labelCount,
             childPartCode: childPartCode,
             childPartDesc: childPartDesc,
           };
-          //onPrint(formattedValues);
-          insertSubAssemblyPartKittingDetails(plsCode,formattedValues);
-
-
+          insertSubAssemblyPartKittingDetails(plsCode, formattedValues);
         }
       })
       .catch(() => {
@@ -538,266 +525,286 @@ const insertSubAssemblyPartKittingDetails = async (plsCode,formattedValues) => {
   }, [planQty, binQty, form, childPartCode, childPartDesc]);
 
   return (
-<>
-{subAssemblyKittingList && subAssemblyKittingList.length > 0 && (
-<Card
-        headStyle={{ backgroundColor: "#00264d", color: "white" }}
-        title={`Sub Assembly Details`}
-      >
-       <Input
-        placeholder="Search..."
-        value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
-        style={{ marginBottom: 16, width: 300 }}
-      />
-        <Table
-          columns={subAssemblyColumns}
-          dataSource={filteredData}
-          bordered
-          locale={{ emptyText: "No data " }}
-          pagination={{ pageSize: 10 }}
-          loading={loading} //  Show loader
-          scroll={{ x: 'max-content' }}
-        />
-
+    <>
+      {loading && (
         <div
           style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
             display: "flex",
             justifyContent: "center",
-            gap: "10px",
-            marginTop: "20px",
+            alignItems: "center",
+            zIndex: 1000,
           }}
         >
-         
+          <Loader />
         </div>
-      </Card>
-)}
+      )}
 
+      {subAssemblyKittingList && subAssemblyKittingList.length > 0 && (
+        <Card
+          headStyle={{ backgroundColor: "#00264d", color: "white" }}
+          title={`Sub Assembly Details`}
+          style={{ position: "relative" }}
+        >
+          <Input
+            placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ marginBottom: 16, width: 300 }}
+          />
+          <Table
+            columns={subAssemblyColumns}
+            dataSource={filteredData}
+            bordered
+            locale={{ emptyText: "No data " }}
+            pagination={{ pageSize: 10 }}
+            scroll={{ x: "max-content" }}
+          />
+        </Card>
+      )}
 
+      {subAssemblyKittingList?.length === 0 && (
+        <Card
+          title="Consignee Details"
+          headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
+          style={{ marginTop: 16, position: "relative" }}
+        >
+          {/* Show scan results table here */}
+          {scanResultsTable}
 
-{subAssemblyKittingList?.length === 0 && (
+          <Form layout="vertical" form={form}>
+            <Row gutter={[16, 8]}>
+              {/* First Row */}
+              <Col span={6}>
+                <Form.Item label="Consignee" name="consignee">
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="Storage Location" name="storageLocation">
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Delivery No"
+                  name="deliveryNo"
+                  rules={[
+                    { required: true, message: "Please enter delivery number" },
+                  ]}
+                >
+                  <Input placeholder="Enter delivery number" />
+                </Form.Item>
+              </Col>
 
-    <Card
-      title="Consignee Details"
-      headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
-      style={{ marginTop: 16 }}
-    >
-      {/* Show scan results table here */}
-      {scanResultsTable}
+              {/* Second Row */}
+              <Col span={6}>
+                <Form.Item label="Item No. Customer" name="itemNo">
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Delivery Date"
+                  name="deliveryDate"
+                  rules={[
+                    { required: true, message: "Please select delivery date" },
+                  ]}
+                >
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Manufacturing Date"
+                  name="manufacturingDate"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please select manufacturing date",
+                    },
+                  ]}
+                >
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </Col>
 
-      <Form layout="vertical" form={form}>
-        <Row gutter={[16, 8]}>
-          {/* First Row */}
-          <Col span={6}>
-            <Form.Item label="Consignee" name="consignee">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Storage Location" name="storageLocation">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item
-              label="Delivery No"
-              name="deliveryNo"
-              rules={[{ required: true, message: "Please enter delivery number" }]}
-            >
-              <Input placeholder="Enter delivery number" />
-            </Form.Item>
-          </Col>
+              {/* Third Row */}
+              <Col span={6}>
+                <Form.Item label="Expiration Date" name="expirationDate">
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="Description" name="description">
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="Plan Qty" name="planQty">
+                  <Input disabled />
+                </Form.Item>
+              </Col>
 
-          {/* Second Row */}
-          <Col span={6}>
-            <Form.Item label="Item No. Customer" name="itemNo">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              label="Delivery Date" 
-              name="deliveryDate"
-              rules={[{ required: true, message: "Please select delivery date" }]}
-            >
-              <DatePicker 
-                style={{ width: "100%" }} 
-                format="YYYY-MM-DD"
-              />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              label="Manufacturing Date" 
-              name="manufacturingDate"
-              rules={[{ required: true, message: "Please select manufacturing date" }]}
-            >
-              <DatePicker 
-                style={{ width: "100%" }} 
-                format="YYYY-MM-DD"
-              />
-            </Form.Item>
-          </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Quantity"
+                  name="quantity"
+                  rules={[{ required: true, message: "Please enter quantity" }]}
+                >
+                  <Input
+                    type="number"
+                    style={{ width: "100%" }}
+                    placeholder="Enter quantity"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    onBlur={() => {
+                      const quantityNum = Number(quantity);
+                      if (quantityNum > planQty) {
+                        toast.error("Quantity cannot exceed plan quantity!");
+                        setQuantity("");
+                        form.setFieldsValue({ quantity: "" });
+                        setLabelCount(0);
+                        form.setFieldsValue({ labelCount: 0 });
+                        return;
+                      }
+                      if (quantityNum !== listTotalCount) {
+                        toast.error(
+                          "Quantity must be equal to totalCount minimum value!"
+                        );
+                        setQuantity("");
+                        form.setFieldsValue({ quantity: "" });
+                        setLabelCount(0);
+                        form.setFieldsValue({ labelCount: 0 });
+                        return;
+                      }
 
-          {/* Third Row */}
-          <Col span={6}>
-            <Form.Item label="Expiration Date" name="expirationDate">
-              <DatePicker 
-                style={{ width: "100%" }} 
-                format="YYYY-MM-DD"
-              />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Description" name="description">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Plan Qty" name="planQty">
-              <Input disabled />
-            </Form.Item>
-          </Col>
+                      if (quantityNum % binQty !== 0) {
+                        console.log("vvvvvbin", binQty);
+                        toast.error(
+                          `Quantity must be a multiple of bin Quantity`
+                        );
+                        setQuantity("");
+                        form.setFieldsValue({ quantity: "" });
+                        setLabelCount(0);
+                        form.setFieldsValue({ labelCount: 0 });
+                        return;
+                      }
 
-          <Col span={6}>
-            <Form.Item 
-              label="Quantity" 
-              name="quantity"
-              rules={[{ required: true, message: "Please enter quantity" }]}
-            >
-              <Input 
-                type="number"
-                style={{ width: "100%" }}
-                placeholder="Enter quantity" 
-                value={quantity}      // controlled input
-              //  onChange={handleQuantityChange}
-              onChange={(e) => setQuantity(e.target.value)} // just update state while typing
-              onBlur={() => {
-                const quantityNum = Number(quantity);
-                if (quantityNum > planQty) {
-                  toast.error("Quantity cannot exceed plan quantity!");
-                  setQuantity(""); // now clear after typing
-                  form.setFieldsValue({ quantity: "" });
-                  setLabelCount(0);
-                  form.setFieldsValue({ labelCount: 0 });
-                  return;
-                }
-                if(quantityNum !== listTotalCount){
-                  toast.error("Quantity must be equal to totalCount minimum value!");
-                  setQuantity(""); // now clear after typing
-                  form.setFieldsValue({ quantity: "" });
-                  setLabelCount(0);
-                  form.setFieldsValue({ labelCount: 0 });
-                  return;
+                      // valid input
+                      const newLabelCount = calculateLabelCount(
+                        quantityNum,
+                        binQty
+                      );
+                      setLabelCount(newLabelCount);
+                      form.setFieldsValue({ labelCount: newLabelCount });
+                    }}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
 
-                }
+              {/* Fourth Row - Bin Qty and Label Count */}
+              <Col span={6}>
+                <Form.Item
+                  label="Bin Qty"
+                  name="binQty"
+                  rules={[
+                    { required: true, message: "Please enter bin quantity" },
+                  ]}
+                >
+                  <Input
+                    type="number"
+                    style={{ width: "100%" }}
+                    placeholder="Enter bin quantity"
+                    onChange={handleBinQtyChange}
+                    min={1}
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="Label Count" name="labelCount">
+                  <Input
+                    style={{ width: "100%" }}
+                    value={labelCount}
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Package Reference No"
+                  name="packageReferenceNo"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter package reference no",
+                    },
+                  ]}
+                >
+                  <Input placeholder="Enter package reference no" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Supplier Number"
+                  name="supplierNumber"
+                  rules={[
+                    { required: true, message: "Please enter supplier number" },
+                  ]}
+                >
+                  <Input placeholder="Enter supplier number" />
+                </Form.Item>
+              </Col>
 
-                if (quantityNum % binQty !== 0) {
-                  console.log("vvvvvbin",binQty)
-                  toast.error(`Quantity must be a multiple of bin Quantity`);
-                  setQuantity("");
-                  form.setFieldsValue({ quantity: "" });
-                  setLabelCount(0);
-                  form.setFieldsValue({ labelCount: 0 });
-                  return;
-                }
-          
-                // valid input
-                const newLabelCount = calculateLabelCount(quantityNum, binQty);
-                setLabelCount(newLabelCount);
-                form.setFieldsValue({ labelCount: newLabelCount });
-              }}
-                min={0}
-              />
-            </Form.Item>
-          </Col>
+              {/* Fifth Row */}
+              <Col span={6}>
+                <Form.Item
+                  label="Pkg No."
+                  name="pkgNo"
+                  rules={[
+                    { required: true, message: "Please enter package number" },
+                  ]}
+                >
+                  <Input placeholder="Enter package number" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Batch No."
+                  name="batchNo"
+                  rules={[
+                    { required: true, message: "Please enter batch number" },
+                  ]}
+                >
+                  <Input placeholder="Enter batch number" />
+                </Form.Item>
+              </Col>
+            </Row>
 
-          {/* Fourth Row - Bin Qty and Label Count */}
-          <Col span={6}>
-            <Form.Item 
-              label="Bin Qty" 
-              name="binQty"
-              rules={[{ required: true, message: "Please enter bin quantity" }]}
-            >
-              <Input 
-                type="number"
-                style={{ width: "100%" }}
-                placeholder="Enter bin quantity"
-                
-              //  defaultValue={100}
-                onChange={handleBinQtyChange}
-                min={1}
-                disabled
-              />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Label Count" name="labelCount">
-              <Input 
-                style={{ width: "100%" }}
-                value={labelCount}
-                disabled
-              />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              label="Package Reference No" 
-              name="packageReferenceNo"
-              rules={[{ required: true, message: "Please enter package reference no" }]}
-            >
-              <Input placeholder="Enter package reference no" />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              label="Supplier Number" 
-              name="supplierNumber"
-              rules={[{ required: true, message: "Please enter supplier number" }]}
-            >
-              <Input placeholder="Enter supplier number" />
-            </Form.Item>
-          </Col>
-
-          {/* Fifth Row */}
-          <Col span={6}>
-            <Form.Item 
-              label="Pkg No." 
-              name="pkgNo"
-              rules={[{ required: true, message: "Please enter package number" }]}
-            >
-              <Input placeholder="Enter package number" />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              label="Batch No." 
-              name="batchNo"
-              rules={[{ required: true, message: "Please enter batch number" }]}
-            >
-              <Input placeholder="Enter batch number" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row justify="end">
-          <Button onClick={onCancel} style={{ marginRight: 8 }}>
-            Cancel
-          </Button>
-          <Button
-            type="primary"
-            onClick={handlePrint}
-            style={{ backgroundColor: "#001F3E", color: "white" }}
-            disabled={labelCount === 0}
-          >
-            Print {labelCount > 0 ? `${labelCount} Label(s)` : "Labels"}
-          </Button>
-        </Row>
-      </Form>
-    </Card>
-
-    )}
-     <KittingQRModel
+            <Row justify="end">
+              <Button onClick={onCancel} style={{ marginRight: 8 }}>
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                onClick={handlePrint}
+                style={{ backgroundColor: "#001F3E", color: "white" }}
+                disabled={labelCount === 0}
+              >
+                Print {labelCount > 0 ? `${labelCount} Label(s)` : "Labels"}
+              </Button>
+            </Row>
+          </Form>
+        </Card>
+      )}
+      <KittingQRModel
         qrModalVisible={qrModal}
         setQrModalVisible={setQrModal}
         selectedQrData={selectedObject}
@@ -825,18 +832,21 @@ const Kitting = () => {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState(null);
   const [childPartCountList, setChildPartCountList] = useState([]);
-  const [listTotalCount,setListTotalCount] = useState("");
-  
+  const [listTotalCount, setListTotalCount] = useState("");
+  const [loading, setLoading] = useState(false); // Main loader state
 
-  
   const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
-  const employeeId = store.get("employeeId")
+  const employeeId = store.get("employeeId");
 
   const fetchPlans = async () => {
-    setLoadingPlans(true);
+    // setLoadingPlans(true);
     try {
-      const response = await PicklistWODropdown(tenantId, branchCode,selectedDate);
+      const response = await PicklistWODropdown(
+        tenantId,
+        branchCode,
+        selectedDate
+      );
       const data = Array.isArray(response.data) ? response.data : response;
       setPlanOptions(data.map((item) => ({ code: item.plsCode })));
     } catch (err) {
@@ -849,10 +859,11 @@ const Kitting = () => {
 
   useEffect(() => {
     fetchPlans();
-  }, [tenantId, branchCode,selectedDate]);
+  }, [tenantId, branchCode, selectedDate]);
 
   const fetchKittingPartDetails = async (planCode) => {
     setLoadingParts(true);
+    setLoading(true); // Start main loader
     try {
       const payload = { tenantId, plscode: planCode };
       const response = await serverApi.post("/getKittingPartDetails", payload);
@@ -873,6 +884,7 @@ const Kitting = () => {
       message.error("Failed to fetch Kitting part details");
     } finally {
       setLoadingParts(false);
+      setLoading(false); // Stop main loader
     }
   };
 
@@ -889,6 +901,7 @@ const Kitting = () => {
     setVerificationStatus({});
     setScannedValues({});
     setAllChildPartsVerified(false);
+    setLoading(true); // Start loader
 
     try {
       const payload = {
@@ -896,7 +909,10 @@ const Kitting = () => {
         childPartCode: record.childPartCode,
         branchCode,
       };
-      const response = await serverApi.post("/getKittingChildPartDetails", payload);
+      const response = await serverApi.post(
+        "/getKittingChildPartDetails",
+        payload
+      );
       const rawData = response.data?.responseData;
       const data = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
       if (data.length > 0) {
@@ -914,6 +930,8 @@ const Kitting = () => {
       }
     } catch (error) {
       message.error("Failed to fetch child part details");
+    } finally {
+      setLoading(false); // Stop loader
     }
   };
 
@@ -950,17 +968,19 @@ const Kitting = () => {
     }
   }, [verificationStatus, selectedPart]);
 
-  const handleConsigneeClick = async() => {
+  const handleConsigneeClick = async () => {
     if (!allChildPartsVerified) return;
     setShowConsigneeCard(true);
+    setLoading(true); // Start loader
+
     try {
       const payload = {
         tenantId,
         childPartCode: selectedPart.childPartCode,
         branchCode,
-        plsCode: selectedPlan
+        plsCode: selectedPlan,
       };
-      
+
       const response = await serverApi.post("/getSubAssyCount", payload);
       console.log(response);
       const rawData = response.data?.responseData;
@@ -968,30 +988,32 @@ const Kitting = () => {
         console.log(rawData);
         setChildPartCountList(rawData);
 
-       const totalCount=Math.min(...rawData.map(item=>Number(item.totalCount)));
-       if (totalCount !== null && totalCount !== undefined) {
-        setListTotalCount(totalCount);
-       }else{
-        setListTotalCount(0);
-       }
-      
-      
-
+        const totalCount = Math.min(
+          ...rawData.map((item) => Number(item.totalCount))
+        );
+        if (totalCount !== null && totalCount !== undefined) {
+          setListTotalCount(totalCount);
+        } else {
+          setListTotalCount(0);
+        }
       } else {
         setChildPartCountList([]);
         message.info("Error");
       }
     } catch (error) {
       message.error("Failed to fetch count");
+    } finally {
+      setLoading(false); // Stop loader
     }
   };
-  
 
   const handleConsigneePrint = (printData) => {
     if (printData && printData.childPartCode) {
       setSelectedQrData(printData.childPartCode);
       setQrModalVisible(true);
-      message.success(`Printing ${printData.labelCount} label(s) for ${printData.childPartCode}`);
+      message.success(
+        `Printing ${printData.labelCount} label(s) for ${printData.childPartCode}`
+      );
     } else {
       message.error("Invalid print data");
     }
@@ -1018,28 +1040,51 @@ const Kitting = () => {
         </a>
       ),
     },
-    { title: "Child Part Description", dataIndex: "childPartDesc", key: "childPartDesc" },
+    {
+      title: "Child Part Description",
+      dataIndex: "childPartDesc",
+      key: "childPartDesc",
+    },
     { title: "Item Type", dataIndex: "itemType", key: "itemType" },
-    { title: "Picklist Qty", dataIndex: "picklistQty", key: "picklistQty", align: "right" },
-    { title: "Picked Qty", dataIndex: "pickedQty", key: "pickedQty", align: "right" },
+    {
+      title: "Picklist Qty",
+      dataIndex: "picklistQty",
+      key: "picklistQty",
+      align: "right",
+    },
+    {
+      title: "Picked Qty",
+      dataIndex: "pickedQty",
+      key: "pickedQty",
+      align: "right",
+    },
     { title: "Product Code", dataIndex: "productCode", key: "productCode" },
   ];
 
   // Build scan results table for ConsigneeDetailsCard, only after completion
-  const scanResultsTable = childPartCountList && childPartCountList.length > 0 ? (
-    <Card title="Sub Child Part Scan Results" style={{ marginBottom: 24 }}>
-      <Table
-        dataSource={childPartCountList}
-        columns={[
-          { title: "Kitting Child Part Code", dataIndex: "kittingChildPartCode", key: "kittingChildPartCode" },
-          { title: "Total Count", dataIndex: "totalCount", key: "totalCount" },
-        ]}
-        pagination={false}
-        bordered
-        size="small"
-      />
-    </Card>
-  ) : null;
+  const scanResultsTable =
+    childPartCountList && childPartCountList.length > 0 ? (
+      <Card title="Sub Child Part Scan Results" style={{ marginBottom: 24 }}>
+        <Table
+          dataSource={childPartCountList}
+          columns={[
+            {
+              title: "Kitting Child Part Code",
+              dataIndex: "kittingChildPartCode",
+              key: "kittingChildPartCode",
+            },
+            {
+              title: "Total Count",
+              dataIndex: "totalCount",
+              key: "totalCount",
+            },
+          ]}
+          pagination={false}
+          bordered
+          size="small"
+        />
+      </Card>
+    ) : null;
 
   // Render child part cards and Completed button
   const renderChildPartCard = () => {
@@ -1093,6 +1138,26 @@ const Kitting = () => {
 
   return (
     <>
+      {/* Main Loader */}
+      {loading && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <Loader />
+        </div>
+      )}
+
       <div style={{ marginBottom: 16 }}>
         <Card
           title="Kitting Process"
@@ -1106,11 +1171,13 @@ const Kitting = () => {
                   name="date"
                   rules={[{ required: true, message: "Please select date" }]}
                 >
-                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD"
-                   onChange={(date) =>
-                    setSelectedDate(date ? date.format("YYYY-MM-DD") : null)
-                  }
-                   />
+                  <DatePicker
+                    style={{ width: "100%" }}
+                    format="YYYY-MM-DD"
+                    onChange={(date) =>
+                      setSelectedDate(date ? date.format("YYYY-MM-DD") : null)
+                    }
+                  />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -1119,7 +1186,11 @@ const Kitting = () => {
                   name="plan"
                   rules={[{ required: true, message: "Please select a plan" }]}
                 >
-                  <Select placeholder="Select Work Order" loading={loadingPlans} allowClear>
+                  <Select
+                    placeholder="Select Work Order"
+                    loading={loadingPlans}
+                    allowClear
+                  >
                     {planOptions.map((plan) => (
                       <Option key={plan.code} value={plan.code}>
                         {plan.code}
@@ -1173,13 +1244,11 @@ const Kitting = () => {
             title={`Work Order Details - Plan ${selectedPlan}`}
             headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
           >
-            <Table
-              columns={columns}
-              dataSource={tableData}
-              loading={loadingParts}
-              pagination={{ pageSize: 5 }}
-              bordered
-            />
+            {tableData.length === 0 ? (
+              <Empty description="No Data Available" />
+            ) : (
+              <Table rowKey="plsdId" columns={columns} dataSource={tableData} />
+            )}
           </Card>
         </div>
       )}
@@ -1218,12 +1287,6 @@ const Kitting = () => {
           />
         </div>
       )}
-
-      {/* <QRModal
-        qrModalVisible={qrModalVisible}
-        setQrModalVisible={setQrModalVisible}
-        selectedQrData={selectedQrData}
-      /> */}
     </>
   );
 };
