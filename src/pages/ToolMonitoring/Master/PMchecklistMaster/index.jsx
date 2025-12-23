@@ -734,7 +734,7 @@ const PMChecklistMaster = ({ modulesprop, screensprop }) => {
                 onCellEditingStarted={onCellEditingStarted}
                 onCellEditingStopped={onCellEditingStopped}
                 onCellValueChanged={onCellValueChanged}
-
+                overlayNoRowsTemplate="No data available"
               />
               <div className="text-center mt-4">
                 <button className="btn text-white me-2" style={{ backgroundColor: "#00264d", minWidth: "90px" }} onClick={createorUpdate}>Update</button>

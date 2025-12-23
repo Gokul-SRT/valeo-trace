@@ -458,7 +458,6 @@ const PreventiveMaintenanceCheckList = () => {
         form.setFieldsValue({
           customerSearch: "",
         });
-        toast.error("There is no Customer for this corresponding Product pls alot in Customer Product Mapping");
       }
     } catch (error) {
       console.error("Error fetching customer by product", error);
@@ -466,7 +465,6 @@ const PreventiveMaintenanceCheckList = () => {
       form.setFieldsValue({
         customerSearch: "",
       });
-      toast.error("There is no Customer for this corresponding Product pls alot in Customer Product Mapping");
     }
   };
 
@@ -748,11 +746,11 @@ const PreventiveMaintenanceCheckList = () => {
                   onChange={(value) => {
                     setSelectedToolSearch(value);
                     if (value === "getAll") {
-                      form.setFieldsValue({ productId: "getAll" });
+                      form.setFieldsValue({ productId: "getAll", customerSearch: "" });
                       setProduct("getAll");
                       setCustomer("getAll");
                     } else {
-                      form.setFieldsValue({ productId: undefined });
+                      form.setFieldsValue({ productId: undefined, customerSearch: "" });
                       setProduct("");
                       setCustomer("");
                     }
@@ -781,15 +779,23 @@ const PreventiveMaintenanceCheckList = () => {
                   onChange={(value) => {
                     addForm.setFieldsValue({ productId: value });
                     setProduct(value);
-                    fetchCustomerByProduct(value); // Call the new function
+                    if (value === "getAll") {
+                      setCustomer("");
+                      form.setFieldsValue({ customerSearch: "" });
+                    } else {
+                      fetchCustomerByProduct(value); // Call the new function
+                    }
                   }}
                 >
-                  {selectedToolSearch === "getAll" && <Option value="getAll">Get All</Option>}
-                  {productDataSearch.map((prod) => (
-                    <Option key={prod.productCode} value={prod.productCode}>
-                      {prod.productDescription}
-                    </Option>
-                  ))}
+                  {selectedToolSearch === "getAll" ? (
+                    <Option value="getAll">Get All</Option>
+                  ) : (
+                    productDataSearch.map((prod) => (
+                      <Option key={prod.productCode} value={prod.productCode}>
+                        {prod.productDescription}
+                      </Option>
+                    ))
+                  )}
                 </Select>
               </Form.Item>
             </Col>
@@ -863,8 +869,11 @@ const PreventiveMaintenanceCheckList = () => {
               <AgGridReact
                 columnDefs={agColumns}
                 rowData={searchResults}
+                domLayout="autoHeight"
+                singleClickEdit={true}
                 pagination={true}
                 paginationPageSize={10}
+                paginationPageSizeSelector={[10, 25, 50, 100]}
                 overlayNoRowsTemplate="No data available"
               />
             </div>
@@ -915,8 +924,10 @@ const PreventiveMaintenanceCheckList = () => {
                     disabled={!isEditable}
                     onChange={(value) => {
                       setSelectedToolAdd(value);
-                      addForm.setFieldsValue({ toolId: value });
+                      addForm.setFieldsValue({ toolId: value, productId: undefined, customer: "" });
                       addForm.setFields([{ name: 'toolId', errors: [] }]);
+                      setProduct("");
+                      setCustomer("");
                       productDropDownDataAdd(value);
                       productDropDownDataSearch(value);
                     }}
