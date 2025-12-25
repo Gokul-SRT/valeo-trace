@@ -13,6 +13,7 @@ import CycleTimeMaster from "../CycleTimeMaster/CycleTimeMaster";
 import GatewayMaster from "../../Master/GatewayMaster";
 import VendorMaster from "../../Master/VendorMaster";
 import ChildPartToVendorMapping from "../ChildPartToVendorMapping";
+import SubAssyMaster from "../SubAssyMaster";
 import { Select } from "antd";
 
 const Traceability = () => {
@@ -50,6 +51,7 @@ const Traceability = () => {
     GatewayMaster,
     VendorMaster,
     ChildPartToVendorMapping,
+    SubAssyMaster,
   };
 
   const moduleScreens = Array.isArray(traceabilityMaster)
