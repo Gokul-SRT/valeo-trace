@@ -221,7 +221,11 @@ const ConsigneeDetailsCard = ({
     setLabelCount(newLabelCount);
     form.setFieldsValue({ labelCount: newLabelCount });
   };
-
+  useEffect(() => {
+    form.setFieldsValue({
+      pkgNo: "SRC",
+    });
+  }, []);
   useEffect(() => {
     fetchPickedAndStandardQty(childPartCode);
   }, [childPartCode]);
@@ -772,7 +776,7 @@ const ConsigneeDetailsCard = ({
                     { required: true, message: "Please enter package number" },
                   ]}
                 >
-                  <Input placeholder="Enter package number" />
+                  <Input disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -1159,10 +1163,10 @@ const Kitting = () => {
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <Card
+        {/* <Card
           title="Kitting Process"
           headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
-        >
+        > */}
           <Form layout="vertical" form={form} onFinish={handleSubmit}>
             <Row gutter={16}>
               <Col span={6}>
@@ -1235,7 +1239,7 @@ const Kitting = () => {
               </Col>
             </Row>
           </Form>
-        </Card>
+        {/* </Card> */}
       </div>
 
       {showTable && (

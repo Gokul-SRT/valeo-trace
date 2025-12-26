@@ -7,7 +7,7 @@ import Linefeeder from "../pages/Traceability/Reports/Linefeeder/Linefeeder";
 import StoreReturnable from "../pages/Traceability/StoreReturnable/StoreReturnable";
 import Traceabilityreports from "../pages/TraceabilityReport/TraceabilityReport";
 import ReverseTraceabilityReport from "../pages/TraceabilityReport/ReverseTraceabilityReport";
-import Kittingprocessscreen from "../pages/Traceability/Kitting";
+import Kittingprocessscreen from "../pages/Traceability/Kitting/KittingContainer";
 import LineDashboard from "../pages/Traceability/Dashboard";
 import ToolChange from "../pages/ToolMonitoring/Reports/ToolChange";
 import ToolHistoryLog from "../pages/ToolMonitoring/Reports/ToolHistoryLog";

@@ -19,6 +19,7 @@ import KittingQRModel from "../../Traceability/Reports/Picklist/KittingQRModel";
 import store from "store";
 import { toast } from "react-toastify";
 import Loader from "../../../Utills/Loader"; // Import your Loader component
+import { backendService } from "../../../service/ToolServerApi";
 
 const { Option } = Select;
 
@@ -54,7 +55,7 @@ const ChildPartValidationCard = ({
       const payload = {
         scannedCode: scanned,
         subChildPartCode: kitPartCode,
-        plsCode,
+        productCode:plsCode,
         childPartCode,
         tenantId,
         branchCode,
@@ -137,7 +138,7 @@ const ChildPartValidationCard = ({
         </div>
       )}
       <Form layout="vertical">
-        <Form.Item label="PLS Code">
+        <Form.Item label="Product Code">
           <Input value={plsCode} disabled />
         </Form.Item>
         <Form.Item label="Child Part Code ">
@@ -221,7 +222,11 @@ const ConsigneeDetailsCard = ({
     setLabelCount(newLabelCount);
     form.setFieldsValue({ labelCount: newLabelCount });
   };
-
+  useEffect(() => {
+    form.setFieldsValue({
+      pkgNo: "SRC",
+    });
+  }, []);
   useEffect(() => {
     fetchPickedAndStandardQty(childPartCode);
   }, [childPartCode]);
@@ -232,7 +237,7 @@ const ConsigneeDetailsCard = ({
       const response = await serverApi.post("getPLSCodePickedQuantity", {
         tenantId,
         branchCode,
-        plsCode: plsCode,
+        productCode: plsCode,
         itemType: "C",
         childPartCode: childCode,
       });
@@ -264,6 +269,11 @@ const ConsigneeDetailsCard = ({
       dataIndex: "plsCode",
       key: "plsCode",
     },
+    {
+        title: "Product Code",
+        dataIndex: "productCode",
+        key: "productCode",
+      },
     {
       title: "ChildPart Code",
       dataIndex: "childPartCode",
@@ -393,7 +403,7 @@ const ConsigneeDetailsCard = ({
         branchCode: branchCode,
         minimumCount: listTotalCount,
         subChildParts: item.kittingChildPartCode,
-        plsCode: plsCode,
+        productCode: plsCode,
         childPartCode: formattedValues.childPartCode,
       }));
 
@@ -433,7 +443,7 @@ const ConsigneeDetailsCard = ({
         tenantId: tenantId,
         branchCode: branchCode,
         employeeId: employeeId,
-        plsCode: plsCode,
+        productCode: plsCode,
         childPartCode: formattedValues.childPartCode,
         childPartDesc: formattedValues.childPartDesc,
         consignee: formattedValues.consignee,
@@ -450,6 +460,7 @@ const ConsigneeDetailsCard = ({
         packageReferenceNo: formattedValues.packageReferenceNo,
         supplierNumber: formattedValues.supplierNumber,
         pkgNo: formattedValues.pkgNo,
+        // pkgNo: "SRC",
         batchNo: formattedValues.batchNo,
       };
 
@@ -665,14 +676,14 @@ const ConsigneeDetailsCard = ({
                     onChange={(e) => setQuantity(e.target.value)}
                     onBlur={() => {
                       const quantityNum = Number(quantity);
-                      if (quantityNum > planQty) {
-                        toast.error("Quantity cannot exceed plan quantity!");
-                        setQuantity("");
-                        form.setFieldsValue({ quantity: "" });
-                        setLabelCount(0);
-                        form.setFieldsValue({ labelCount: 0 });
-                        return;
-                      }
+                    //   if (quantityNum > planQty) {
+                    //     toast.error("Quantity cannot exceed plan quantity!");
+                    //     setQuantity("");
+                    //     form.setFieldsValue({ quantity: "" });
+                    //     setLabelCount(0);
+                    //     form.setFieldsValue({ labelCount: 0 });
+                    //     return;
+                    //   }
                       if (quantityNum !== listTotalCount) {
                         toast.error(
                           "Quantity must be equal to totalCount minimum value!"
@@ -772,7 +783,7 @@ const ConsigneeDetailsCard = ({
                     { required: true, message: "Please enter package number" },
                   ]}
                 >
-                  <Input placeholder="Enter package number" />
+                  <Input disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -839,13 +850,45 @@ const Kitting = () => {
   const branchCode = store.get("branchCode");
   const employeeId = store.get("employeeId");
 
+
+
+  const getProductDropDownData = async () => {
+    try {
+      const payload = {
+        tenantId,
+        isActive: "1",
+      }
+      const response = await backendService({requestPath:"getProductDropdown", requestData:payload});
+
+      let returnData = [];
+
+      if (response?.responseCode === '200' && response.responseData) {
+       
+        returnData = response.responseData;
+        setPlanOptions(returnData);
+      } else {
+
+        toast.error(response.responseMessage || "Failed to load Product.");
+        setPlanOptions([]);
+      }
+     
+    } catch (error) {
+      console.error("Error fetching Product dropdown data:", error);
+      toast.error("Error fetching data. Please try again later.");
+      setPlanOptions([]);
+    }finally {
+        setLoadingPlans(false);
+      }
+  };
+
+
+/*
   const fetchPlans = async () => {
     // setLoadingPlans(true);
     try {
       const response = await PicklistWODropdown(
         tenantId,
-        branchCode,
-        selectedDate
+        branchCode
       );
       const data = Array.isArray(response.data) ? response.data : response;
       setPlanOptions(data.map((item) => ({ code: item.plsCode })));
@@ -856,29 +899,45 @@ const Kitting = () => {
       setLoadingPlans(false);
     }
   };
+*/
 
   useEffect(() => {
-    fetchPlans();
-  }, [tenantId, branchCode, selectedDate]);
+    // fetchPlans();
+    getProductDropDownData();
+  }, [tenantId, branchCode]);
 
   const fetchKittingPartDetails = async (planCode) => {
     setLoadingParts(true);
     setLoading(true); // Start main loader
     try {
-      const payload = { tenantId, plscode: planCode };
-      const response = await serverApi.post("/getKittingPartDetails", payload);
-      const data = response.data.responseData || response.data || [];
-      const formatted = data.map((item, index) => ({
-        key: index + 1,
-        plsdId: item.plsdId,
-        childPartCode: item.childPartCode,
-        childPartDesc: item.childPartDesc,
-        itemType: item.itemType,
-        picklistQty: item.picklistQty,
-        pickedQty: item.pickedQty,
-        productCode: item.productCode,
-      }));
-      setTableData(formatted);
+    //   const payload = { tenantId, plscode: planCode };
+    //   const response = await serverApi.post("/getKittingPartDetails", payload);
+    //   const data = response.data.responseData || response.data || [];
+    //   const formatted = data.map((item, index) => ({
+    //     key: index + 1,
+    //     plsdId: item.plsdId,
+    //     childPartCode: item.childPartCode,
+    //     childPartDesc: item.childPartDesc,
+    //     itemType: item.itemType,
+    //     picklistQty: item.picklistQty,
+    //     pickedQty: item.pickedQty,
+    //     productCode: item.productCode,
+    //   }));
+
+    const payload = { tenantId, productCode: planCode, branchCode: branchCode };
+    const response = await serverApi.post("/getKitPartByProduct", payload);
+    const data = response.data.responseData || response.data || [];
+    // const formatted = data.map((item, index) => ({
+    //   key: index + 1,
+    //   plsdId: item.plsdId,
+    //   childPartCode: item.childPartCode,
+    //   childPartDesc: item.childPartDesc,
+    //   itemType: item.itemType,
+    //   picklistQty: item.picklistQty,
+    //   pickedQty: item.pickedQty,
+    //   productCode: item.productCode,
+    // }));
+      setTableData(data);
       setShowTable(true);
     } catch (error) {
       message.error("Failed to fetch Kitting part details");
@@ -978,7 +1037,7 @@ const Kitting = () => {
         tenantId,
         childPartCode: selectedPart.childPartCode,
         branchCode,
-        plsCode: selectedPlan,
+        productCode: selectedPlan,
       };
 
       const response = await serverApi.post("/getSubAssyCount", payload);
@@ -1022,7 +1081,7 @@ const Kitting = () => {
   const handleConsigneeCardClose = () => setShowConsigneeCard(false);
 
   const columns = [
-    { title: "PLSD ID", dataIndex: "plsdId", key: "plsdId" },
+ //   { title: "PLSD ID", dataIndex: "plsdId", key: "plsdId" },
     {
       title: "Child Part Code",
       dataIndex: "childPartCode",
@@ -1045,20 +1104,20 @@ const Kitting = () => {
       dataIndex: "childPartDesc",
       key: "childPartDesc",
     },
-    { title: "Item Type", dataIndex: "itemType", key: "itemType" },
-    {
-      title: "Picklist Qty",
-      dataIndex: "picklistQty",
-      key: "picklistQty",
-      align: "right",
-    },
-    {
-      title: "Picked Qty",
-      dataIndex: "pickedQty",
-      key: "pickedQty",
-      align: "right",
-    },
-    { title: "Product Code", dataIndex: "productCode", key: "productCode" },
+    { title: "Item Type", dataIndex: "typeCode", key: "typeCode" },
+    // {
+    //   title: "Picklist Qty",
+    //   dataIndex: "picklistQty",
+    //   key: "picklistQty",
+    //   align: "right",
+    // },
+    // {
+    //   title: "Picked Qty",
+    //   dataIndex: "pickedQty",
+    //   key: "pickedQty",
+    //   align: "right",
+    // },
+   // { title: "Product Code", dataIndex: "productCode", key: "productCode" },
   ];
 
   // Build scan results table for ConsigneeDetailsCard, only after completion
@@ -1159,13 +1218,13 @@ const Kitting = () => {
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <Card
+        {/* <Card
           title="Kitting Process"
           headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
-        >
+        > */}
           <Form layout="vertical" form={form} onFinish={handleSubmit}>
             <Row gutter={16}>
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item
                   label="Date"
                   name="date"
@@ -1179,21 +1238,22 @@ const Kitting = () => {
                     }
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
               <Col span={6}>
                 <Form.Item
-                  label="WO/Plan"
+                  label="Product"
                   name="plan"
-                  rules={[{ required: true, message: "Please select a plan" }]}
+                  rules={[{ required: true, message: "Please select a product" }]}
                 >
                   <Select
-                    placeholder="Select Work Order"
+                    placeholder="Select Product"
                     loading={loadingPlans}
                     allowClear
+                    showSearch
                   >
                     {planOptions.map((plan) => (
-                      <Option key={plan.code} value={plan.code}>
-                        {plan.code}
+                      <Option key={plan.productCode} value={plan.productCode}>
+                        {plan.productDesc}
                       </Option>
                     ))}
                   </Select>
@@ -1235,13 +1295,13 @@ const Kitting = () => {
               </Col>
             </Row>
           </Form>
-        </Card>
+        {/* </Card> */}
       </div>
 
       {showTable && (
         <div style={{ marginBottom: 16 }}>
           <Card
-            title={`Work Order Details - Plan ${selectedPlan}`}
+            title={`Product Details - Product ${selectedPlan}`}
             headStyle={{ backgroundColor: "#001F3E", color: "#fff" }}
           >
             {tableData.length === 0 ? (
