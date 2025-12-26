@@ -109,8 +109,8 @@ const PicklistVerification = () => {
     const childPartCode = scannedValue.substring(17, 35);
     const vendorCode = scannedValue.substring(35, 42);
     const pickedQtyStr = scannedValue.substring(42, 50);
-    const labelNumber = scannedValue.substring(50, 68);
-    const batchNumber = scannedValue.substring(68, 80);
+    const labelNumber = scannedValue?.substring(50, 68)?.trim() || "";
+    const batchNumber = scannedValue?.substring(68, 80)?.trim() || "";
     const deliveryDate = scannedValue.substring(80, 88);
     const productionDate = scannedValue.substring(88, 96);
     const expirationDate = scannedValue.substring(96, 104);
@@ -156,11 +156,7 @@ const PicklistVerification = () => {
       });
 
       if (response.data === "success") {
-        // const updatedData = lineFeederDatas.map((r) =>
-        //   r.childPartCode === matchedChildPart.childPartCode
-        //     ? { ...r, pickedQty: Number(r.pickedQty) + Number(pickedQty) }
-        //     : r
-        // );
+        
         fetchLatestPicklistData(pickListCodeVerrify);
 
         toast.success("Scan processed successfully!");

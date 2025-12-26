@@ -260,7 +260,7 @@ const TraceabilityLog = () => {
     const childPartCode = scannedValue.substring(17, 35); // 17 - 34 (18 chars)
     const vendorCode = scannedValue.substring(35, 42); // 35 - 41 (7 chars)
     const lineQtyStr = scannedValue.substring(42, 50); // 42 - 49 (8 chars)
-    const labelNumber = scannedValue.substring(50, 68); // 50 - 67 (18 chars)
+    const labelNumber = scannedValue?.substring(50, 68)?.trim() || ""; // 50 - 67 (18 chars)
     const batchNumber = scannedValue.substring(68, 80); // 68 - 79 (12 chars)
     const deliveryDate = scannedValue.substring(80, 88); // 80 - 87 (8 chars)
     const productionDate = scannedValue.substring(88, 96); // 88 - 95 (8 chars)
@@ -307,6 +307,7 @@ const TraceabilityLog = () => {
         childPartCode: matchedChildPart.childPartCode,
         lineQty: lineQt,
         picklistCode: pickListCodeVerrify,
+        packageNumber: labelNumber,
       });
 
       if (response.data === "success") {
