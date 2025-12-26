@@ -105,11 +105,11 @@ const TraceabilityLog = () => {
     if (selectedProduct) {
       setSelectedWorkOrder(null);
       setWorkOrders([]);
-      fetchWorkOrders(selectedProduct,selectedLine);
+      fetchWorkOrders(selectedProduct, selectedLine);
     }
   }, [selectedProduct]);
 
-  const fetchWorkOrders = async (productCode,lineCode) => {
+  const fetchWorkOrders = async (productCode, lineCode) => {
     try {
       const response = await serverApi.post("getplsCodeByProduct", {
         tenantId: tenantId,
@@ -157,9 +157,9 @@ const TraceabilityLog = () => {
 
   const handleSubmit = () => {
     const newErrors = {};
-    if (!selectedLine) newErrors.line = "Please select a Line";
-    if (!selectedProduct) newErrors.product = "Please select a Product";
-    if (!selectedWorkOrder) newErrors.workOrder = "Please select a Work Order";
+    if (!selectedLine) newErrors.line = "Please Select Line";
+    if (!selectedProduct) newErrors.product = "Please Select Product";
+    if (!selectedWorkOrder) newErrors.workOrder = "Please Select Work Order";
     setErrors(newErrors);
     if (Object.keys(newErrors).length === 0 && selectedWorkOrder)
       fetchTraceabilityData(selectedWorkOrder);
@@ -178,17 +178,16 @@ const TraceabilityLog = () => {
     setShowDetails(false);
   };
 
-
   const getCurrentDateTime = () => {
     const now = new Date();
-  
+
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
     const seconds = String(now.getSeconds()).padStart(2, "0");
-  
+
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
@@ -273,7 +272,6 @@ const TraceabilityLog = () => {
       toast.error("Invalid quantity");
       return;
     }
-    
 
     console.log("Invoice Number:", invoiceNumber);
     console.log("Child Part Code:", childPartCode);
@@ -296,7 +294,7 @@ const TraceabilityLog = () => {
     );
 
     if (!matchedChildPart) {
-      toast.error("Child part not found");
+      toast.error("Incorrect lot/part barcode scanned");
       return;
     }
 
@@ -315,7 +313,7 @@ const TraceabilityLog = () => {
         toast.success("Scan processed successfully!");
         // Call your second API here
         const scannedItem = {
-          plsId:pickListCodeVerrify,
+          plsId: pickListCodeVerrify,
           itemNo: matchedChildPart.childPartCode,
           lineQty: lineQt,
           lotNumber: batchNumber.trim(),
@@ -329,7 +327,7 @@ const TraceabilityLog = () => {
           branchCode: branchCode,
           isProcess: "0",
           scannerId: "1",
-          employeeId:employeeId,
+          employeeId: employeeId,
           jsonMessage: JSON.stringify(scannedItem), // convert object to JSON string
         };
 
@@ -613,8 +611,10 @@ const TraceabilityLog = () => {
                                 <Progress
                                   percent={percent}
                                   size="small"
-                                  showInfo={false}
                                   strokeWidth={6}
+                                  showInfo={true}
+                                  format={(p) => `${Math.round(p)}%`}
+                                  style={{ width: "120px" }}
                                 />
                               </div>
                             </div>

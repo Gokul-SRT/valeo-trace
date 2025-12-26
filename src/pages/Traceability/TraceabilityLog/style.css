@@ -90,3 +90,19 @@
   width: 80%;
   margin-left: 20px;
 }
+
+.ant-progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #000;
+}
+
+.ant-progress-inner {
+  background-color: #eaeaea;
+  border-radius: 6px;
+}
+
+.ant-progress-bg {
+  border-radius: 6px;
+}
+
