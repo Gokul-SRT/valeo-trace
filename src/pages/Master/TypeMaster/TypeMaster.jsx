@@ -57,6 +57,7 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response.data.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(structuredClone(updatedResponseData)); // Use structuredClone
@@ -112,7 +113,7 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName} </span>
         </div>
       </div>
     );
@@ -125,12 +126,22 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
       filter: "agTextColumnFilter",
       headerComponent: RequiredHeader, // Add required indicator
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
+      valueSetter: (params) => {
+        params.data.typeCode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
     },
     {
       headerName: "Type Description",
       field: "typeDescription",
       filter: "agTextColumnFilter",
-      headerComponent: RequiredHeader, // Add required indicator
+      headerComponent: RequiredHeader,
+      valueSetter: (params) => {
+        params.data.typeDescription = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       headerName: "Bin Quantity(Nos)",
@@ -141,6 +152,11 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
       valueFormatter: (params) => {
         return params.value ? Number(params.value).toLocaleString() : "";
       },
+      valueSetter: (params) => {
+        params.data.stantardQuantity = params.newValue;
+        params.data.changed = true;
+        return true;
+      }
     },
     {
       // Add Status column
@@ -153,7 +169,8 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
       valueGetter: (params) =>
         params.data.isActive === "1" || params.data.isActive === 1,
       valueSetter: (params) => {
-        params.data.isActive = params.newValue ? "1" : "0";
+        params.data.isActive = params.newValue ? "1" : "0"; 
+         params.data.changed = true;
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -211,22 +228,22 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
   };
 
   // Normalize list for comparison (convert boolean/string status to consistent format)
-  const normalizeList = (list) => {
-    return list.map((item) => ({
-      ...item,
-      isActive:
-        item.isActive === "1" || item.isActive === 1 || item.isActive === true
-          ? "1"
-          : "0",
-    }));
-  };
+  // const normalizeList = (list) => {
+  //   return list.map((item) => ({
+  //     ...item,
+  //     isActive:
+  //       item.isActive === "1" || item.isActive === 1 || item.isActive === true
+  //         ? "1"
+  //         : "0",
+  //   }));
+  // };
 
-  // Check if there are changes
-  const hasChanges = () => {
-    const normMaster = normalizeList(masterList);
-    const normOriginal = normalizeList(originalList);
-    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
-  };
+  // // Check if there are changes
+  // const hasChanges = () => {
+  //   const normMaster = normalizeList(masterList);
+  //   const normOriginal = normalizeList(originalList);
+  //   return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  // };
 
   const createorUpdate = async () => {
     try {
@@ -235,10 +252,19 @@ const TypeMaster = ({ modulesprop, screensprop }) => {
       // Commit any ongoing edits
       gridRef.current.api.stopEditing();
 
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   return;
+      // }
+
+
+        const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+              const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+      
+              if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+                toast.info("No new or modified records found!");
+                return;
+              }
 
       // Check EMPTY Type codes
       const hasEmptyTypeCode = masterList.some(

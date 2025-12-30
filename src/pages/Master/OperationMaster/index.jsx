@@ -2,10 +2,6 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-// import "ag-grid-enterprise";
-// import { ModuleRegistry } from "ag-grid-community";
-// import { SetFilterModule } from "ag-grid-enterprise";
-// import { DateFilterModule } from "ag-grid-enterprise";
 import { Select } from "antd";
 import store from "store";
 import { toast } from "react-toastify";
@@ -13,7 +9,7 @@ import serverApi from "../../../serverAPI";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-// ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
+
 
 
 const { Option } = Select;
@@ -296,7 +292,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         }
         fetchData();
       } else {
-       toast.error("Please enter the mandatory fields.");
+       toast.error("Please fill all mandatory(*) fields");
       }
 
     } catch (error) {
@@ -324,7 +320,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );

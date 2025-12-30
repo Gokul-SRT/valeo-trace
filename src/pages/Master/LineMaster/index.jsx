@@ -2,13 +2,8 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-// import "ag-grid-enterprise";
-// import { ModuleRegistry } from "ag-grid-community";
-// import { SetFilterModule } from "ag-grid-enterprise";
-// import { DateFilterModule } from "ag-grid-enterprise";
-// import { ExcelExportModule } from "ag-grid-enterprise";
 
-import { Input, Button, Form, message,Select } from "antd";
+import { Input, Button, Form, message, Select } from "antd";
 import { backendService } from "../../../service/ToolServerApi";
 import { toast } from "react-toastify";
 import store from "store";
@@ -18,13 +13,8 @@ import serverApi from "../../../serverAPI";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-import Loader from "../../../Utills/Loader"
+import Loader from "../../../Utills/Loader";
 
-// ModuleRegistry.registerModules([
-//   SetFilterModule,
-//   DateFilterModule,
-//   ExcelExportModule,
-// ]);
 
 const { Option } = Select;
 //  Custom MultiSelect Cell Editor
@@ -36,7 +26,7 @@ const MultiSelectEditor = forwardRef((props, ref) => {
     if (props.data && props.colDef.field) {
       const initial = props.data[props.colDef.field];
       if (typeof initial === "string" && initial.length > 0) {
-        setSelectedValues(initial.split(",").map(s => s.trim()));
+        setSelectedValues(initial.split(",").map((s) => s.trim()));
       } else if (Array.isArray(initial)) {
         setSelectedValues(initial);
       } else {
@@ -47,16 +37,18 @@ const MultiSelectEditor = forwardRef((props, ref) => {
 
   React.useImperativeHandle(ref, () => ({
     getValue() {
-      const value = selectedValues.filter(v => v).join(","); // Remove empty values
+      const value = selectedValues.filter((v) => v).join(","); // Remove empty values
       return value || null; // Return null for empty instead of empty string
     },
-    isPopup() { return false; }
+    isPopup() {
+      return false;
+    },
   }));
 
   const handleChange = (values) => {
     setSelectedValues(values || []);
     // CRITICAL: Trigger ag-grid value change properly
-    props.onValueChange(values.filter(v => v).join(",") || null);
+    props.onValueChange(values.filter((v) => v).join(",") || null);
   };
 
   return (
@@ -66,15 +58,15 @@ const MultiSelectEditor = forwardRef((props, ref) => {
       style={{ width: "100%" }}
       onChange={handleChange}
       placeholder="Select Product Codes"
-      options={props.values?.map((item) => ({
-        label: item.value,
-        value: item.key,
-      })) || []}
+      options={
+        props.values?.map((item) => ({
+          label: item.value,
+          value: item.key,
+        })) || []
+      }
     />
   );
 });
-
-
 
 const LineMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -111,12 +103,14 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await backendService({requestPath:"getlineMasterdtl", 
-        requestData:{
-        isActive: "getAll",
-        tenantId: tenantId,
-        branchCode: branchCode,
-      }});
+      const response = await backendService({
+        requestPath: "getlineMasterdtl",
+        requestData: {
+          isActive: "getAll",
+          tenantId: tenantId,
+          branchCode: branchCode,
+        },
+      });
 
       // ✅ Handle if backend sends null, undefined, or empty array
       if (!response || response.length === 0) {
@@ -126,6 +120,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(structuredClone(updatedResponseData));
@@ -134,7 +129,7 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     } catch (error) {
       console.error("Error fetching master data:", error);
       toast.error("Error fetching data. Please try again later.");
-    }finally {
+    } finally {
       setLoading(false); // ✅ Stop loader
     }
   };
@@ -154,27 +149,19 @@ const LineMaster = ({ modulesprop, screensprop }) => {
         tenantId,
         // branchCode,
         isActive: "1",
-
-      }
-      const response = await backendService({requestPath:"getProductDropdown", requestData:payload});
-
-     
-      
-
+      };
+      const response = await backendService({
+        requestPath: "getProductDropdown",
+        requestData: payload,
+      });
 
       let returnData = [];
 
-
-      if (response?.responseCode === '200' && response.responseData) {
-
-     
-
+      if (response?.responseCode === "200" && response.responseData) {
         // toast.success(response.data.responseMessage);
         returnData = response.responseData;
       } else {
-
         toast.error(response.responseMessage || "Failed to load Child Parts.");
-
       }
       const options = returnData.map((item) => ({
         key: item.productCode || "",
@@ -189,7 +176,6 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     }
   };
 
-
   // const RequiredHeader = (props) => {
   //   return (
   //     <span>
@@ -199,40 +185,51 @@ const LineMaster = ({ modulesprop, screensprop }) => {
   // };
   const RequiredHeader = (props) => {
     const buttonRef = React.useRef(null);
-    
+
     return (
       <div className="ag-cell-label-container" role="presentation">
-        <span 
+        <span
           ref={buttonRef}
-          className="ag-header-icon ag-header-cell-filter-button" 
+          className="ag-header-icon ag-header-cell-filter-button"
           onClick={() => props.showColumnMenu(buttonRef.current)}
         >
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text">
+          <span style={{ color: "red" }}>*</span>{props.displayName}
+          </span>
         </div>
       </div>
     );
   };
-
 
   const columnDefs = [
     {
       headerName: "Line Code",
       field: "lineMstCode",
       filter: "agTextColumnFilter",
-       headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
+      valueSetter: (params) => {
+        params.data.lineMstCode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
       editable: (params) => (params.data.isUpdate === 0 ? true : false),
     },
     {
       headerName: "Line Description",
       field: "lineMstDesc",
       filter: "agTextColumnFilter",
-       headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
+      valueSetter: (params) => {
+        params.data.lineMstDesc = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
     },
-  
-   /* {
+
+    /* {
       headerName: "Product Code",
       field: "productCode",
       filter: "agTextColumnFilter",
@@ -255,38 +252,40 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     },
 */
 
-
-{
-  headerName: "Product Code",
-  field: "productCode",
-  filter: "agTextColumnFilter",
-  editable: true,
-   headerComponent: RequiredHeader,
-  cellEditor: MultiSelectEditor,
-  cellEditorParams: { values: productData },
-  valueSetter: (params) => {
-    // ✅ Handle both string and array inputs
-    const value = params.newValue;
-    if (value === null || value === undefined || value === "") {
-      params.data.productCode = null;
-    } else if (typeof value === "string") {
-      params.data.productCode = value;
-    }
-    return true;
-  },
-  valueFormatter: (params) => {
-    if (!params.value) return "";
-    const keys = typeof params.value === "string" ? params.value.split(",").map(k => k.trim()) : params.value;
-    return keys
-      .filter(k => k)
-      .map((k) => {
-        const option = productData.find((item) => item.key === k);
-        return option ? option.value : k;
-      })
-      .join(", ");
-  },
-},
-
+    {
+      headerName: "Product Code",
+      field: "productCode",
+      filter: "agTextColumnFilter",
+      editable: true,
+      headerComponent: RequiredHeader,
+      cellEditor: MultiSelectEditor,
+      cellEditorParams: { values: productData },
+      valueSetter: (params) => {
+        // ✅ Handle both string and array inputs
+        const value = params.newValue;
+        if (value === null || value === undefined || value === "") {
+          params.data.productCode = null;
+        } else if (typeof value === "string") {
+          params.data.productCode = value;
+        }
+        params.data.changed = true;
+        return true;
+      },
+      valueFormatter: (params) => {
+        if (!params.value) return "";
+        const keys =
+          typeof params.value === "string"
+            ? params.value.split(",").map((k) => k.trim())
+            : params.value;
+        return keys
+          .filter((k) => k)
+          .map((k) => {
+            const option = productData.find((item) => item.key === k);
+            return option ? option.value : k;
+          })
+          .join(", ");
+      },
+    },
 
     {
       headerName: "Status",
@@ -301,12 +300,13 @@ const LineMaster = ({ modulesprop, screensprop }) => {
       valueSetter: (params) => {
         // when checkbox is clicked, set 1 for true, 0 for false
         params.data.isActive = params.newValue ? "1" : "0";
+        params.data.changed = true;
         return true;
       },
       cellStyle: { textAlign: "center" },
       minWidth: 120,
       maxWidth: 160,
-      flex: 1,   // dynamic resizing
+      flex: 1, // dynamic resizing
     },
   ];
 
@@ -317,42 +317,41 @@ const LineMaster = ({ modulesprop, screensprop }) => {
     };
 
     const linecodeempty = masterList.filter((item) => !item.lineMstCode);
-    console.log(linecodeempty,"linecodeempty");
+    console.log(linecodeempty, "linecodeempty");
     if (linecodeempty && linecodeempty?.length === 0) {
       const updated = [...masterList, emptyRow];
       setMasterList(updated);
       setOriginalList(updated);
 
-// Scroll to last page and focus new row after a small delay
-setTimeout(() => {
-  const api = gridRef.current?.api;
-  if (!api) return;
+      // Scroll to last page and focus new row after a small delay
+      setTimeout(() => {
+        const api = gridRef.current?.api;
+        if (!api) return;
 
-  const lastRowIndex = updated.length - 1;
-  const totalPages = api.paginationGetTotalPages();
+        const lastRowIndex = updated.length - 1;
+        const totalPages = api.paginationGetTotalPages();
 
-  // Go to last page
-  api.paginationGoToLastPage();
+        // Go to last page
+        api.paginationGoToLastPage();
 
-  // Ensure the last row is visible at the bottom
-  setTimeout(() => {
-    api.ensureIndexVisible(lastRowIndex, "bottom");
+        // Ensure the last row is visible at the bottom
+        setTimeout(() => {
+          api.ensureIndexVisible(lastRowIndex, "bottom");
 
-    // Flash the new row to draw attention
-    api.flashCells({
-      rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
-    });
+          // Flash the new row to draw attention
+          api.flashCells({
+            rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+          });
 
-    // Focus and start editing on Product Code column
-    const firstColId = "lineMstCode"; // field name of first editable column
-    api.setFocusedCell(lastRowIndex, firstColId);
-    api.startEditingCell({
-      rowIndex: lastRowIndex,
-      colKey: firstColId,
-    });
-  }, 150);
-}, 100);
-
+          // Focus and start editing on Product Code column
+          const firstColId = "lineMstCode"; // field name of first editable column
+          api.setFocusedCell(lastRowIndex, firstColId);
+          api.startEditingCell({
+            rowIndex: lastRowIndex,
+            colKey: firstColId,
+          });
+        }, 150);
+      }, 100);
     } else {
       message.error("Please enter the Line code for all the rows.");
       toast.error("Please enter the Line code for all the rows.");
@@ -360,9 +359,12 @@ setTimeout(() => {
   };
 
   const normalizeList = (list) => {
-    return list.map(item => ({
+    return list.map((item) => ({
       ...item,
-      isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
+      isActive:
+        item.isActive === "1" || item.isActive === 1 || item.isActive === true
+          ? "1"
+          : "0",
     }));
   };
 
@@ -372,58 +374,72 @@ setTimeout(() => {
     return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
   };
 
-
   const createorUpdate = async () => {
     try {
       setLoading(true);
- //  Commit any ongoing edits
- gridRef.current.api.stopEditing();
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
+      //  Commit any ongoing edits
+      gridRef.current.api.stopEditing();
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   return;
+      // }
+
+      const rowsToInsert = masterList.filter(
+        (row) => row.isUpdate === "0" || row.isUpdate === 0
+      );
+      const rowsToUpdate = masterList.filter(
+        (row) =>
+          row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0
+      );
+
+      if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+        toast.info("No new or modified records found!");
         return;
       }
-  // Check EMPTY line codes
-  const hasEmptyLineCode = masterList.some(
-    (item) => !item.lineMstCode || item.lineMstCode.trim() === ""
-  );
 
-  if (hasEmptyLineCode) {
-    toast.error("Please fill Line Code for all rows!");
-    return;
-  }
-//  Validate: Line Description mandatory
-const missingLineDesc = masterList.some(
-  (item) => !item.lineMstDesc || item.lineMstDesc.trim() === ""
-);
-if (missingLineDesc) {
-  toast.error("Line Description is required for all rows!");
-  return;
-}
+      // Check EMPTY line codes
+      const hasEmptyLineCode = masterList.some(
+        (item) => !item.lineMstCode || item.lineMstCode.trim() === ""
+      );
 
-//  Validate: Product Code mandatory (multi-select)
-const missingProduct = masterList.some(
-  (item) =>
-    !item.productCode ||
-    item.productCode === "" ||
-    (Array.isArray(item.productCode) && item.productCode.length === 0)
-);
-if (missingProduct) {
-  toast.error("Product Code is required for all rows!");
-  return;
-}
+      const missingLineDesc = masterList.some(
+        (item) => !item.lineMstDesc || item.lineMstDesc.trim() === ""
+      );
 
-   // Check DUPLICATE line codes
-   const lineCodes = masterList.map((item) => item.lineMstCode.trim());
-   const duplicateCodes = lineCodes.filter(
-     (code, index) => lineCodes.indexOf(code) !== index
-   );
+      const missingProduct = masterList.some(
+        (item) =>
+          !item.productCode ||
+          item.productCode === "" ||
+          (Array.isArray(item.productCode) && item.productCode.length === 0)
+      );
 
-   if (duplicateCodes.length > 0) {
-     toast.error(`Duplicate Line Code found: ${duplicateCodes[0]}`);
-     return;
-   }
+      if (hasEmptyLineCode || missingLineDesc || missingProduct) {
+        toast.error("Please fill all mandatory(*) fields");
+        return;
+      }
 
+      // if (missingLineDesc) {
+      //   toast.error("Line Description is required for all rows!");
+      //   return;
+      // }
 
+      //  Validate: Product Code mandatory (multi-select)
+
+      // if (missingProduct) {
+      //   toast.error("Product Code is required for all rows!");
+      //   return;
+      // }
+
+      // Check DUPLICATE line codes
+      const lineCodes = masterList.map((item) => item.lineMstCode.trim());
+      const duplicateCodes = lineCodes.filter(
+        (code, index) => lineCodes.indexOf(code) !== index
+      );
+
+      if (duplicateCodes.length > 0) {
+        toast.error(`Duplicate Line Code found: ${duplicateCodes[0]}`);
+        return;
+      }
 
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
@@ -437,19 +453,15 @@ if (missingProduct) {
         branchCode: branchCode,
       }));
 
-
       const response = await serverApi.post(
         "insertupdatelinemaster",
         updatedList
       );
 
-
       if (response && response.data === "SUCCESS") {
         toast.success("Add/Update successfully!");
         fetchData();
-
       } else if (response.data && response.data === "DUBLICATE") {
-
         toast.success("Do Not Allow Dublicate LineCode!");
       } else {
         toast.error("No Data To Save/Update. Please try again later.");
@@ -459,7 +471,7 @@ if (missingProduct) {
       console.error("Error saving product data:", error);
       toast.error("No Data To Save/Update!");
       fetchData();
-    }finally {
+    } finally {
       setLoading(false); //  Stop loader
     }
   };
@@ -467,7 +479,7 @@ if (missingProduct) {
   // ✅ Cancel
   const handleCancel = () => {
     setSelectedModule("");
-   // setSelectedScreen("");
+    // setSelectedScreen("");
     setMasterList([]);
     setOriginalList([]);
     fetchData();
@@ -494,120 +506,94 @@ if (missingProduct) {
   //   }
   // };
 
-const onExportExcel = async () => {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Line Master");
-
-    // ===== Column Widths (similar style) =====
-    const columnWidths = [25, 35, 40, 18];
-    columnWidths.forEach((w, i) => {
-      worksheet.getColumn(i + 1).width = w;
-    });
-
-    // ===== Title Row Height =====
-    worksheet.getRow(1).height = 65;
-
-    // ===== Left Logo =====
+  const onExportExcel = async () => {
     try {
-      const imgUrl = `${window.location.origin}/pngwing.com.png`;
-      const logo1 = await fetch(imgUrl);
-      const blob1 = await logo1.blob();
-      const arr1 = await blob1.arrayBuffer();
-      const imageId1 = workbook.addImage({
-        buffer: arr1,
-        extension: "png",
-      });
-      worksheet.addImage(imageId1, {
-        tl: { col: 0, row: 0 },
-        br: { col: 1, row: 1 },
-      });
-    } catch {
-      console.warn("Left logo not found");
-    }
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Line Master");
 
-    // ===== Title Cell =====
-    worksheet.mergeCells("B1:C1");
-    const titleCell = worksheet.getCell("B1");
-    titleCell.value = `Line Master\nGenerated On: ${moment().format(
-      "DD/MM/YYYY HH:mm:ss"
-    )}`;
-    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-    titleCell.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-      wrapText: true,
-    };
-    titleCell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-
-    // ===== Right Logo =====
-    try {
-      const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
-      const logo2 = await fetch(imgUrl1);
-      const blob2 = await logo2.blob();
-      const arr2 = await blob2.arrayBuffer();
-      const imageId2 = workbook.addImage({
-        buffer: arr2,
-        extension: "png",
+      // ===== Column Widths (similar style) =====
+      const columnWidths = [25, 35, 40, 18];
+      columnWidths.forEach((w, i) => {
+        worksheet.getColumn(i + 1).width = w;
       });
-      worksheet.addImage(imageId2, {
-        tl: { col: 3, row: 0 },
-        br: { col: 4, row: 1 },
-      });
-    } catch {
-      console.warn("Right logo not found");
-    }
 
-    // ===== Header Row =====
-    const startRow = 3;
-    const headers = [
-      "Line Code",
-      "Line Description",
-      "Product Code(s)",
-      "Status",
-    ];
+      // ===== Title Row Height =====
+      worksheet.getRow(1).height = 65;
 
-    const headerRow = worksheet.getRow(startRow);
-    headers.forEach((header, idx) => {
-      const cell = headerRow.getCell(idx + 1);
-      cell.value = header;
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
-      cell.alignment = { horizontal: "center", vertical: "middle" };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
+      // ===== Left Logo =====
+      try {
+        const imgUrl = `${window.location.origin}/pngwing.com.png`;
+        const logo1 = await fetch(imgUrl);
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
+          extension: "png",
+        });
+        worksheet.addImage(imageId1, {
+          tl: { col: 0, row: 0 },
+          br: { col: 1, row: 1 },
+        });
+      } catch {
+        console.warn("Left logo not found");
+      }
+
+      // ===== Title Cell =====
+      worksheet.mergeCells("B1:C1");
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = `Line Master\nGenerated On: ${moment().format(
+        "DD/MM/YYYY HH:mm:ss"
+      )}`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
       };
-      cell.border = {
+      titleCell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
         right: { style: "thin" },
       };
-    });
 
-    // ===== Data Rows =====
-    masterList.forEach((item, index) => {
-      const rowNumber = startRow + index + 1;
-      const row = worksheet.getRow(rowNumber);
+      // ===== Right Logo =====
+      try {
+        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+        const logo2 = await fetch(imgUrl1);
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
+          extension: "png",
+        });
+        worksheet.addImage(imageId2, {
+          tl: { col: 3, row: 0 },
+          br: { col: 4, row: 1 },
+        });
+      } catch {
+        console.warn("Right logo not found");
+      }
 
-      row.values = [
-        item.lineMstCode || "",
-        item.lineMstDesc || "",
-        item.productCode || "",
-        item.isActive === "1" ? "Active" : "Inactive",
+      // ===== Header Row =====
+      const startRow = 3;
+      const headers = [
+        "Line Code",
+        "Line Description",
+        "Product Code(s)",
+        "Status",
       ];
 
-      row.eachCell((cell) => {
-        cell.alignment = {
-          horizontal: "center",
-          vertical: "middle",
-          wrapText: true,
+      const headerRow = worksheet.getRow(startRow);
+      headers.forEach((header, idx) => {
+        const cell = headerRow.getCell(idx + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
         };
         cell.border = {
           top: { style: "thin" },
@@ -616,27 +602,51 @@ const onExportExcel = async () => {
           right: { style: "thin" },
         };
       });
-    });
 
-    // ===== AutoFilter =====
-    worksheet.autoFilter = {
-      from: { row: startRow, column: 1 },
-      to: { row: startRow, column: headers.length },
-    };
+      // ===== Data Rows =====
+      masterList.forEach((item, index) => {
+        const rowNumber = startRow + index + 1;
+        const row = worksheet.getRow(rowNumber);
 
-    // ===== Save File =====
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-      new Blob([buffer], { type: "application/octet-stream" }),
-      `Line_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-    );
-  } catch (error) {
-    console.error("Excel export error:", error);
-    toast.error("Error exporting Line Master.");
-  }
-};
+        row.values = [
+          item.lineMstCode || "",
+          item.lineMstDesc || "",
+          item.productCode || "",
+          item.isActive === "1" ? "Active" : "Inactive",
+        ];
 
+        row.eachCell((cell) => {
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true,
+          };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
 
+      // ===== AutoFilter =====
+      worksheet.autoFilter = {
+        from: { row: startRow, column: 1 },
+        to: { row: startRow, column: headers.length },
+      };
+
+      // ===== Save File =====
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: "application/octet-stream" }),
+        `Line_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Error exporting Line Master.");
+    }
+  };
 
   return (
     <div>
@@ -659,7 +669,9 @@ const onExportExcel = async () => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold"><span className="text-danger">*</span>&nbsp;Status</label>
+              <label className="form-label fw-bold">
+                <span className="text-danger">*</span>&nbsp;Status
+              </label>
               <select
                 className="form-select"
                 onChange={(e) => handleFilterChange(e.target.value)}
@@ -688,19 +700,19 @@ const onExportExcel = async () => {
             //   const updatedList = [...masterList];
             //   updatedList[params.rowIndex] = params.data;
             //   setMasterList(updatedList);
-             
+
             // }}
 
             // Update masterList immediately after cell editing stops
-    onCellEditingStopped={(params) => {
-      const updatedList = [...masterList];
-      updatedList[params.rowIndex] = { ...params.data }; // copy updated row
-      setMasterList(updatedList);
-    }}
-    overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
+            onCellEditingStopped={(params) => {
+              const updatedList = [...masterList];
+              updatedList[params.rowIndex] = { ...params.data }; // copy updated row
+              setMasterList(updatedList);
+            }}
+            overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
 
-     {loading && (
+          {loading && (
             <div
               style={{
                 position: "absolute",

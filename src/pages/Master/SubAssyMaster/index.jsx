@@ -169,7 +169,7 @@ const SubAssyMaster = ({ modulesprop, screensprop }) => {
         </span>
         <div className="ag-header-cell-label" role="presentation">
           <span className="ag-header-cell-text">
-            {props.displayName} <span style={{ color: "red" }}>*</span>
+            <span style={{ color: "red" }}>*</span>{props.displayName} 
           </span>
         </div>
       </div>

@@ -85,6 +85,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response?.data?.responseData.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(structuredClone(updatedResponseData));
@@ -127,7 +128,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );
@@ -216,6 +217,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.childPartId = params.newValue;
+        params.data.changed = true;
         return true;
       },
       valueFormatter: (params) => {
@@ -248,6 +250,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.typeId = params.newValue;
+        params.data.changed = true;
         return true;
       },
       valueFormatter: (params) => {
@@ -259,6 +262,23 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
         const option = typeIdData.find((item) => item.typeId === params.data.typeId?.toString());
         return option ? `${option.typeCode}-${option.typeDescription}` : "";
       },
+    },
+     {
+      headerName: "Status",
+      field: "status",
+      filter: true,
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) =>
+        params.data.status === "1" || params.data.status === 1,
+      valueSetter: (params) => {
+        // when checkbox is clicked, set 1 for true, 0 for false
+        params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        return true;
+      },
+      cellStyle: { textAlign: "center" },
     },
   ];
 
@@ -304,7 +324,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
   const normalizeList = (list) => {
     return list.map((item) => ({
       ...item,
-      isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0",
+      status: item.status === "1" || item.status === 1 || item.status === true ? "1" : "0",
     }));
   };
 
@@ -319,11 +339,24 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       setLoading(true);
       gridRef.current.api.stopEditing();
 
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        setLoading(false);
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   setLoading(false);
+      //   return;
+      // }
+
+
+       const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+        const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+
+        console.log("masterList:", masterList);
+        console.log("rowsToInsert:", rowsToInsert);
+        console.log("rowsToUpdate:", rowsToUpdate);
+
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("No new or modified records found!");
+          return;
+        }
 
       // Duplicate ChildPartId check
       const childPartIds = masterList.map((item) => item.childPartId);
@@ -342,18 +375,19 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
 
       // Validate required fields
       const invalidChildPart = masterList.filter((item) => !item.childPartId);
-      if (invalidChildPart.length > 0) {
-        toast.error("Please fill Child Part Code for all rows.");
+      const invalidTypeCode = masterList.filter((item) => !item.typeId);
+      if (invalidChildPart.length > 0 || invalidTypeCode.length > 0) {
+        toast.error("Please fill all mandatory(*) fields");
         setLoading(false);
         return;
       }
 
-      const invalidTypeCode = masterList.filter((item) => !item.typeId);
-      if (invalidTypeCode.length > 0) {
-        toast.error("Please fill Type Code for all rows.");
-        setLoading(false);
-        return;
-      }
+      
+      // if (invalidTypeCode.length > 0) {
+      //   toast.error("Please fill Type Code for all rows.");
+      //   setLoading(false);
+      //   return;
+      // }
 
       console.log("masterList", masterList);
       const updatedList = masterList.map((item) => ({
@@ -362,8 +396,9 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
         childPartId: item.childPartId,
         typeId: item.typeId,
         tenantId: tenantId,
-        updatedBy: employeeId,
+        udatedBy: employeeId,
         branchCode: branchCode,
+        status: item.status,
       }));
 
       const response = await serverApi.post("insertupdatechildparttypemapping", updatedList);
@@ -392,22 +427,36 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
     loadOptionsAndData();
   };
 
- const onExportExcelChildPartToTypeMaster = async () => {
+
+  const handleFilterChange = (value) => {
+  if (!value || value === "GetAll") {
+    setMasterList(originalList);
+  } 
+  else if (value === "1") {
+    setMasterList(originalList.filter((item) => item.status === "1"));
+  } 
+  else if (value === "0") {
+    setMasterList(originalList.filter((item) => item.status === "0"));
+  }
+};
+
+
+const onExportExcelChildPartToTypeMaster = async () => {
   try {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Child Part To Type Master");
 
-    // ===== Column Widths =====
-    // 3 columns: S.No, Child Part Code, Type Code
-    const columnWidths = [10, 30, 40]; // Added width for S.No column
+    /* ================= Column Widths ================= */
+    // S.No, Child Part Code, Type Code, Status
+    const columnWidths = [10, 30, 40, 15];
     columnWidths.forEach((w, i) => {
       worksheet.getColumn(i + 1).width = w;
     });
 
-    // ===== Title Row Height =====
+    /* ================= Title Row ================= */
     worksheet.getRow(1).height = 65;
 
-    // ===== Left Logo =====
+    /* ================= Left Logo ================= */
     try {
       const imgUrl = `${window.location.origin}/pngwing.com.png`;
       const logo1 = await fetch(imgUrl);
@@ -417,19 +466,18 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
         buffer: arr1,
         extension: "png",
       });
-      // Left logo in column A
+
       worksheet.addImage(imageId1, {
         tl: { col: 0, row: 0 },
         br: { col: 1, row: 1 },
-        editAs: 'oneCell'
+        editAs: "oneCell",
       });
     } catch {
       console.warn("Left logo not found");
     }
 
-    // ===== Title Cell =====
-    // Merge cells for title (columns A to C)
-    // worksheet.mergeCells("");
+    /* ================= Title Cell ================= */
+    worksheet.mergeCells("B1:C1");
     const titleCell = worksheet.getCell("B1");
     titleCell.value = `Child Part To Type Master\nGenerated On: ${moment().format(
       "DD/MM/YYYY HH:mm:ss"
@@ -447,7 +495,7 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       right: { style: "thin" },
     };
 
-    // ===== Right Logo =====
+    /* ================= Right Logo ================= */
     try {
       const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
       const logo2 = await fetch(imgUrl1);
@@ -457,22 +505,23 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
         buffer: arr2,
         extension: "png",
       });
-      // Right logo in column D (now col 3 since we have 3 columns)
+
       worksheet.addImage(imageId2, {
-        tl: { col: 2, row: 0 },
-        br: { col: 3, row: 1 },
-        editAs: 'oneCell'
+        tl: { col: 3, row: 0 },
+        br: { col: 4, row: 1 },
+        editAs: "oneCell",
       });
     } catch {
       console.warn("Right logo not found");
     }
 
-    // ===== Header Row =====
+    /* ================= Header Row ================= */
     const startRow = 3;
     const headers = [
-      "S.No", // New column added
+      "S.No",
       "Child Part Code",
       "Type Code",
+      "Status",
     ];
 
     const headerRow = worksheet.getRow(startRow);
@@ -494,30 +543,30 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
       };
     });
 
-    // ===== Data Rows =====
+    /* ================= Data Rows ================= */
     masterList.forEach((item, index) => {
       const rowNumber = startRow + index + 1;
       const row = worksheet.getRow(rowNumber);
 
-      const childPart = childPartData.find((p) => p.childPartId === item.childPartId);
-      const typeInfo = typeIdData.find((t) => t.typeId === item.typeId?.toString());
+      const childPart = childPartData.find(
+        (p) => p.childPartId === item.childPartId
+      );
+      const typeInfo = typeIdData.find(
+        (t) => t.typeId === item.typeId?.toString()
+      );
 
-      // Add S.No as first column
       row.values = [
-        index + 1, // S.No starting from 1
-        childPart ? `${childPart.childPartCode}-${childPart.childPartDesc}` : "",
-        typeInfo ? `${typeInfo.typeCode}-${typeInfo.typeDescription}` : "",
+        index + 1, // S.No
+        childPart
+          ? `${childPart.childPartCode}-${childPart.childPartDesc}`
+          : "",
+        typeInfo
+          ? `${typeInfo.typeCode}-${typeInfo.typeDescription}`
+          : "",
+        item.status === "1" || item.status === 1 ? "Active" : "Inactive",
       ];
 
-      // Format S.No column differently (optional)
-      const snoCell = row.getCell(1);
-      snoCell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-      };
-      snoCell.font = { bold: true };
-
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
         cell.alignment = {
           horizontal: "center",
           vertical: "middle",
@@ -530,33 +579,33 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
           right: { style: "thin" },
         };
       });
+
+      // Bold S.No
+      row.getCell(1).font = { bold: true };
     });
 
-    // ===== Freeze Header Row ===== (Optional but useful)
-    worksheet.views = [
-      { state: 'frozen', ySplit: startRow } // Freeze rows above data
-    ];
+    /* ================= Freeze Header ================= */
+    worksheet.views = [{ state: "frozen", ySplit: startRow }];
 
-    // ===== AutoFilter =====
-    // Auto filter for all 3 columns
+    /* ================= Auto Filter ================= */
     worksheet.autoFilter = {
       from: { row: startRow, column: 1 },
       to: { row: startRow, column: headers.length },
     };
 
-    // ===== Save File =====
+    /* ================= Save File ================= */
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(
       new Blob([buffer], { type: "application/octet-stream" }),
-      `Child_Part_To_Type_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      `Child_Part_To_Type_Master_${moment().format(
+        "YYYYMMDD_HHmmss"
+      )}.xlsx`
     );
-    
-    // toast.success("Excel exported successfully with S.No column!");
   } catch (error) {
     console.error("Excel export error:", error);
-    // toast.error("Error exporting Child Part To Type Master.");
   }
 };
+
 
   return (
     <div>
@@ -571,6 +620,23 @@ const ChildPartToTypeMasterMapping = ({ modulesprop, screensprop }) => {
             onClick={handleAddRow}
             title="Add Row"
           />
+        </div>
+
+          {/* Filter Dropdown */}
+        <div className="p-3">
+          <div className="row">
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="card-body p-3" style={{ position: "relative" }}>

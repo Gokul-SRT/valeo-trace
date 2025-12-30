@@ -82,6 +82,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response.data.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(structuredClone(updatedResponseData));
@@ -132,7 +133,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );
@@ -191,6 +192,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.childPartId = params.newValue;
+        params.data.changed = true;
         return true;
       },
       valueFormatter: (params) => {
@@ -213,7 +215,30 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       field: "packetsQtys",
       filter: "agTextColumnFilter",
        headerComponent: RequiredHeader,
+       valueSetter: (params) => {
+        params.data.packetsQtys = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
       cellStyle: { textAlign: "right" },
+    },
+     {
+      headerName: "Status",
+      field: "status",
+      filter: true,
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      headerComponent: RequiredHeader,
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) =>
+        params.data.status === "1" || params.data.status === 1,
+      valueSetter: (params) => {
+        // when checkbox is clicked, set 1 for true, 0 for false
+        params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        return true;
+      },
+      cellStyle: { textAlign: "center" },
     },
   ];
 
@@ -255,31 +280,44 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       toast.error("Please enter the Packet ID for all the rows.");
     }
   };
-  const normalizeList = (list) => {
-    return list.map((item) => ({
-      ...item,
-      isActive:
-        item.isActive === "1" || item.isActive === 1 || item.isActive === true
-          ? "1"
-          : "0",
-    }));
-  };
+  // const normalizeList = (list) => {
+  //   return list.map((item) => ({
+  //     ...item,
+  //     isActive:
+  //       item.isActive === "1" || item.isActive === 1 || item.isActive === true
+  //         ? "1"
+  //         : "0",
+  //   }));
+  // };
 
-  const hasChanges = () => {
-    const normMaster = normalizeList(masterList);
-    const normOriginal = normalizeList(originalList);
-    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
-  };
+  // const hasChanges = () => {
+  //   const normMaster = normalizeList(masterList);
+  //   const normOriginal = normalizeList(originalList);
+  //   return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  // };
   const createorUpdate = async () => {
     try {
       setLoading(true);
       gridRef.current.api.stopEditing();
 
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        setLoading(false);
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   setLoading(false);
+      //   return;
+      // }
+
+      
+              const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+              const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+      
+              console.log("masterList:", masterList);
+              console.log("rowsToInsert:", rowsToInsert);
+              console.log("rowsToUpdate:", rowsToUpdate);
+      
+              if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+                toast.info("No new or modified records found!");
+                return;
+              }
 
       // Duplicate ChildPartId check
       const childPartIds = masterList.map((item) => item.childPartId);
@@ -309,18 +347,19 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
       }
 
       const invalidChildPart = masterList.filter((item) => !item.childPartId);
-      if (invalidChildPart.length > 0) {
-        toast.error("Please fill ChildPartCode for all rows.");
+      const invalidOffsetVal = masterList.filter((item) => !item.packetsQtys);
+      if (invalidChildPart.length > 0 || invalidOffsetVal.length > 0) {
+        toast.error("Please fill all mandatory(*) fields");
         setLoading(false);
         return;
       }
 
-      const invalidOffsetVal = masterList.filter((item) => !item.packetsQtys);
-      if (invalidOffsetVal.length > 0) {
-        toast.error("Please fill Packet QTy for all rows.");
-        setLoading(false);
-        return;
-      }
+      
+      // if (invalidOffsetVal.length > 0) {
+      //   toast.error("Please fill Packet QTy for all rows.");
+      //   setLoading(false);
+      //   return;
+      // }
 
       console.log("masterList", masterList);
 
@@ -332,6 +371,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
         tenantId: tenantId,
         updatedBy: employeeId,
         branchCode: branchCode,
+        status: item.status,
       }));
 
       const response = await serverApi.post(
@@ -363,103 +403,135 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
     loadOptionsAndData();
   };
 
-  const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-    } else if (value === "1") {
-      setMasterList(originalList.filter((item) => item.isActive === "1"));
-    } else if (value === "0") {
-      setMasterList(originalList.filter((item) => item.isActive === "0"));
-    }
-  };
+ const handleFilterChange = (value) => {
+  if (!value || value === "GetAll") {
+    setMasterList(originalList);
+  } else if (value === "1") {
+    setMasterList(originalList.filter((item) => item.status === "1"));
+  } else if (value === "0") {
+    setMasterList(originalList.filter((item) => item.status === "0"));
+  }
+};
 
-  const onExportExcel = async () => {
+
+ const onExportExcel = async () => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Packet Qty Master");
+
+    // ===== Column Widths =====
+    const columnWidths = [30, 45, 20, 20];
+    columnWidths.forEach((w, i) => {
+      worksheet.getColumn(i + 1).width = w;
+    });
+
+    // ===== Title Row Height =====
+    worksheet.getRow(1).height = 65;
+
+    // ===== Left Logo =====
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Packet Qty Master");
-
-      // ===== Column Widths (similar style) =====
-      const columnWidths = [30, 45, 20];
-      columnWidths.forEach((w, i) => {
-        worksheet.getColumn(i + 1).width = w;
+      const imgUrl = `${window.location.origin}/pngwing.com.png`;
+      const logo1 = await fetch(imgUrl);
+      const blob1 = await logo1.blob();
+      const arr1 = await blob1.arrayBuffer();
+      const imageId1 = workbook.addImage({
+        buffer: arr1,
+        extension: "png",
       });
+      worksheet.addImage(imageId1, {
+        tl: { col: 0, row: 0 },
+        br: { col: 1, row: 1 },
+      });
+    } catch {
+      console.warn("Left logo not found");
+    }
 
-      // ===== Title Row Height =====
-      worksheet.getRow(1).height = 65;
+    // ===== Title Cell =====
+    worksheet.mergeCells("B1:D1");
+    const titleCell = worksheet.getCell("B1");
+    titleCell.value = `Packet Qty Master\nGenerated On: ${moment().format(
+      "DD/MM/YYYY HH:mm:ss"
+    )}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+    titleCell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
 
-      // ===== Left Logo =====
-      try {
-        const imgUrl = `${window.location.origin}/pngwing.com.png`;
-        const logo1 = await fetch(imgUrl);
-        const blob1 = await logo1.blob();
-        const arr1 = await blob1.arrayBuffer();
-        const imageId1 = workbook.addImage({
-          buffer: arr1,
-          extension: "png",
-        });
-        worksheet.addImage(imageId1, {
-          tl: { col: 0, row: 0 },
-          br: { col: 1, row: 1 },
-        });
-      } catch {
-        console.warn("Left logo not found");
-      }
+    // ===== Right Logo =====
+    try {
+      const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+      const logo2 = await fetch(imgUrl1);
+      const blob2 = await logo2.blob();
+      const arr2 = await blob2.arrayBuffer();
+      const imageId2 = workbook.addImage({
+        buffer: arr2,
+        extension: "png",
+      });
+      worksheet.addImage(imageId2, {
+        tl: { col: 3, row: 0 },
+        br: { col: 4, row: 1.6 },
+      });
+    } catch {
+      console.warn("Right logo not found");
+    }
 
-      // ===== Title Cell =====
-      worksheet.mergeCells("B1");
-      const titleCell = worksheet.getCell("B1");
-      titleCell.value = `Packet Qty Master\nGenerated On: ${moment().format(
-        "DD/MM/YYYY HH:mm:ss"
-      )}`;
-      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-      titleCell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-        wrapText: true,
+    // ===== Header Row =====
+    const startRow = 3;
+    const headers = [
+      "Child Part Code",
+      "Child Part Description",
+      "Packet Qty",
+      "Status",
+    ];
+
+    const headerRow = worksheet.getRow(startRow);
+    headers.forEach((header, idx) => {
+      const cell = headerRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
       };
-      titleCell.border = {
+      cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
         right: { style: "thin" },
       };
+    });
 
-      // ===== Right Logo =====
-      try {
-        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
-        const logo2 = await fetch(imgUrl1);
-        const blob2 = await logo2.blob();
-        const arr2 = await blob2.arrayBuffer();
-        const imageId2 = workbook.addImage({
-          buffer: arr2,
-          extension: "png",
-        });
-        worksheet.addImage(imageId2, {
-          tl: { col: 2, row: 0 },
-          br: { col: 3, row: 1.6 },
-        });
-      } catch {
-        console.warn("Right logo not found");
-      }
+    // ===== Data Rows =====
+    masterList.forEach((item, index) => {
+      const childPart = childPartOptions.find(
+        (p) => p.childPartId === item.childPartId
+      );
 
-      // ===== Header Row =====
-      const startRow = 3;
-      const headers = [
-        "Child Part Code",
-        "Child Part Description",
-        "Packet Qty",
+      const rowNumber = startRow + index + 1;
+      const row = worksheet.getRow(rowNumber);
+
+      row.values = [
+        item.childPartCode || "",
+        childPart ? childPart.childPartDesc : "",
+        item.packetsQtys || "",
+        item.status === "1" || item.status === 1 ? "Active" : "Inactive",
       ];
 
-      const headerRow = worksheet.getRow(startRow);
-      headers.forEach((header, idx) => {
-        const cell = headerRow.getCell(idx + 1);
-        cell.value = header;
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
+      row.eachCell((cell) => {
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
         };
         cell.border = {
           top: { style: "thin" },
@@ -468,54 +540,26 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
           right: { style: "thin" },
         };
       });
+    });
 
-      // ===== Data Rows =====
-      masterList.forEach((item, index) => {
-        const childPart = childPartOptions.find(
-          (p) => p.childPartId === item.childPartId
-        );
+    // ===== AutoFilter =====
+    worksheet.autoFilter = {
+      from: { row: startRow, column: 1 },
+      to: { row: startRow, column: headers.length },
+    };
 
-        const rowNumber = startRow + index + 1;
-        const row = worksheet.getRow(rowNumber);
+    // ===== Save File =====
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], { type: "application/octet-stream" }),
+      `Packet_Qty_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+    );
+  } catch (error) {
+    console.error("Excel export error:", error);
+    toast.error("Error exporting Packet Qty Master.");
+  }
+};
 
-        row.values = [
-          item.childPartId || "",
-          childPart ? childPart.childPartDesc : "",
-          item.packetsQtys || "",
-        ];
-
-        row.eachCell((cell) => {
-          cell.alignment = {
-            horizontal: "center",
-            vertical: "middle",
-            wrapText: true,
-          };
-          cell.border = {
-            top: { style: "thin" },
-            left: { style: "thin" },
-            bottom: { style: "thin" },
-            right: { style: "thin" },
-          };
-        });
-      });
-
-      // ===== AutoFilter =====
-      worksheet.autoFilter = {
-        from: { row: startRow, column: 1 },
-        to: { row: startRow, column: headers.length },
-      };
-
-      // ===== Save File =====
-      const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(
-        new Blob([buffer], { type: "application/octet-stream" }),
-        `Packet_Qty_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-      );
-    } catch (error) {
-      console.error("Excel export error:", error);
-      toast.error("Error exporting Packet Qty Master.");
-    }
-  };
 
   return (
     <div>
@@ -531,6 +575,24 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
             title="Add Row"
           />
         </div>
+
+           {/* Filter Dropdown */}
+        <div className="p-3">
+          <div className="row">
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
 
         <div className="card-body p-3" style={{ position: "relative" }}>
           {optionsLoaded && (

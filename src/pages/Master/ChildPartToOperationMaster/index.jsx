@@ -84,6 +84,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
         const updatedResponseData = response.data.map((item) => ({
           ...item,
           isUpdate: 1,
+          changed: false,
         }));
         setMasterList(updatedResponseData);
         setOriginalList(structuredClone(updatedResponseData));
@@ -172,7 +173,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"> <span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );
@@ -180,7 +181,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
 
   const columnDefs = [
      {
-      headerName: "Operation Code",
+      headerName: "Operation Desc.",
       field: "operationId",
       editable: true,
       cellEditor: "agSelectCellEditor",
@@ -193,6 +194,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.operationId = params.newValue;
+        params.data.changed = true;
         return true;
       },
       valueFormatter: (params) => {
@@ -205,9 +207,10 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
         const found = operationOptions.find((p) => p.operationId === params.data.operationId);
         return found ? found.operationDesc : "";
       },
+      
     },
     {
-      headerName: "Child Part Code ",
+      headerName: "Child Part Desc. ",
       field: "childPartId",
       editable: true,
       cellEditor: "agSelectCellEditor",
@@ -217,11 +220,40 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       }),
       valueGetter: (params) => {
         return params.data.childPartId;
+
       },
       valueSetter: (params) => {
-        params.data.childPartId = params.newValue;
-        return true;
-      },
+  const newValue = params.newValue;
+  params.data.changed = true;
+
+  if (!newValue) {
+    toast.error("Child Part Code is required!");
+    return false;
+  }
+
+  const isDuplicate = masterList.some(
+    (item, index) =>
+      index !== params.node.rowIndex &&
+      item.childPartId === newValue
+  );
+
+  if (isDuplicate) {
+    const dupObj = childPartOptions.find(
+      (p) => p.childPartId === newValue
+    );
+
+    toast.error(
+      `Already mapped Child Part: ${
+        dupObj ? dupObj.childPartDesc : newValue
+      }`
+    );
+    return false; 
+  }
+
+  params.data.childPartId = newValue;
+  return true;
+},
+
       valueFormatter: (params) => {
         if (!params.value) return "";
         const found = childPartOptions.find((p) => p.childPartId === params.value);
@@ -245,7 +277,37 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
         step: 1,
         min: 0,
       },
+       valueSetter: (params) => {
+    const value = params.newValue;
+    params.data.changed = true;
+
+    // allow only whole numbers
+    if (!/^\d+$/.test(value)) {
+      toast.error("Only numbers are allowed in Offset!");
+      return false; // reject edit
+    }
+
+    params.data.offset = value;
+    return true;
+  },
       cellStyle: { textAlign: "right" },
+    },
+     {
+      headerName: "Status",
+      field: "status",
+      filter: true,
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) =>
+        params.data.status === "1" || params.data.status === 1,
+      valueSetter: (params) => {
+        // when checkbox is clicked, set 1 for true, 0 for false
+        params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        return true;
+      },
+      cellStyle: { textAlign: "center" },
     },
   ];
 
@@ -305,57 +367,73 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       setLoading(true);
       gridRef.current.api.stopEditing();
       
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        setLoading(false);
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.info("No new or modified records found!");
+      //   setLoading(false);
+      //   return;
+      // }
+
+       const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+              const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+      
+              console.log("masterList:", masterList);
+              console.log("rowsToInsert:", rowsToInsert);
+              console.log("rowsToUpdate:", rowsToUpdate);
+      
+              if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+                toast.info("No new or modified records found!");
+                return;
+              }
 
       // Duplicate ChildPartId check
-      const childPartIds = masterList.map((item) => item.operationId);
-      const duplicateChildPartIds = childPartIds.filter(
-        (id, index) => id && childPartIds.indexOf(id) !== index
-      );
+      // const childPartIds = masterList.map((item) => item.childPartId);
+      // const duplicateChildPartIds = childPartIds.filter(
+      //   (id, index) => id && childPartIds.indexOf(id) !== index
+      // );
 
-      if (duplicateChildPartIds.length > 0) {
-        const duplicateId = duplicateChildPartIds[0];
-        const dupObj = operationOptions.find((item) => item.operationId === duplicateId);
-        const desc = dupObj ? dupObj.operationDesc : duplicateId;
-        toast.error(`Already Mapped This OperationDesc: ${desc}`);
-        setLoading(false);
-        return;
-      }
+      // if (duplicateChildPartIds.length > 0) {
+      //   const duplicateId = duplicateChildPartIds[0];
+      //   const dupObj = childPartOptions.find((item) => item.childPartId === duplicateId);
+      //   const desc = dupObj ? dupObj.childPartDesc : duplicateId;
+      //   toast.error(`Already Mapped This ChildPartDesc: ${desc}`);
+      //   setLoading(false);
+      //   return;
+      // }
 
-      const invalidOffset = masterList.filter(
-        (item) => !item.offset || !/^\d+$/.test(item.offset)
-      );
+      // const invalidOffset = masterList.filter(
+      //   (item) => !item.offset || !/^\d+$/.test(item.offset)
+      // );
 
-      if (invalidOffset.length > 0) {
-        toast.error("Offset must be a valid number!");
-        setLoading(false);
-        return;
-      }
+      // if (invalidOffset.length > 0) {
+      //   toast.error("Offset must be a valid number!");
+      //   setLoading(false);
+      //   return;
+      // }
 
       const invalidChildPart = masterList.filter((item) => !item.childPartId);
-      if (invalidChildPart.length > 0) {
-        toast.error("Please fill ChildPartCode for all rows.");
-        setLoading(false);
-        return;
-      }
-
       const invalidOperation = masterList.filter((item) => !item.operationId);
-      if (invalidOperation.length > 0) {
-        toast.error("Please fill OpertaionCode for all rows.");
+      const invalidOffsetVal = masterList.filter((item) => !item.offset);
+
+
+      if (invalidChildPart.length > 0 || invalidOperation.length > 0 || invalidOffsetVal.length > 0) {
+        toast.error("Please fill all mandatory(*) fields");
         setLoading(false);
         return;
       }
 
-      const invalidOffsetVal = masterList.filter((item) => !item.offset);
-      if (invalidOffsetVal.length > 0) {
-        toast.error("Please fill Offset for all rows.");
-        setLoading(false);
-        return;
-      }
+      
+      // if (invalidOperation.length > 0) {
+      //   toast.error("Please fill OpertaionCode for all rows.");
+      //   setLoading(false);
+      //   return;
+      // }
+
+     
+      // if (invalidOffsetVal.length > 0) {
+      //   toast.error("Please fill Offset for all rows.");
+      //   setLoading(false);
+      //   return;
+      // }
 
       const updatedList = masterList.map((item) => ({
         isUpdate: item.isUpdate,
@@ -366,6 +444,7 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
         updatedBy: employeeId,
         branchCode: branchCode,
         offset: item.offset,
+        status: item.status,
       }));
 
       const response = await serverApi.post("insertupdateoperationchildmapping", updatedList);
@@ -392,106 +471,144 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
     loadOptionsAndData();
   };
 
-  const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-    } else if (value === "1") {
-      setMasterList(originalList.filter((item) => item.isActive === "1"));
-    } else if (value === "0") {
-      setMasterList(originalList.filter((item) => item.isActive === "0"));
-    }
-  };
+ const handleFilterChange = (value) => {
+  if (!value || value === "GetAll") {
+    setMasterList(originalList);
+  } else if (value === "Active") {
+    setMasterList(originalList.filter((item) => item.status === "1"));
+  } else if (value === "Inactive") {
+    setMasterList(originalList.filter((item) => item.status === "0"));
+  }
+};
+
 
   const onExportExcelChildPartToOperationMaster = async () => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Operation-ChildPartMapping");
+
+    // ===== Column Widths =====
+    const columnWidths = [20, 25, 35, 25, 35, 20, 15]; // Status column added
+    columnWidths.forEach((w, i) => {
+      worksheet.getColumn(i + 1).width = w;
+    });
+
+    // ===== Title Row Height =====
+    worksheet.getRow(1).height = 65;
+
+    // ===== Left Logo =====
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("ChildPartToOperationMaster");
-
-      // ===== Column Widths (similar style) =====
-      const columnWidths = [20, 25, 35, 25, 35, 20];
-      columnWidths.forEach((w, i) => {
-        worksheet.getColumn(i + 1).width = w;
+      const imgUrl = `${window.location.origin}/pngwing.com.png`;
+      const logo1 = await fetch(imgUrl);
+      const blob1 = await logo1.blob();
+      const arr1 = await blob1.arrayBuffer();
+      const imageId1 = workbook.addImage({
+        buffer: arr1,
+        extension: "png",
       });
+      worksheet.addImage(imageId1, {
+        tl: { col: 0, row: 0 },
+        br: { col: 1, row: 1 },
+      });
+    } catch {
+      console.warn("Left logo not found");
+    }
 
-      // ===== Title Row Height =====
-      worksheet.getRow(1).height = 65;
+    // ===== Title Cell =====
+    worksheet.mergeCells("B1:F1");
+    const titleCell = worksheet.getCell("B1");
+    titleCell.value = `Operation-ChildPartMapping\nGenerated On: ${moment().format(
+      "DD/MM/YYYY HH:mm:ss"
+    )}`;
+    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+      wrapText: true,
+    };
+    titleCell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
 
-      // ===== Left Logo =====
-      try {
-        const imgUrl = `${window.location.origin}/pngwing.com.png`;
-        const logo1 = await fetch(imgUrl);
-        const blob1 = await logo1.blob();
-        const arr1 = await blob1.arrayBuffer();
-        const imageId1 = workbook.addImage({
-          buffer: arr1,
-          extension: "png",
-        });
-        worksheet.addImage(imageId1, {
-          tl: { col: 0, row: 0 },
-          br: { col: 1, row: 1 },
-        });
-      } catch {
-        console.warn("Left logo not found");
-      }
+    // ===== Right Logo =====
+    try {
+      const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
+      const logo2 = await fetch(imgUrl1);
+      const blob2 = await logo2.blob();
+      const arr2 = await blob2.arrayBuffer();
+      const imageId2 = workbook.addImage({
+        buffer: arr2,
+        extension: "png",
+      });
+      worksheet.addImage(imageId2, {
+        tl: { col: 6, row: 0 },
+        br: { col: 7, row: 1 },
+      });
+    } catch {
+      console.warn("Right logo not found");
+    }
 
-      // ===== Title Cell =====
-      worksheet.mergeCells("B1:E1");
-      const titleCell = worksheet.getCell("B1");
-      titleCell.value = `ChildPartToOperationMaster\nGenerated On: ${moment().format(
-        "DD/MM/YYYY HH:mm:ss"
-      )}`;
-      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-      titleCell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-        wrapText: true,
+    // ===== Header Row =====
+    const startRow = 3;
+    const headers = [
+      "Mapping ID",
+      "Child Part Code",
+      "Child Part Description",
+      "Operation Code",
+      "Operation Description",
+      "Offset",
+      "Status",
+    ];
+
+    const headerRow = worksheet.getRow(startRow);
+    headers.forEach((header, idx) => {
+      const cell = headerRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
       };
-      titleCell.border = {
+      cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
         right: { style: "thin" },
       };
+    });
 
-      // ===== Right Logo =====
-      try {
-        const imgUrl1 = `${window.location.origin}/smartrunLogo.png`;
-        const logo2 = await fetch(imgUrl1);
-        const blob2 = await logo2.blob();
-        const arr2 = await blob2.arrayBuffer();
-        const imageId2 = workbook.addImage({
-          buffer: arr2,
-          extension: "png",
-        });
-        worksheet.addImage(imageId2, {
-          tl: { col: 5, row: 0 },
-          br: { col: 6, row: 1 },
-        });
-      } catch {
-        console.warn("Right logo not found");
-      }
+    // ===== Data Rows =====
+    masterList.forEach((item, index) => {
+      const rowNumber = startRow + index + 1;
+      const row = worksheet.getRow(rowNumber);
 
-      // ===== Header Row =====
-      const startRow = 3;
-      const headers = [
-        "Mapping ID",
-        "Child Part Code",
-        "Child Part Description",
-        "Operation Code",
-        "Operation Description",
-        "Offset",
+      const childPart = childPartOptions.find(
+        (p) => p.childPartId === item.childPartId
+      );
+      const operation = operationOptions.find(
+        (p) => p.operationId === item.operationId
+      );
+
+      row.values = [
+        item.opChildPartMapId || "",
+        childPart ? childPart.childPartId : item.childPartId || "",
+        childPart ? childPart.childPartDesc : "",
+        operation ? operation.operationId : item.operationId || "",
+        operation ? operation.operationDesc : "",
+        item.offset || "",
+        item.status === "1" || item.status === 1 ? "Active" : "Inactive",
       ];
 
-      const headerRow = worksheet.getRow(startRow);
-      headers.forEach((header, idx) => {
-        const cell = headerRow.getCell(idx + 1);
-        cell.value = header;
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
+      row.eachCell((cell) => {
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
         };
         cell.border = {
           top: { style: "thin" },
@@ -500,56 +617,26 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
           right: { style: "thin" },
         };
       });
+    });
 
-      // ===== Data Rows =====
-      masterList.forEach((item, index) => {
-        const rowNumber = startRow + index + 1;
-        const row = worksheet.getRow(rowNumber);
-        
-        const childPart = childPartOptions.find((p) => p.childPartId === item.childPartId);
-        const operation = operationOptions.find((p) => p.operationId === item.operationId);
+    // ===== AutoFilter =====
+    worksheet.autoFilter = {
+      from: { row: startRow, column: 1 },
+      to: { row: startRow, column: headers.length },
+    };
 
-        row.values = [
-          item.opChildPartMapId || "",
-          childPart ? childPart.childPartId : item.childPartId || "",
-          childPart ? childPart.childPartDesc : "",
-          operation ? operation.operationId : item.operationId || "",
-          operation ? operation.operationDesc : "",
-          item.offset || "",
-        ];
+    // ===== Save File =====
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], { type: "application/octet-stream" }),
+      `Operation-ChildPartMapping_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+    );
+  } catch (error) {
+    console.error("Excel export error:", error);
+    toast.error("Error exporting Operation-ChildPartMapping.");
+  }
+};
 
-        row.eachCell((cell) => {
-          cell.alignment = {
-            horizontal: "center",
-            vertical: "middle",
-            wrapText: true,
-          };
-          cell.border = {
-            top: { style: "thin" },
-            left: { style: "thin" },
-            bottom: { style: "thin" },
-            right: { style: "thin" },
-          };
-        });
-      });
-
-      // ===== AutoFilter =====
-      worksheet.autoFilter = {
-        from: { row: startRow, column: 1 },
-        to: { row: startRow, column: headers.length },
-      };
-
-      // ===== Save File =====
-      const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(
-        new Blob([buffer], { type: "application/octet-stream" }),
-        `ChildPartToOperationMaster_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-      );
-    } catch (error) {
-      console.error("Excel export error:", error);
-      toast.error("Error exporting ChildPartToOperationMaster.");
-    }
-  };
 
   return (
     <div>
@@ -564,6 +651,23 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
             onClick={handleAddRow}
             title="Add Row"
           />
+        </div>
+
+         {/* Filter Dropdown */}
+        <div className="p-3">
+          <div className="row">
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="card-body p-3" style={{ position: "relative" }}>

@@ -105,6 +105,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
           vendorId: item.vendorId,
           childPartDesc: item.childPartDesc,
           vendorDesc: item.vendorDesc,
+          status: item.status,
           isUpdate: 1,
         }));
 
@@ -185,7 +186,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );
@@ -214,6 +215,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.childPartId = params.newValue;
+        params.data.changed = true;
         // Update description when child part changes
         const found = childPartOptions.find(
           (p) => p.childPartId === params.newValue
@@ -254,6 +256,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       },
       valueSetter: (params) => {
         params.data.vendorId = params.newValue;
+        params.data.changed = true;
         // Update description when vendor changes
         const found = vendorOptions.find(
           (item) => item.vendorId === params.newValue
@@ -279,6 +282,24 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       field: "cvMapId",  // Changed from childVendorMapId to cvMapId
       hide: true,
     },
+    {
+      headerName: "Status",
+      field: "status",
+      filter: true,
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      headerComponent: RequiredHeader,
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) =>
+        params.data.status === "1" || params.data.status === 1,
+      valueSetter: (params) => {
+        // when checkbox is clicked, set 1 for true, 0 for false
+        params.data.status = params.newValue ? "1" : "0";
+        params.data.changed = true;
+        return true;
+      },
+      cellStyle: { textAlign: "center" },
+    },
   ];
 
   const handleAddRow = () => {
@@ -286,6 +307,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       isUpdate: 0,
       childPartId: "",
       vendorId: "",
+      status: "1",
     };
 
     const emptyRows = masterList.filter((item) => !item.cvMapId);  // Changed from childVendorMapId to cvMapId
@@ -343,11 +365,23 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
         gridRef.current.api.stopEditing();
       }
 
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
-        setLoading(false);
-        return;
-      }
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   setLoading(false);
+      //   return;
+      // }
+
+  const rowsToInsert = masterList.filter(row => row.isUpdate === "0" || row.isUpdate === 0);
+        const rowsToUpdate = masterList.filter(row => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0);
+
+        console.log("masterList:", masterList);
+        console.log("rowsToInsert:", rowsToInsert);
+        console.log("rowsToUpdate:", rowsToUpdate);
+
+        if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+          toast.info("No new or modified records found!");
+          return;
+        }
 
       // Duplicate ChildPartId check
       // const childPartIds = masterList.map((item) => item.childPartId);
@@ -389,6 +423,7 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
           tenantId: tenantId,
           branchCode: branchCode,
           updatedBy: employeeId,
+          status: item.status,
         };
 
         // Add cvMapId if it exists (for updates)
@@ -419,13 +454,8 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       if (response.data && response.data.responseCode === "200") {
         toast.success("Add/Update successful");
         await loadOptionsAndData();
-      } else if (response.data && response.data.responseMessage) {
-        if (response.data.responseMessage.includes("DUPLICATE") || 
-            response.data.responseMessage.includes("DUBLICATE")) {
-          toast.error("Duplicate entry found!");
-        } else {
-          toast.error(response.data.responseMessage);
-        }
+      } else if (response.data && response.data.responseCode === "400") {     
+          toast.error("Already mapped for given details");
       } else {
         toast.error("Failed to save data. Please try again.");
       }
@@ -590,6 +620,17 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
     }
   };
 
+   // Filter change
+  const handleFilterChange = (value) => {
+    if (!value || value === "GetAll") {
+      setMasterList(originalList);
+    } else if (value === "Active") {
+      setMasterList(originalList.filter((item) => item.status === "1"));
+    } else if (value === "Inactive") {
+      setMasterList(originalList.filter((item) => item.status === "0"));
+    }
+  };
+
   return (
     <div>
       <div className="card shadow" style={{ borderRadius: "6px" }}>
@@ -603,6 +644,23 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
             onClick={handleAddRow}
             title="Add Row"
           />
+        </div>
+
+         {/* Filter Dropdown */}
+        <div className="p-3">
+          <div className="row">
+            <div className="col-md-3">
+              <label className="form-label fw-bold">Status</label>
+              <select
+                className="form-select"
+                onChange={(e) => handleFilterChange(e.target.value)}
+              >
+                <option value="GetAll">Get All</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="card-body p-3" style={{ position: "relative" }}>

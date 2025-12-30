@@ -2,13 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-// import "ag-grid-enterprise";
-// import { ModuleRegistry } from "ag-grid-community";
-// import {
-//   SetFilterModule,
-//   DateFilterModule,
-//   ExcelExportModule,
-// } from "ag-grid-enterprise";
 import { Modal, Select, message } from "antd";
 import { toast } from "react-toastify";
 import {
@@ -18,7 +11,7 @@ import {
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-import Loader from "../../../Utills/Loader"
+import Loader from "../../../Utills/Loader";
 
 // ModuleRegistry.registerModules([
 //   SetFilterModule,
@@ -26,7 +19,7 @@ import Loader from "../../../Utills/Loader"
 //   ExcelExportModule,
 // ]);
 
-const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
+const ProductMaster = ({ modulesprop, screensprop, onCancel }) => {
   const [selectedModule, setSelectedModule] = useState("");
   const [selectedScreen, setSelectedScreen] = useState("");
   const [masterList, setMasterList] = useState([]);
@@ -137,16 +130,17 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
           // Handle operation data - convert to array format
           operationCodes: item.operationId ? [item.operationId] : [],
           operationDescription: item.operationDescription || "",
+          changed: false, 
         }));
         console.log("Fetched and mapped data:", updated);
         setMasterList(updated);
-       // setOriginalList(updated);
-       setOriginalList(structuredClone(updated));
+        // setOriginalList(updated);
+        setOriginalList(structuredClone(updated));
       }
     } catch (error) {
       console.error("Error fetching master data:", error);
       toast.error("Error fetching data. Please try again later.");
-    }finally {
+    } finally {
       setLoading(false); // ✅ Stop loader
     }
   };
@@ -202,48 +196,49 @@ const ProductMaster = ({ modulesprop, screensprop,onCancel }) => {
     );
   };
 */
-const GroupCodeDropdownEditor = (props) => {
-  const [selectedValue, setSelectedValue] = useState(props.value || "");
+  const GroupCodeDropdownEditor = (props) => {
+    const [selectedValue, setSelectedValue] = useState(props.value || "");
 
-  useEffect(() => {
-    setSelectedValue(props.value || "");
-  }, [props.value]);
+    useEffect(() => {
+      setSelectedValue(props.value || "");
+    }, [props.value]);
 
-  const handleChange = (e) => {
-    const value = e.target.value;
-    setSelectedValue(value);
-    // Do NOT setDataValue here; AG Grid will handle it when editing stops
-  };
-
-  // AG Grid calls this when editing stops to get the value
-  useEffect(() => {
-    return () => {
-      const selectedGrp = groupDropdown.find((g) => g.grpCode === selectedValue);
-      if (selectedGrp) {
-        // Update both fields in the row
-        props.node.setDataValue("groupCode", selectedGrp.grpCode);
-        props.node.setDataValue("groupId", selectedGrp.grpId);
-      }
+    const handleChange = (e) => {
+      const value = e.target.value;
+      setSelectedValue(value);
+      // Do NOT setDataValue here; AG Grid will handle it when editing stops
     };
-  }, [selectedValue, props.node]);
 
-  return (
-    <select
-      value={selectedValue}
-      onChange={handleChange}
-      style={{ width: "100%", height: "100%" }}
-      autoFocus
-    >
-      <option value="">Select Group Code</option>
-      {groupDropdown.map((grp) => (
-        <option key={grp.grpId} value={grp.grpCode}>
-          {grp.grpCode}
-        </option>
-      ))}
-    </select>
-  );
-};
+    // AG Grid calls this when editing stops to get the value
+    useEffect(() => {
+      return () => {
+        const selectedGrp = groupDropdown.find(
+          (g) => g.grpCode === selectedValue
+        );
+        if (selectedGrp) {
+          // Update both fields in the row
+          props.node.setDataValue("groupCode", selectedGrp.grpCode);
+          props.node.setDataValue("groupId", selectedGrp.grpId);
+        }
+      };
+    }, [selectedValue, props.node]);
 
+    return (
+      <select
+        value={selectedValue}
+        onChange={handleChange}
+        style={{ width: "100%", height: "100%" }}
+        autoFocus
+      >
+        <option value="">Select Group Code</option>
+        {groupDropdown.map((grp) => (
+          <option key={grp.grpId} value={grp.grpCode}>
+            {grp.grpCode}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   // ✅ Group Code Cell Renderer (NEW - to display selected value)
   const GroupCodeCellRenderer = (props) => {
@@ -305,7 +300,7 @@ const GroupCodeDropdownEditor = (props) => {
           : item
       );
       setMasterList(updatedList);
-     // setOriginalList(updatedList);
+      // setOriginalList(updatedList);
       setIsModalOpen(false);
       setSelectedOperations([]);
       setEditingRow(null);
@@ -328,21 +323,22 @@ const GroupCodeDropdownEditor = (props) => {
   //   );
   // };
 
-
   const RequiredHeader = (props) => {
     const buttonRef = React.useRef(null);
-    
+
     return (
       <div className="ag-cell-label-container" role="presentation">
-        <span 
+        <span
           ref={buttonRef}
-          className="ag-header-icon ag-header-cell-filter-button" 
+          className="ag-header-icon ag-header-cell-filter-button"
           onClick={() => props.showColumnMenu(buttonRef.current)}
         >
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text">
+            <span style={{ color: "red" }}>*</span>{props.displayName} 
+          </span>
         </div>
       </div>
     );
@@ -352,15 +348,25 @@ const GroupCodeDropdownEditor = (props) => {
     {
       headerName: "Product Code",
       field: "productCode",
-       filter: "agTextColumnFilter",
-       headerComponent: RequiredHeader,
+      filter: "agTextColumnFilter",
+      headerComponent: RequiredHeader,
       editable: (params) => params.data.isUpdate === 0,
+      valueSetter: (params) => {
+        params.data.productCode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
     },
     {
       headerName: "Product Description",
       field: "productDesc",
       filter: "agTextColumnFilter",
-       headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
+      valueSetter: (params) => {
+        params.data.productDesc = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
     },
     // {
     //   headerName: "UOM",
@@ -371,17 +377,27 @@ const GroupCodeDropdownEditor = (props) => {
       headerName: "Group Code",
       field: "groupCode", // ✅ Use groupCode instead of grpCode
       editable: true,
-       headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
       cellEditor: GroupCodeDropdownEditor,
       cellRenderer: GroupCodeCellRenderer,
+      valueSetter: (params) => {
+        params.data.groupCode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
     },
     {
       headerName: "Operations",
       field: "operationDescription",
       editable: false,
       suppressNavigable: true,
-       headerComponent: RequiredHeader,
+      headerComponent: RequiredHeader,
       cellRenderer: OperationIdCellRenderer,
+      valueSetter: (params) => {
+        params.data.operationDescription = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
       cellStyle: { cursor: "pointer" },
     },
     {
@@ -395,6 +411,7 @@ const GroupCodeDropdownEditor = (props) => {
         params.data.isActive === "1" || params.data.isActive === 1,
       valueSetter: (params) => {
         params.data.isActive = params.newValue ? "1" : "0";
+         params.data.changed = true;
         return true;
       },
       cellStyle: { textAlign: "center" },
@@ -402,68 +419,67 @@ const GroupCodeDropdownEditor = (props) => {
   ];
 
   const handleAddRow = () => {
-  const emptyRow = {
-    isUpdate: 0,
-    productCode: "",
-    productDesc: "",
-   // productUomCode: "",
-    groupCode: "",
-    groupId: "",
-    operationCodes: [],
-    operationDescription: "",
-    isActive: "1",
-    productCategoryCode: "FG",
-    isInventory: "0",
-    tenantId,
-    branchCode,
-    updatedBy: employeeId,
+    const emptyRow = {
+      isUpdate: 0,
+      productCode: "",
+      productDesc: "",
+      // productUomCode: "",
+      groupCode: "",
+      groupId: "",
+      operationCodes: [],
+      operationDescription: "",
+      isActive: "1",
+      productCategoryCode: "FG",
+      isInventory: "0",
+      tenantId,
+      branchCode,
+      updatedBy: employeeId,
+    };
+
+    // Check if there is any row with empty productCode
+    const productCodeEmpty = masterList.filter((item) => !item.productCode);
+    if (productCodeEmpty.length > 0) {
+      message.error("Please enter the Product code for all the rows.");
+      return;
+    }
+
+    const updated = [...masterList, emptyRow];
+    setMasterList(updated);
+    setOriginalList(updated);
+
+    // Scroll to last page and focus new row after a small delay
+    setTimeout(() => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+
+      const lastRowIndex = updated.length - 1;
+      const totalPages = api.paginationGetTotalPages();
+
+      // Go to last page
+      api.paginationGoToLastPage();
+
+      // Ensure the last row is visible at the bottom
+      setTimeout(() => {
+        api.ensureIndexVisible(lastRowIndex, "bottom");
+
+        // Flash the new row to draw attention
+        api.flashCells({
+          rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
+        });
+
+        // Focus and start editing on Product Code column
+        const firstColId = "productCode"; // field name of first editable column
+        api.setFocusedCell(lastRowIndex, firstColId);
+        api.startEditingCell({
+          rowIndex: lastRowIndex,
+          colKey: firstColId,
+        });
+      }, 150);
+    }, 100);
   };
 
-  // Check if there is any row with empty productCode
-  const productCodeEmpty = masterList.filter((item) => !item.productCode);
-  if (productCodeEmpty.length > 0) {
-    message.error("Please enter the Product code for all the rows.");
-    return;
-  }
-
-  const updated = [...masterList, emptyRow];
-  setMasterList(updated);
-  setOriginalList(updated);
-
-  // Scroll to last page and focus new row after a small delay
-  setTimeout(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-
-    const lastRowIndex = updated.length - 1;
-    const totalPages = api.paginationGetTotalPages();
-
-    // Go to last page
-    api.paginationGoToLastPage();
-
-    // Ensure the last row is visible at the bottom
-    setTimeout(() => {
-      api.ensureIndexVisible(lastRowIndex, "bottom");
-
-      // Flash the new row to draw attention
-      api.flashCells({
-        rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
-      });
-
-      // Focus and start editing on Product Code column
-      const firstColId = "productCode"; // field name of first editable column
-      api.setFocusedCell(lastRowIndex, firstColId);
-      api.startEditingCell({
-        rowIndex: lastRowIndex,
-        colKey: firstColId,
-      });
-    }, 150);
-  }, 100);
-};
-
-
-// Normalize each row for comparison
-/*
+  // Normalize each row for comparison
+  /*
 const normalizeItem = (item) => ({
   productCode: item.productCode?.trim() || "",
   productDesc: item.productDesc?.trim() || "",
@@ -507,28 +523,39 @@ const hasChanges = () => {
 
 */
 
-const normalizeList = (list) => {
-  return list.map(item => ({
-    ...item,
-    isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
-  }));
-};
+  // const normalizeList = (list) => {
+  //   return list.map(item => ({
+  //     ...item,
+  //     isActive: item.isActive === "1" || item.isActive === 1 || item.isActive === true ? "1" : "0"
+  //   }));
+  // };
 
-const hasChanges = () => {
-  const normMaster = normalizeList(masterList);
-  const normOriginal = normalizeList(originalList);
-  return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
-};
-
-
+  // const hasChanges = () => {
+  //   const normMaster = normalizeList(masterList);
+  //   const normOriginal = normalizeList(originalList);
+  //   return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  // };
 
   // ✅ FIXED Update function
   const createorUpdate = async () => {
     try {
       setLoading(true);
       gridRef.current.api.stopEditing();
-      if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
+      // if (!hasChanges()) {
+      //   toast.error("Change any one field before saving.");
+      //   return;
+      // }
+
+      const rowsToInsert = masterList.filter(
+        (row) => row.isUpdate === "0" || row.isUpdate === 0
+      );
+      const rowsToUpdate = masterList.filter(
+        (row) =>
+          row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0
+      );
+
+      if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+        toast.info("No new or modified records found!");
         return;
       }
 
@@ -538,42 +565,43 @@ const hasChanges = () => {
           item.isUpdate === 0 && (!item.productCode || !item.productDesc)
       );
 
-      if (invalidRows.length > 0) {
-        toast.error(
-          "Please fill Product Code and Description for all new rows."
-        );
-        return;
-      }
-
-
       const invalidGroupCode = masterList.filter(
         (item) =>
-          item.isUpdate === 0 && (!item.groupCode || item.groupCode.trim() === "")
+          item.isUpdate === 0 &&
+          (!item.groupCode || item.groupCode.trim() === "")
       );
 
-      if (invalidGroupCode.length > 0) {
-        toast.error(
-          "Please fill GroupCode for all new rows."
-        );
-        return;
-      }
-
-      const invalidOperation = masterList.filter(
+       const invalidOperation = masterList.filter(
         (item) =>
-          item.isUpdate === 0 && (!item.operationDescription || item.operationDescription.trim() === "")
+          item.isUpdate === 0 &&
+          (!item.operationDescription ||
+            item.operationDescription.trim() === "")
       );
 
-      if (invalidOperation.length > 0) {
+
+
+      if (invalidRows.length > 0 || invalidGroupCode.length > 0 || invalidOperation.length > 0) {
         toast.error(
-          "Please fill Operations for all new rows."
+          "Please fill all mandatory(*) fields"
         );
         return;
       }
 
+      
 
+      // if (invalidGroupCode.length > 0) {
+      //   toast.error("Please fill GroupCode for all new rows.");
+      //   return;
+      // }
+      // if (invalidOperation.length > 0) {
+      //   toast.error("Please fill Operations for all new rows.");
+      //   return;
+      // }
 
-      const productCodes=masterList.map((item)=> item.productCode.trim());
-      const duplicateCodes=productCodes.filter((code,index)=> productCodes.indexOf(code) !== index);
+      const productCodes = masterList.map((item) => item.productCode.trim());
+      const duplicateCodes = productCodes.filter(
+        (code, index) => productCodes.indexOf(code) !== index
+      );
 
       if (duplicateCodes.length > 0) {
         toast.error(`Duplicate Product Code found: ${duplicateCodes[0]}`);
@@ -651,7 +679,7 @@ const hasChanges = () => {
     } catch (error) {
       console.error("Error saving product data:", error);
       toast.error("No Data To Save/Update!");
-    }finally {
+    } finally {
       setLoading(false); // ✅ Stop loader
     }
   };
@@ -669,126 +697,90 @@ const hasChanges = () => {
   };
 
   const onExportExcelProductMaster = async () => {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Product Master");
-
-    // ===== Column Setup =====
-    worksheet.columns = [
-      { width: 20 }, // Product Code
-      { width: 30 }, // Product Description
-      { width: 15 }, // Group Code
-      { width: 40 }, // Operation Description
-      { width: 15 }, // Status
-    ];
-
-    // ===== Logo + Title Row =====
-    worksheet.getRow(1).height = 50;
-
-    // Left Logo
     try {
-      const logo1 = await fetch("/pngwing.com.png");
-      const blob1 = await logo1.blob();
-      const arr1 = await blob1.arrayBuffer();
-      const imageId1 = workbook.addImage({
-        buffer: arr1,
-        extension: "png",
-      });
-      worksheet.addImage(imageId1, {
-        tl: { col: 0, row: 0 },
-        ext: { width: 120, height: 40 },
-      });
-    } catch {
-      console.warn("Left logo not found");
-    }
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Product Master");
 
-    // Title
-    worksheet.mergeCells("B1:D1");
-    const titleCell = worksheet.getCell("B1");
-    titleCell.value = `Product Master\nGenerated: ${moment().format(
-      "DD/MM/YYYY HH:mm"
-    )}`;
-    titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
-    titleCell.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-      wrapText: true,
-    };
-
-    // Right Logo
-    try {
-      const logo2 = await fetch("/smartrunLogo.png");
-      const blob2 = await logo2.blob();
-      const arr2 = await blob2.arrayBuffer();
-      const imageId2 = workbook.addImage({
-        buffer: arr2,
-        extension: "png",
-      });
-       worksheet.addImage(imageId2, {
-          tl: { col: 2, row: 0 },
-          br: { col: 5, row: 1.6 },
-      });
-    } catch {
-      console.warn("Right logo not found");
-    }
-
-    // ===== Table Header =====
-    const headerRowIndex = 3;
-    const headers = [
-      "Product Code",
-      "Product Description",
-      "Group Code",
-      "Operation Description",
-      "Status",
-    ];
-
-    worksheet.getRow(headerRowIndex).height = 25;
-
-    headers.forEach((header, index) => {
-      const cell = worksheet.getCell(headerRowIndex, index + 1);
-      cell.value = header;
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
-      cell.alignment = { horizontal: "center", vertical: "middle" };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-
-    // ===== Filtered Data =====
-    const dataToExport =
-      currentFilter === "GetAll"
-        ? originalList
-        : currentFilter === "1"
-        ? originalList.filter((i) => i.isActive === "1")
-        : originalList.filter((i) => i.isActive === "0");
-
-    // ===== Data Rows =====
-    dataToExport.forEach((item, index) => {
-      const rowIndex = headerRowIndex + index + 1;
-      const row = worksheet.getRow(rowIndex);
-      row.height = 20;
-
-      row.values = [
-        item.productCode || "",
-        item.productDesc || "",
-        item.groupCode || "",
-        item.operationDescription || "",
-        item.isActive === "1" ? "Active" : "Inactive",
+      // ===== Column Setup =====
+      worksheet.columns = [
+        { width: 20 }, // Product Code
+        { width: 30 }, // Product Description
+        { width: 15 }, // Group Code
+        { width: 40 }, // Operation Description
+        { width: 15 }, // Status
       ];
 
-      row.eachCell((cell) => {
-        cell.alignment = {
-          horizontal: "center",
-          vertical: "middle",
-          wrapText: true,
+      // ===== Logo + Title Row =====
+      worksheet.getRow(1).height = 50;
+
+      // Left Logo
+      try {
+        const logo1 = await fetch("/pngwing.com.png");
+        const blob1 = await logo1.blob();
+        const arr1 = await blob1.arrayBuffer();
+        const imageId1 = workbook.addImage({
+          buffer: arr1,
+          extension: "png",
+        });
+        worksheet.addImage(imageId1, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 120, height: 40 },
+        });
+      } catch {
+        console.warn("Left logo not found");
+      }
+
+      // Title
+      worksheet.mergeCells("B1:D1");
+      const titleCell = worksheet.getCell("B1");
+      titleCell.value = `Product Master\nGenerated: ${moment().format(
+        "DD/MM/YYYY HH:mm"
+      )}`;
+      titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
+      titleCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      // Right Logo
+      try {
+        const logo2 = await fetch("/smartrunLogo.png");
+        const blob2 = await logo2.blob();
+        const arr2 = await blob2.arrayBuffer();
+        const imageId2 = workbook.addImage({
+          buffer: arr2,
+          extension: "png",
+        });
+        worksheet.addImage(imageId2, {
+          tl: { col: 2, row: 0 },
+          br: { col: 5, row: 1.6 },
+        });
+      } catch {
+        console.warn("Right logo not found");
+      }
+
+      // ===== Table Header =====
+      const headerRowIndex = 3;
+      const headers = [
+        "Product Code",
+        "Product Description",
+        "Group Code",
+        "Operation Description",
+        "Status",
+      ];
+
+      worksheet.getRow(headerRowIndex).height = 25;
+
+      headers.forEach((header, index) => {
+        const cell = worksheet.getCell(headerRowIndex, index + 1);
+        cell.value = header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
         };
         cell.border = {
           top: { style: "thin" },
@@ -797,34 +789,68 @@ const hasChanges = () => {
           right: { style: "thin" },
         };
       });
-    });
 
-    // ===== AutoFilter =====
-    if (dataToExport.length > 0) {
-      worksheet.autoFilter = {
-        from: { row: headerRowIndex, column: 1 },
-        to: {
-          row: headerRowIndex + dataToExport.length,
-          column: headers.length,
-        },
-      };
+      // ===== Filtered Data =====
+      const dataToExport =
+        currentFilter === "GetAll"
+          ? originalList
+          : currentFilter === "1"
+          ? originalList.filter((i) => i.isActive === "1")
+          : originalList.filter((i) => i.isActive === "0");
+
+      // ===== Data Rows =====
+      dataToExport.forEach((item, index) => {
+        const rowIndex = headerRowIndex + index + 1;
+        const row = worksheet.getRow(rowIndex);
+        row.height = 20;
+
+        row.values = [
+          item.productCode || "",
+          item.productDesc || "",
+          item.groupCode || "",
+          item.operationDescription || "",
+          item.isActive === "1" ? "Active" : "Inactive",
+        ];
+
+        row.eachCell((cell) => {
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true,
+          };
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+      });
+
+      // ===== AutoFilter =====
+      if (dataToExport.length > 0) {
+        worksheet.autoFilter = {
+          from: { row: headerRowIndex, column: 1 },
+          to: {
+            row: headerRowIndex + dataToExport.length,
+            column: headers.length,
+          },
+        };
+      }
+
+      // ===== Export File =====
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `Product_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
+      );
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Error exporting Product Master.");
     }
-
-    // ===== Export File =====
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-      new Blob([buffer], {
-        type:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      }),
-      `Product_Master_${moment().format("YYYYMMDD_HHmmss")}.xlsx`
-    );
-  } catch (error) {
-    console.error("Excel export error:", error);
-    toast.error("Error exporting Product Master.");
-  }
-};
-
+  };
 
   const handlecellclicked = (params) => {
     console.log("cell clicked", params);
@@ -854,7 +880,9 @@ const hasChanges = () => {
         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
-              <label className="form-label fw-bold"><span className="text-danger">*</span>&nbsp;Status</label>
+              <label className="form-label fw-bold">
+                <span className="text-danger">*</span>&nbsp;Status
+              </label>
               <select
                 className="form-select"
                 value={currentFilter}
@@ -889,7 +917,7 @@ const hasChanges = () => {
             //   setMasterList(updatedList);
             //  // setOriginalList(updatedList);
             // }}
-             onCellClicked={handlecellclicked}
+            onCellClicked={handlecellclicked}
             onCellEditingStopped={(params) => {
               const updatedList = [...masterList];
               updatedList[params.rowIndex] = { ...params.data }; // copy updated row
@@ -897,7 +925,7 @@ const hasChanges = () => {
             }}
             overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
-           {loading && (
+          {loading && (
             <div
               style={{
                 position: "absolute",

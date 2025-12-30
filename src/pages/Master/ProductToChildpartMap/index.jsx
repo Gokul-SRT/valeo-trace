@@ -2,9 +2,6 @@ import React, { useRef, useEffect, useState, forwardRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-// import "ag-grid-enterprise";
-// import { ModuleRegistry } from "ag-grid-community";
-// import { SetFilterModule, DateFilterModule } from "ag-grid-enterprise";
 import { Select } from "antd";
 import ServerApi from "../../../serverAPI";
 import CommonserverApi from "../../../CommonserverApi";
@@ -112,8 +109,9 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               item.childPartDesc.length > 0
             ? item.childPartDesc.split(",").map((i) => i.trim())
             : [],
-          isActive: item.isActive !== undefined ? item.isActive : 1,
+          status: item.status !== undefined ? item.status : 1,
           isUpdate: "1",
+          changed: false,
         }));
         console.log("Fetched Mapping Data:", updatedData);
         setMappingList(updatedData);
@@ -241,6 +239,11 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         const option = productData.find((item) => item.key === params.value);
         return option ? option.value : params.value;
       },
+      valueSetter: (params) => {
+        params.data.productCode = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
       headerComponent: RequiredHeader,
     },
     {
@@ -264,62 +267,68 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
           })
           .join(", ");
       },
+      valueSetter: (params) => {
+        params.data.childPartId = params.newValue;
+        params.data.changed = true;
+        return true;
+      },
       headerComponent: RequiredHeader,
     },
-    // {
-    //   headerName: "Status",
-    //   field: "isActive",
-    //   editable: true,
-    //   cellRenderer: "agCheckboxCellRenderer",
-    //   cellEditor: "agCheckboxCellEditor",
-    //   valueGetter: (params) => Number(params.data.isActive) === 1,
-    //   valueSetter: (params) => {
-    //     params.data.isActive = params.newValue ? 1 : 0;
-    //     return true;
-    //   },
-    //   cellStyle: { textAlign: "center" },
-    // },
+    {
+      headerName: "Status",
+      field: "status",
+      editable: true,
+      cellRenderer: "agCheckboxCellRenderer",
+      cellEditor: "agCheckboxCellEditor",
+      valueGetter: (params) => Number(params.data.status) === 1,
+      valueSetter: (params) => {
+        params.data.status = params.newValue ? 1 : 0;
+        params.data.changed = true;
+        return true;
+      },
+      cellStyle: { textAlign: "center" },
+    },
   ];
 
   // 🔹 Add new mapping row
   const handleAddMappingRow = () => {
-    const newRow = {
+    const emptyRow = {
       productCode: "",
       childPartId: [],
       childPartDesc: [],
-      isActive: 1,
+      status: 1,
       isUpdate: "0",
+      changed: false,
     };
 
-    const updated = [...mappingList, newRow];
-    setMappingList(updated);
+    // Check for empty rows before adding new one
+    const emptyRows = mappingList.filter(
+      (item) => !item.productCode && (!item.childPartId || item.childPartId.length === 0)
+    );
 
-    setTimeout(() => {
-      const api = mappingGridRef.current?.api;
-      if (api) {
-        const totalPages = api.paginationGetTotalPages();
-        const lastRowIndex = updated.length - 1;
-
-        // Go to last page
-        api.paginationGoToPage(totalPages - 1);
-
-        setTimeout(() => {
-          // Ensure last row is visible
-          api.ensureIndexVisible(lastRowIndex, "bottom");
-
-          // Flash last added row
-          api.flashCells({
-            rowNodes: [api.getDisplayedRowAtIndex(lastRowIndex)],
-          });
-
-          // Start editing first cell (productCode)
-          api.startEditingCell({
-            rowIndex: lastRowIndex,
-            colKey: "productCode",
-          });
-        }, 150);
-      }
-    }, 100);
+    if (emptyRows && emptyRows?.length === 0) {
+      const updated = [...mappingList, emptyRow];
+      setMappingList(updated);
+      
+      setTimeout(() => {
+        const api = mappingGridRef.current?.api;
+        if (api && api.paginationGetTotalPages) {
+          const totalPages = api.paginationGetTotalPages();
+          api.paginationGoToPage(Math.max(0, totalPages - 1));
+          
+          setTimeout(() => {
+            const lastRowIndex = updated.length - 1;
+            // Start editing first cell (productCode)
+            api.startEditingCell({
+              rowIndex: lastRowIndex,
+              colKey: "productCode",
+            });
+          }, 150);
+        }
+      }, 100);
+    } else {
+      toast.error("Please enter the empty rows.");
+    }
   };
 
   // 🔹 Filter handler
@@ -329,11 +338,11 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       setMappingList(originalMappingList);
     } else if (value === "Active") {
       setMappingList(
-        originalMappingList.filter((item) => Number(item.isActive) === 1)
+        originalMappingList.filter((item) => Number(item.status) === 1)
       );
     } else if (value === "Inactive") {
       setMappingList(
-        originalMappingList.filter((item) => Number(item.isActive) === 0)
+        originalMappingList.filter((item) => Number(item.status) === 0)
       );
     }
   };
@@ -350,7 +359,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       const worksheet = workbook.addWorksheet("Product Child Part Mapping");
 
       // ===== Column Widths =====
-      const columnWidths = [30, 50];
+      const columnWidths = [30, 50,20];
       columnWidths.forEach((w, i) => {
         worksheet.getColumn(i + 1).width = w;
       });
@@ -418,7 +427,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       const headers = [
         "Product Code",
         "Child Part Codes",
-        // "Status",
+        "Status",
       ];
 
       const headerRow = worksheet.getRow(startRow);
@@ -457,7 +466,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         row.values = [
           item.productCode || "",
           childPartNames,
-          // Number(item.isActive) === 1 ? "Active" : "Inactive",
+          Number(item.status) === 1 ? "Active" : "Inactive",
         ];
 
         row.eachCell((cell) => {
@@ -503,60 +512,60 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       // Stop any ongoing editing
       mappingGridRef.current?.api?.stopEditing();
 
-      // ✅ Validate rows
-      const invalidRow = mappingList.find(
-        (item) => !item.productCode?.trim() || item.childPartId?.length === 0
+      // Find new rows (isUpdate === "0" or 0)
+      const rowsToInsert = mappingList.filter(
+        (row) => row.isUpdate === "0" || row.isUpdate === 0
       );
-      console.log("Validating rows before save:", mappingList, invalidRow);
-      if (invalidRow) {
-        toast.info(
-          "Please fill in both Product Code and Child Part Code for all rows before saving."
-        );
+      
+      // Find modified rows (changed === true and not new rows)
+      const rowsToUpdate = mappingList.filter(
+        (row) => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0
+      );
+
+      console.log("masterList:", mappingList);
+      console.log("rowsToInsert:", rowsToInsert);
+      console.log("rowsToUpdate:", rowsToUpdate);
+
+      if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
+        toast.info("No new or modified records found!");
         setIsSaving(false);
+        setLoading(false);
         return;
       }
 
-      // Find new rows (isUpdate === "0")
-      const newRows = mappingList.filter((item) => item.isUpdate === "0");
+      // Validate mandatory fields
+      const productCodeEmpty = mappingList.filter(
+        (item) => !item.productCode || item.productCode.trim() === ""
+      );
+      const childPartEmpty = mappingList.filter(
+        (item) => !item.childPartId || item.childPartId.length === 0
+      );
 
-      // Find modified rows by comparing with originalMappingList
-      const modifiedRows = mappingList.filter((currentRow) => {
-        if (currentRow.isUpdate === "0") return false; // Skip new rows
-
-        const originalRow = originalMappingList.find(
-          (orig) => orig.productCode === currentRow.productCode
-        );
-
-        if (!originalRow) return false;
-
-        // Compare all relevant fields
-        return (
-          currentRow.productCode !== originalRow.productCode ||
-          JSON.stringify(currentRow.childPartId) !==
-            JSON.stringify(originalRow.childPartId) ||
-          currentRow.isActive !== originalRow.isActive
-        );
-      });
-
-      // Combine new and modified rows
-      const changedRows = [...newRows, ...modifiedRows];
-
-      if (changedRows.length === 0) {
-        toast.info("No new or modified rows to save.");
+      if (productCodeEmpty && productCodeEmpty?.length > 0) {
+        toast.error("Please fill Product Code mandatory fields");
         setIsSaving(false);
+        setLoading(false);
         return;
       }
 
-      console.log("Changed rows:", changedRows);
+      if (childPartEmpty && childPartEmpty?.length > 0) {
+        toast.error("Please fill Child Part Code mandatory fields");
+        setIsSaving(false);
+        setLoading(false);
+        return;
+      }
 
-      // ✅ Prepare payload
-      const dataToSend = changedRows.map((item) => ({
+      // ✅ Prepare payload - send all rows with proper structure
+      const dataToSend = mappingList.map((item) => ({
+        isUpdate: item.isUpdate,
         productCode: item.productCode,
         childPartCode: Array.isArray(item.childPartId)
           ? item.childPartId
           : (item.childPartId || "").split(",").map((id) => id.trim()),
         tenantId,
         updatedBy: employeeId,
+        status: item.status,
+        branchCode,
       }));
 
       console.log("Sending payload:", dataToSend);
@@ -569,11 +578,11 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       if (response?.data?.responseCode === "200") {
         toast.success(
           response.data.responseDataMessage ||
-            "Mapping data saved successfully!"
+            "Add/Update successful"
         );
         fetchMappingData();
       } else {
-        toast.error("Failed to save records. Check console for details.");
+        toast.error(response.data.responseMessage || "Failed to save records.");
       }
     } catch (error) {
       console.error("Error saving mapping data:", error);
@@ -608,7 +617,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         </div>
 
         {/* 🔹 Filter Section */}
-        {/* <div className="p-3">
+         <div className="p-3">
           <div className="row">
             <div className="col-md-3">
               <label className="form-label fw-bold">Status</label>
@@ -622,7 +631,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               </select>
             </div>
           </div>
-        </div> */}
+        </div> 
 
         {/* 🔹 AG Grid */}
         <div className="card-body p-3 ag-theme-alpine">
@@ -639,23 +648,8 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
             onFirstDataRendered={autoSizeAllColumns}
             onCellValueChanged={(params) => {
               const updatedList = [...mappingList];
-              const rowIndex = params.rowIndex;
-
-              if (rowIndex >= 0 && rowIndex < updatedList.length) {
-                const row = updatedList[rowIndex];
-
-                // Update the specific field that was changed
-                if (params.colDef.field) {
-                  row[params.colDef.field] = params.newValue;
-                }
-
-                // If it's not a new row, mark it as modified
-                if (row.isUpdate !== "0") {
-                  row.isUpdate = "1";
-                }
-
-                setMappingList(updatedList);
-              }
+              updatedList[params.rowIndex] = params.data;
+              setMappingList(updatedList);
             }}
           />
           {loading && (

@@ -2,10 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { AgGridReact } from "ag-grid-react";
 import { PlusOutlined } from "@ant-design/icons";
-// import "ag-grid-enterprise";
-// import { ModuleRegistry } from "ag-grid-community";
-// import { SetFilterModule } from "ag-grid-enterprise";
-// import { DateFilterModule } from "ag-grid-enterprise";
 import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
 import { gettypeMasterdtl } from "../../../services/ChildPartMasterService";
@@ -14,7 +10,6 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 
-// ModuleRegistry.registerModules([SetFilterModule, DateFilterModule]);
 
 const ChildPartMaster = ({ modulesprop, screensprop }) => {
   const [selectedModule, setSelectedModule] = useState("");
@@ -119,7 +114,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
         console.log("rowsToUpdate:", rowsToUpdate);
 
         if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
-          toast.info("Change any one field before saving.");
+          toast.info("No new or modified records found!");
           return;
         }
 
@@ -194,7 +189,7 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
           <span className="ag-icon ag-icon-filter" role="presentation"></span>
         </span>
         <div className="ag-header-cell-label" role="presentation">
-          <span className="ag-header-cell-text">{props.displayName} <span style={{color: 'red'}}>*</span></span>
+          <span className="ag-header-cell-text"><span style={{color: 'red'}}>*</span>{props.displayName}</span>
         </div>
       </div>
     );
