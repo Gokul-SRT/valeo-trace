@@ -109,7 +109,7 @@ const ToolHistoryLog = () => {
     {
       headerName: "Components produced in the last run (in Nos.)",
       field: "usageTillDate",
-      flex: 2,
+      flex: 3,
       sortable: true,
       filter: "agTextColumnFilter",
     },
@@ -169,6 +169,19 @@ const ToolHistoryLog = () => {
   // 🔹 CSV Export
   const handleExport = async () => {
     try {
+      // Get document reference
+      const docResponse = await backendService({
+        requestPath: "getDocumentRefDetails",
+        requestData: {
+          documentName: "Critical Spare Parts List",
+          date: moment().format("YYYY-MM-DD HH:mm:ss"),
+          tenantId,
+          branchCode,
+        },
+      });
+      
+      const docNo = docResponse?.responseCode === "200" ? docResponse.responseDataMessage : "";
+
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Tool History Report");
 
@@ -181,9 +194,22 @@ const ToolHistoryLog = () => {
       worksheet.getColumn(6).width = 20; // Rectified By
 
       // --- Row 1 height for logos ---
-      worksheet.getRow(1).height = 65;
+      worksheet.getRow(2).height = 65;
 
-      // --- Insert Customer Logo in A1 ---
+      // --- Doc No in row 1 ---
+      worksheet.mergeCells('A1:F1');
+      const docNoCell = worksheet.getCell("A1");
+      docNoCell.value = `Doc No: ${docNo}`;
+      docNoCell.font = { bold: true, size: 12 };
+      docNoCell.alignment = { horizontal: "center", vertical: "middle" };
+      docNoCell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+
+      // --- Insert Customer Logo in A2 ---
       const customerLogoResp = await fetch("/pngwing.com.png");
       const customerBlob = await customerLogoResp.blob();
       const customerBuffer = await customerBlob.arrayBuffer();
@@ -191,20 +217,20 @@ const ToolHistoryLog = () => {
         buffer: customerBuffer,
         extension: "png",
       });
-      worksheet.addImage(customerImageId, { tl: { col: 0, row: 0 }, br: { col: 1, row: 1 } });
+      worksheet.addImage(customerImageId, { tl: { col: 0, row: 1 }, br: { col: 1, row: 2 } });
 
-      // --- Merge cells B1:E1 for title ---
-      worksheet.mergeCells('B1:E1');
+      // --- Merge cells B2:E2 for title ---
+      worksheet.mergeCells('B2:E2');
       const toolNo = form.getFieldValue("toolNo");
       const toolDesc = toolData.find(tool => tool.key === toolNo)?.value || toolNo;
       const year = form.getFieldValue("year") ? form.getFieldValue("year").format("YYYY") : "";
 
-      const middlewareCell = worksheet.getCell("B1");
+      const middlewareCell = worksheet.getCell("B2");
 
       // Use rich text for multiple font sizes in the same cell
       middlewareCell.value = {
         richText: [
-          { text: "Tool History Report\n", font: { bold: true, size: 14 } }, // main title
+          { text: "Tool History Card Report\n", font: { bold: true, size: 14 } }, // main title
           { text: `Tool Desc: ${toolDesc} | Year: ${year}`, font: { size: 10 } }, // subtitle smaller
         ],
       };
@@ -217,7 +243,7 @@ const ToolHistoryLog = () => {
         right: { style: "thin" },
       };
 
-      // --- Company Logo in F1 ---
+      // --- Company Logo in F2 ---
       const companyLogoResp = await fetch("/smartrunLogo.png");
       const companyBlob = await companyLogoResp.blob();
       const companyBuffer = await companyBlob.arrayBuffer();
@@ -225,10 +251,10 @@ const ToolHistoryLog = () => {
         buffer: companyBuffer,
         extension: "png",
       });
-      worksheet.addImage(companyImageId, { tl: { col: 5, row: 0 }, br: { col: 6, row: 1 } });
+      worksheet.addImage(companyImageId, { tl: { col: 5, row: 1 }, br: { col: 6, row: 2 } });
 
-      // --- Table header at row 3 ---
-      const startRow = 3;
+      // --- Table header at row 4 ---
+      const startRow = 4;
       const headers = [
         "Date",
         "Components produced in the last run (in Nos.)",
@@ -299,7 +325,7 @@ const ToolHistoryLog = () => {
       {/* 🔸 Tool History Search Card */}
       <Card
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
-        title="Tool History Card"
+        title="Tool History Card Report"
         style={{ marginTop: "20px", borderRadius: "8px" }}
       >
         <Form
@@ -359,7 +385,16 @@ const ToolHistoryLog = () => {
             >
               Submit
             </Button>
-            <Button onClick={handleCancel}>Cancel</Button>
+            <Button 
+              type="primary"
+              onClick={handleCancel}
+              style={{
+                backgroundColor: "#00264d",
+                borderColor: "#00264d",
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </Form>
       </Card>
@@ -370,7 +405,7 @@ const ToolHistoryLog = () => {
           headStyle={{ backgroundColor: "#00264d", color: "white" }}
           title={
             <span>
-              Tool History Log Details{" "}
+              Tool History Card Report Details{" "}
               {selectedTool && selectedYear && (
                 <span style={{ fontSize: "14px", fontWeight: "normal" }}>
                   — Tool Desc: <b>{selectedTool}</b> | Year: <b>{selectedYear}</b> | Customer: <b>Maruti</b>
@@ -380,20 +415,6 @@ const ToolHistoryLog = () => {
           }
           style={{ marginTop: "30px", borderRadius: "8px" }}
         >
-          {/* Export Button */}
-          <div style={{ marginBottom: "10px", textAlign: "left", display: 'block' }}>
-            <Button
-              type="primary"
-              onClick={handleExport}
-              style={{
-                backgroundColor: "#28a745",
-                borderColor: "#28a745",
-              }}
-            >
-              Export to CSV
-            </Button>
-          </div>
-
           <div style={{ position: "relative" }}>
             {isLoading && (
               <div
@@ -414,8 +435,12 @@ const ToolHistoryLog = () => {
                 columnDefs={columnDefs}
                 pagination={true}
                 paginationPageSize={10}
+                paginationPageSizeSelector={[10, 25, 50, 100]}
                 suppressCellFocus={true}
-                domLayout="autoHeight"
+                domLayout="normal"
+                singleClickEdit={true}
+                suppressHorizontalScroll={false}
+                autoSizeStrategy={{ type: 'fitGridWidth' }}
                 overlayNoRowsTemplate="No Data Available"
               />
             </div>

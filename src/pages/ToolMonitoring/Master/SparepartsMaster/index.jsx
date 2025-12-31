@@ -738,7 +738,9 @@ const CriticalSpareMaster = () => {
                   defaultColDef={defaultColDef}
                   pagination
                   paginationPageSize={10}
+                  paginationPageSizeSelector={[10, 25, 50, 100]}
                   domLayout="autoHeight"
+                  singleClickEdit={true}
                   onCellValueChanged={onCellValueChanged}
                   rowSelection="single"
                   suppressClickEdit={false}

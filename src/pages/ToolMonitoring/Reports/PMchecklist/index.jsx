@@ -63,9 +63,11 @@ const PreventiveMaintenanceCheckList = () => {
   const [preventiveQty, setPreventiveQty] = useState(0);
   const [addChecklistData, setAddChecklistData] = useState([]);
   const [currentViewedRecordId, setCurrentViewedRecordId] = useState(null);
+  const [createdBy, setCreatedBy] = useState("");
 
   const tenantId = store.get("tenantId");
   const branchCode = store.get("branchCode");
+  const employeeId = store.get("employeeId");
 
   const columns = [
     { title: "S.No", dataIndex: "SNo", key: "SNo" },
@@ -216,6 +218,7 @@ const PreventiveMaintenanceCheckList = () => {
       setShowViewChecklist(true);
       setShowDetails(false);
       setCurrentViewedRecordId(record.logId); // Store the record ID for export
+      setCreatedBy(record.employeeName); // Store the created by information
 
       const response = await backendService({
         requestPath: "getViewPMChecklistDtl",
@@ -305,6 +308,7 @@ const PreventiveMaintenanceCheckList = () => {
   const handleAddChecklist = () => {
     setShowAddChecklist(true);
     setShowDetails(false);
+    setShowViewChecklist(false);
     addForm.resetFields();
     setAddChecklistData([]);
     setOperation("");
@@ -516,6 +520,7 @@ const PreventiveMaintenanceCheckList = () => {
         customerId: customer,
         tenantId,
         branchCode,
+        employeeId,
         characteristicList: addChecklistData.map((item) => ({
           characteristicId: item.characteristicId,
           observedReading: item.observed,
@@ -549,6 +554,7 @@ const PreventiveMaintenanceCheckList = () => {
       const payload = {
         tenantId,
         branchCode,
+        employeeId,
         characteristicList: addChecklistData.map((item) => ({
           toolPmLogId: item.toolPmLogId, // REQUIRED for update
           observedReading: item.observed,
@@ -563,9 +569,13 @@ const PreventiveMaintenanceCheckList = () => {
       });
 
       if (response?.responseCode === "200") {
-        // Close view card
+        toast.success("Add/Update successful");
+        // Close view card and show summary
         setShowViewChecklist(false);
+        setShowDetails(true);
         setIsEditable(false);
+      } else {
+        toast.error("Update failed");
       }
     } catch (error) {
       console.error("Update PM Checklist Error:", error);
@@ -623,15 +633,11 @@ const PreventiveMaintenanceCheckList = () => {
   }, [selectedLineAdd]);
 
   const agColumns = [
-    { headerName: "S.No", field: "sno", width: 90 },
-    { headerName: "Line", field: "lineMstDescription", flex: 1 },
-    { headerName: "Tool", field: "toolDesc", flex: 1 },
-    { headerName: "Product", field: "productDescription", flex: 1 },
-    { headerName: "Customer", field: "customerName", flex: 1 },
     { 
       headerName: "Date", 
       field: "createdDate", 
       flex: 1,
+      filter: false,
       cellRenderer: (params) => {
         if (params.value) {
           const date = dayjs(params.value);
@@ -640,6 +646,12 @@ const PreventiveMaintenanceCheckList = () => {
         return params.value;
       },
     },
+    { headerName: "S.No", field: "sno", width: 90 },
+    { headerName: "Line", field: "lineMstDescription", flex: 1 },
+    { headerName: "Tool", field: "toolDesc", flex: 1 },
+    { headerName: "Product", field: "productDescription", flex: 1 },
+    { headerName: "Customer", field: "customerName", flex: 1 },
+    { headerName: "Created By", field: "employeeName", flex: 1 },
     {
       headerName: "Action",
       field: "action",
@@ -665,6 +677,12 @@ const PreventiveMaintenanceCheckList = () => {
       filter: false,
     },
   ];
+
+  const defaultColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+  };
 
   const exportToFormattedExcel = async () => {
     let reportId = currentViewedRecordId;
@@ -869,6 +887,7 @@ const PreventiveMaintenanceCheckList = () => {
               <AgGridReact
                 columnDefs={agColumns}
                 rowData={searchResults}
+                defaultColDef={defaultColDef}
                 domLayout="autoHeight"
                 singleClickEdit={true}
                 pagination={true}

@@ -24,6 +24,7 @@ const ToolChange = () => {
   const [productDataList, setProductDataList] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [historyData, setHistoryData] = useState([])
+  const [showMinus, setShowMinus] = useState(false)
   const tenantId = store.get('tenantId')
   const branchCode = store.get('branchCode')
   const empId = store.get('employeeId')
@@ -53,23 +54,29 @@ const ToolChange = () => {
 
   const getProductDropdown = useCallback(async () => {
     try {
-      const response = await ProductDropdown();
+      const response = await backendService({
+        requestPath: "getToolModelDropdown",
+        requestData: {
+          tenantId,
+          branchCode,
+          toolNo: form.getFieldValue("toolNo")
+        }
+      });
       console.log(response)
-      let returnData = [];
-      if (response) {
-        returnData = response;
-        const options = returnData.map(item => ({
-          productCode: item.productCode,
-          productDesc: item.productDesc,
+      if (response?.responseCode === "200" && response.responseData) {
+        const options = response.responseData.map(item => ({
+          productCode: item,
+          productDesc: item,
         }));
         setProductDataList(options);
-        return returnData;
+        return response.responseData;
       } else {
-        console.warn("LineMstdropdown returned no data.");
+        console.warn("getToolModelDropdown returned no data.");
+        setProductDataList([]);
         return [];
       }
     } catch (error) {
-      console.error("Error fetching line dropdown data:", error);
+      console.error("Error fetching product dropdown data:", error);
       setProductDataList([]);
     }
   }, []);
@@ -137,7 +144,7 @@ const ToolChange = () => {
       })
       if (response) {
         if (response.responseCode === '200') {
-          toast.success(response.responseMessage)
+          toast.success("Update Successful")
         }else if (response.responseCode === '409'){
           toast.warning(response.responseMessage)
         }else{
@@ -174,8 +181,14 @@ const ToolChange = () => {
               operation: updatedData.operationDesc,
               maxUsage: updatedData.maxUseage || '',
               usageTillDate: updatedData.usageTillDate || '0',
-              remainUseage: updatedData.remainUseage == null ? updatedData.maxUseage : updatedData.remainUseage
+              remainUseage: (() => {
+                const usage = Number(updatedData.usageTillDate) || 0;
+                const max = Number(updatedData.maxUseage) || 0;
+                const remaining = updatedData.remainUseage == null ? updatedData.maxUseage : updatedData.remainUseage;
+                return usage > max ? `-${remaining}` : remaining;
+              })()
             });
+            
             getProductDropdown()
           }
         }else{
