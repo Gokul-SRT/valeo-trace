@@ -284,7 +284,7 @@ const Picklist = () => {
         return dayjs(text).format("DD-MMM-YYYY");
       },
     },
-    { title: "Shift", dataIndex: "shift", key: "shift" },
+   // { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
     { title: "Partially Issued Qty", dataIndex: "partialQty", key: "partialQty" },
   ];
@@ -317,7 +317,7 @@ const Picklist = () => {
         return dayjs(text).format("DD-MMM-YYYY");
       },
     },
-    { title: "Shift", dataIndex: "shift", key: "shift" },
+   // { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
   ];
 
@@ -336,7 +336,7 @@ const Picklist = () => {
         return dayjs(text).format("DD-MMM-YYYY");
       },
     },
-    { title: "Shift", dataIndex: "shift", key: "shift" },
+   // { title: "Shift", dataIndex: "shift", key: "shift" },
     { title: "Status", dataIndex: "status", key: "status" },
   ];
 
