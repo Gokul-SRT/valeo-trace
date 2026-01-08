@@ -135,8 +135,9 @@ const ChildPartMaster = ({ modulesprop, screensprop }) => {
             }
 
     try {
-     
-      const updatedList = masterList.map((item) => ({
+      const combinedList = [...rowsToInsert,...rowsToUpdate];
+      console.log("combinedList",combinedList);
+      const updatedList = combinedList.map((item) => ({
         isUpdate: item.isUpdate,
         childPartCode: item.childPartCode,
         childPartDesc: item.childPartDesc,

@@ -257,12 +257,12 @@ const ChildPartToOperationMaster = ({ modulesprop, screensprop }) => {
       valueFormatter: (params) => {
         if (!params.value) return "";
         const found = childPartOptions.find((p) => p.childPartId === params.value);
-        return found ? found.childPartDesc : params.value;
+        return found ? `${found.childPartCode}-${found.childPartDesc}`: params.value;
       },
       filter: "agTextColumnFilter",
       filterValueGetter: (params) => {
         const found = childPartOptions.find((p) => p.childPartId === params.data.childPartId);
-        return found ? found.childPartDesc : "";
+        return found ? `${found.childPartCode}-${found.childPartDesc}`: "";
       },
     },
 

@@ -200,7 +200,7 @@ const PacketQtyMaster = ({ modulesprop, screensprop }) => {
         const found = childPartOptions.find(
           (p) => p.childPartId === params.value
         );
-        return found ? found.childPartDesc : params.value;
+        return found ? `${found.childPartCode}-${found.childPartDesc}`: params.value;
       },
       filter: "agTextColumnFilter",
       filterValueGetter: (params) => {

@@ -236,7 +236,7 @@ const OperationMaster = ({ modulesprop, screensprop }) => {
         console.log("rowsToUpdate:", rowsToUpdate);
 
         if (rowsToInsert.length === 0 && rowsToUpdate.length === 0) {
-          toast.info("Change any one field before saving.");
+          toast.info("No new or modified records found!");
           return;
         }
 

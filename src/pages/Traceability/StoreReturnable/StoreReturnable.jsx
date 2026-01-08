@@ -23,6 +23,7 @@ import { toast } from "react-toastify";
 import serverApi from "../../../serverAPI";
 import store from "store";
 import QRModal from "../../Traceability/StoreReturnable/QrCodeModel";
+import Loader from "../../../Utills/Loader";
 
 const { Option } = Select;
 
@@ -36,6 +37,7 @@ const StoreReturnable = () => {
   const [childPartCode, setChildPartCode] = useState(null);
 
   const [remainQty, setRemainQty] = useState("");
+  const [balanceQty, setBalanceQty] = useState(""); // New state for balance quantity
   const [showTable, setShowTable] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQrData, setSelectedQrData] = useState("");
@@ -66,6 +68,7 @@ const StoreReturnable = () => {
     setPickListCode(null);
     setChildPartCode(null);
     setRemainQty("");
+    setBalanceQty(""); // Reset balance qty
     setRawScanned("");
     setChildPartDesc("");
     setShowTable(false);
@@ -106,11 +109,14 @@ const StoreReturnable = () => {
   };
   const fetchChildPartByPicklist = async (plsCode) => {
     try {
-      const response = await serverApi.post("getChildPartDropDownBypicklistCode", {
-        picklistCode: plsCode,
-        tenantId,
-        branchCode,
-      });
+      const response = await serverApi.post(
+        "getChildPartDropDownBypicklistCode",
+        {
+          picklistCode: plsCode,
+          tenantId,
+          branchCode,
+        }
+      );
       const res = response.data;
       if (res.responseCode === "200" && Array.isArray(res.responseData)) {
         const options = res.responseData.map((item) => ({
@@ -122,17 +128,21 @@ const StoreReturnable = () => {
         if (options.length === 1) {
           setChildPartCode(options[0].value);
           setChildPartDesc(options[0].desc);
+          // Fetch balance qty when only one child part is available
+          fetchBalanceQty(plsCode, options[0].value);
         }
       } else {
         setChildPartMastOptions([]);
         setChildPartCode(null);
         setChildPartDesc("");
+        setBalanceQty(""); // Clear balance qty
         toast.warning("No Child Part Found");
       }
     } catch (err) {
       toast.error("Error loading child parts");
     }
   };
+
   const fetchChildPartDescription = async (childCode) => {
     try {
       const response = await serverApi.post("getChildPartDescByChildpart", {
@@ -150,6 +160,36 @@ const StoreReturnable = () => {
       }
     } catch (error) {
       toast.error("Error loading child part description");
+    }
+  };
+
+  // Fetch balance quantity from backend API
+  const fetchBalanceQty = async (plsCode, childPartCode) => {
+    try {
+      const response = await serverApi.post("getPendingCount", {
+        pickListCode: plsCode,
+        childPartCode: childPartCode,
+        tenantId: tenantId,
+        branchCode: branchCode,
+      });
+      const res = response.data;
+      if (
+        res.responseCode === "200" &&
+        Array.isArray(res.responseData) &&
+        res.responseData.length > 0
+      ) {
+        const balanceQty =
+          res.responseData[0].balanceQty || res.responseData[0].BALANCE_QTY;
+        setBalanceQty(balanceQty ? balanceQty.toString() : "0");
+        toast.success("Balance quantity loaded");
+      } else {
+        setBalanceQty("0");
+        toast.warning("No balance quantity found");
+      }
+    } catch (error) {
+      console.error("Error fetching balance quantity:", error);
+      setBalanceQty("0");
+      toast.error("Failed to load balance quantity");
     }
   };
 
@@ -195,16 +235,23 @@ const StoreReturnable = () => {
   const callStoreReturnableInsertAPI = async () => {
     try {
       const scannedValue = form.getFieldValue("childPartScan");
+
+      console.log(newCode,"newCode");
+      console.log(scannedValue,"scannedValue");
       const payload = {
         plsCode: pickListCode,
         childPartCode: childPartCode || "",
         childPartDesc: childPartDesc,
-        childPartScan: returnChildPart === "Unused Qty" ? scannedValue : newCode,
+        childPartScan:
+          returnChildPart === "Unused Qty" ? scannedValue : newCode,
         returnChildPart: returnChildPart,
         tenantId: tenantId,
         branchCode: branchCode,
       };
-      const response = await serverApi.post("getStoreReturnableScanInsert", payload);
+      const response = await serverApi.post(
+        "getStoreReturnableScanInsert",
+        payload
+      );
       const res = response.data;
       if (res.responseCode === "200") {
         setQrModalVisible(true);
@@ -229,12 +276,16 @@ const StoreReturnable = () => {
         plsCode: pickListCode,
         childPartCode: childPartCode || "",
         childPartDesc: "",
-        childPartScan: returnChildPart === "Unused Qty" ? scannedValue : usedinputscanvalue,
+        childPartScan:
+          returnChildPart === "Unused Qty" ? scannedValue : usedinputscanvalue,
         returnChildPart: returnChildPart,
         tenantId: tenantId,
         branchCode: branchCode,
       };
-      const response = await serverApi.post("getStoreReturnableScanInsert", payload);
+      const response = await serverApi.post(
+        "getStoreReturnableScanInsert",
+        payload
+      );
       const res = response.data;
       if (res.responseCode === "200") {
         toast.success("Inserted Successfully");
@@ -253,12 +304,15 @@ const StoreReturnable = () => {
     let start = 42;
     let end = 50;
     const valueString = fixLength(value, 8);
-    let result = rawScanned.substring(0, start) + valueString + rawScanned.substring(end);
+    let result =
+      rawScanned.substring(0, start) + valueString + rawScanned.substring(end);
     setReplaceqrcode(result);
   };
   const handletPickListCode = (value) => {
     setPickListCode(value);
     fetchChildPartByPicklist(value);
+    // Clear balance qty when picklist changes
+    setBalanceQty("");
   };
   function fixLength(value, length) {
     return value.toString().padEnd(length, " ");
@@ -266,21 +320,15 @@ const StoreReturnable = () => {
   const handleChildPartCode = (value) => {
     setChildPartCode(value);
     fetchChildPartDescription(value);
+
+    // Fetch balance quantity when child part is selected
+    if (pickListCode && value) {
+      fetchBalanceQty(pickListCode, value);
+    } else {
+      setBalanceQty("");
+    }
   };
-  // useEffect(() => {
-  //   if (!searchText) {
-  //     setFilteredData(dataSource);
-  //     return;
-  //   }
-  //   setFilteredData(
-  //     dataSource.filter((r) =>
-  //       Object.values(r)
-  //         .join(" ")
-  //         .toLowerCase()
-  //         .includes(searchText.toLowerCase())
-  //     )
-  //   );
-  // }, [searchText]);
+
   const columns = [
     { title: "Date", dataIndex: "date", width: 120 },
     { title: "Product", dataIndex: "product", width: 150 },
@@ -288,35 +336,6 @@ const StoreReturnable = () => {
     { title: "Work Order", dataIndex: "workOrder", width: 130 },
     { title: "Child Part", dataIndex: "childPart", width: 200 },
     { title: "Quantity", dataIndex: "quantity", width: 100, align: "center" },
-    // {
-    //   title: "Action",
-    //   width: 120,
-    //   align: "center",
-    //   render: (_, record) => (
-    //     <Dropdown
-    //       menu={{
-    //         items: [
-    //           {
-    //             key: "1",
-    //             label: "View QR Code",
-    //             icon: <EyeOutlined />,
-    //             onClick: () => handleViewQR(record.qrCode),
-    //           },
-    //           {
-    //             key: "2",
-    //             label: "Download QR Code",
-    //             icon: <DownloadOutlined />,
-    //             onClick: () => handleViewQR(record.qrCode),
-    //           },
-    //         ],
-    //       }}
-    //     >
-    //       <Button type="primary" style={{ backgroundColor: "#00264d" }}>
-    //         Actions
-    //       </Button>
-    //     </Dropdown>
-    //   ),
-    // },
   ];
   // Backend columns
   const returnableColumns = [
@@ -325,53 +344,8 @@ const StoreReturnable = () => {
     { title: "Return Child Part", dataIndex: "returnChildPart", width: 120 },
     { title: "Child Part Desc", dataIndex: "childPartDesc", width: 180 },
     { title: "Child Part Scan", dataIndex: "childPartScan", width: 320 },
-    // {
-    //   title: "Action",
-    //   width: 100,
-    //   align: "center",
-    //   render: (_, record) => (
-    //     <Dropdown
-    //       menu={{
-    //         items: [
-    //           {
-    //             key: "1",
-    //             label: "View QR Code",
-    //             icon: <EyeOutlined />,
-    //             onClick: () => handleViewQR(record.qrCode),
-    //           },
-    //         ],
-    //       }}
-    //     >
-    //       <Button type="primary" style={{ backgroundColor: "#00264d" }}>
-    //         Actions
-    //       </Button>
-    //     </Dropdown>
-    //   ),
-    // },
   ];
   const [form] = Form.useForm();
-
-  // Sample table data (optional)
-  // const dataSource = [
-  //   {
-  //     key: 1,
-  //     date: moment().format("YYYY-MM-DD"),
-  //     product: "MSIL Z12E 200 OE",
-  //     line: "Disc Assy",
-  //     workOrder: "WO-001",
-  //     childPart: "CF72760",
-  //     quantity: "1,000",
-  //   },
-  //   {
-  //     key: 2,
-  //     date: moment().format("YYYY-MM-DD"),
-  //     product: "MSIL Z12E 200 OE",
-  //     line: "Disc Assy",
-  //     workOrder: "WO-002",
-  //     childPart: "CF72760HF",
-  //     quantity: 75,
-  //   },
-  // ].map((r) => ({ ...r, qrCode: JSON.stringify(r) }));
 
   const handleViewQR = (qrData) => {
     setSelectedQrData(qrData);
@@ -424,10 +398,14 @@ const StoreReturnable = () => {
                 <Select
                   placeholder="Select Return Type"
                   value={returnChildPart}
-                  onChange={(v) => {setReturnChildPart(v);}}
+                  onChange={(v) => {
+                    setReturnChildPart(v);
+                  }}
                 >
                   {returnChildPartOptions.map((o) => (
-                    <Option key={o.id} value={o.name}>{o.name}</Option>
+                    <Option key={o.id} value={o.name}>
+                      {o.name}
+                    </Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -465,7 +443,9 @@ const StoreReturnable = () => {
                       optionFilterProp="children"
                     >
                       {childPartMastOptions.map((cp) => (
-                        <Option key={cp.value} value={cp.value}>{cp.value}</Option>
+                        <Option key={cp.value} value={cp.value}>
+                          {cp.value}
+                        </Option>
                       ))}
                     </Select>
                   </Form.Item>
@@ -476,6 +456,16 @@ const StoreReturnable = () => {
                       placeholder="Child Part Description"
                       value={childPartDesc}
                       readOnly
+                    />
+                  </Form.Item>
+                </Col>
+                {/* NEW: Balance Qty Column */}
+                <Col xs={24} sm={12} md={6} lg={5}>
+                  <Form.Item label="Balance Qty *">
+                    <Input
+                      placeholder="Balance Quantity"
+                      value={balanceQty}
+                      disabled
                     />
                   </Form.Item>
                 </Col>
@@ -503,7 +493,10 @@ const StoreReturnable = () => {
             {returnChildPart === "Unused Qty" && (
               <>
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <Form.Item label="Pick List Code *" style={{ marginBottom: 0 }}>
+                  <Form.Item
+                    label="Pick List Code *"
+                    style={{ marginBottom: 0 }}
+                  >
                     <Select
                       placeholder="Select Pick List Code"
                       value={pickListCode}
@@ -520,7 +513,11 @@ const StoreReturnable = () => {
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <Form.Item name="childPartScan" label="Child Part Scan *" style={{ marginBottom: 0 }}>
+                  <Form.Item
+                    name="childPartScan"
+                    label="Child Part Scan *"
+                    style={{ marginBottom: 0 }}
+                  >
                     <Input placeholder="Scan Child Part" />
                   </Form.Item>
                 </Col>
@@ -587,42 +584,39 @@ const StoreReturnable = () => {
           </Form.Item>
         </Form>
       </Card>
-      {/* {showTable && (
-        <Card
-          title="Store Returnable Details"
-          headStyle={{ backgroundColor: "#00264d", color: "white" }}
-        >
-          <div style={{ marginBottom: 16, textAlign: "right" }}>
-            <Input.Search
-              placeholder="Search..."
-              value={searchText}
-              allowClear
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 200 }}
-            />
-          </div>
-          <Table
-            columns={columns}
-            dataSource={filteredData}
-            pagination={{ pageSize: 5 }}
-            bordered
-            scroll={{ x: 1000 }}
-          />
-        </Card>
-      )} */}
       {/* BACKEND DATA TABLE BELOW */}
       <Card
         title="Store Returnable Retrieval Details"
         headStyle={{ backgroundColor: "#00264d", color: "white" }}
       >
-        <Table
-          columns={returnableColumns}
-          dataSource={retrievedData}
-          loading={retrievalLoading}
-          pagination={{ pageSize: 6 }}
-          bordered
-          scroll={{ x: 1200 }}
-        />
+        <div style={{ position: "relative" }}>
+          <Table
+            columns={returnableColumns}
+            dataSource={retrievedData}
+            // loading={retrievalLoading}
+            pagination={{ pageSize: 6 }}
+            bordered
+            scroll={{ x: 1200 }}
+          />
+          {retrievalLoading && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(255,255,255,0.7)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 10,
+              }}
+            >
+              <Loader />
+            </div>
+          )}
+        </div>
       </Card>
       <Modal
         title="QR Code Details"

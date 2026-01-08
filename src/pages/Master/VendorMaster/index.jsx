@@ -16,6 +16,8 @@ const VendorMaster = ({onCancel}) => {
   const [originalList, setOriginalList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const gridRef = useRef(null);
+  const [fullList, setFullList] = useState([]);
+
 
   const autoSizeAllColumns = (params) => {
     if (!params.columnApi || !params.columnApi.getAllColumns) return;
@@ -56,9 +58,9 @@ const VendorMaster = ({onCancel}) => {
           // Convert status to string for consistency with checkbox
           status: item.status,
           isUpdate: 1,
-          changed: false
+          // changed: false
         }));
-
+        setFullList(apiData);
         setMasterList(apiData);
         setOriginalList(structuredClone(apiData)); // Use structuredClone like LineMaster
       } else {
@@ -77,23 +79,23 @@ const VendorMaster = ({onCancel}) => {
   const onCellValueChanged = (params) => {
     if (!params.data) return;
     
-    params.data.changed = true;
+    // params.data.changed = true;
     setMasterList([...masterList]);
   };
 
   // Function to check if there are any changes
-  const hasChanges = () => {
-    // Normalize status values for comparison
-    const normalizeStatus = (list) => list.map(item => ({
-      ...item,
-      status: item.status === "1" || item.status === 1 || item.status === true ? "1" : "0"
-    }));
+  // const hasChanges = () => {
+  //   // Normalize status values for comparison
+  //   const normalizeStatus = (list) => list.map(item => ({
+  //     ...item,
+  //     status: item.status === "1" || item.status === 1 || item.status === true ? "1" : "0"
+  //   }));
 
-    const normMaster = normalizeStatus(masterList);
-    const normOriginal = normalizeStatus(originalList);
+  //   const normMaster = normalizeStatus(masterList);
+  //   const normOriginal = normalizeStatus(originalList);
     
-    return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
-  };
+  //   return JSON.stringify(normMaster) !== JSON.stringify(normOriginal);
+  // };
 
   const createorUpdate = async () => {
   
@@ -117,6 +119,29 @@ const VendorMaster = ({onCancel}) => {
       setIsLoading(false);
       return;
     }
+
+
+    const invalidVendorCode = masterList.some(
+  (item) =>
+    item.vendorCode &&
+    (
+      item.vendorCode.startsWith("-") ||         
+      !/^[A-Za-z0-9]+$/.test(item.vendorCode)      
+    ) ||
+      item.vendorName &&
+    (  item.vendorCode.startsWith("-") ||
+      !/^[A-Za-z0-9]+$/.test(item.vendorName)     
+    )
+);
+
+if (invalidVendorCode) {
+  toast.error(
+    "Invalid Vendor Code found. Negative values and special characters are not allowed."
+  );
+  setIsLoading(false);
+  return;
+}
+
 
     // 🔹 Duplicate vendor code check
     const codes = masterList.map((i) => i.vendorCode.trim());
@@ -145,7 +170,7 @@ const VendorMaster = ({onCancel}) => {
     });
 
     if (rowsToSave.length === 0) {
-      toast.error("No changes to save");
+      toast.error("No new or modified records found!");
       setIsLoading(false);
       return;
     }
@@ -166,7 +191,9 @@ const VendorMaster = ({onCancel}) => {
     );
 console.log("response",response);
     if (response.data.responseCode === "200") {
-      toast.success("Vendor details saved successfully");
+      toast.success("Add/Update successfully!");
+      setFullList(structuredClone(masterList));
+       setOriginalList(structuredClone(masterList));
       fetchData();
     } else if (response.data.responseCode === "DUBLICATE") {
       toast.error("Duplicate vendor code found!");
@@ -308,18 +335,18 @@ console.log("response",response);
   };
 
   const handleFilterChange = (value) => {
-    if (!value || value === "GetAll") {
-      setMasterList(originalList);
-    } else if (value === "Active") {
-      setMasterList(originalList.filter((item) => 
-        item.status === "1" || item.status === 1
-      ));
-    } else if (value === "Inactive") {
-      setMasterList(originalList.filter((item) => 
-        item.status === "0" || item.status === 0
-      ));
-    }
-  };
+  if (value === "GetAll") {
+    setMasterList(fullList);
+  } else if (value === "Active") {
+    setMasterList(fullList.filter(item =>
+      item.status === "1" || item.status === 1
+    ));
+  } else if (value === "Inactive") {
+    setMasterList(fullList.filter(item =>
+      item.status === "0" || item.status === 0
+    ));
+  }
+};
 
  const onExportExcel = async () => {
   try {

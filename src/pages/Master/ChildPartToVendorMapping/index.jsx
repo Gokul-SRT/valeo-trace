@@ -270,11 +270,11 @@ const ChildPartToVendorMapping = ({ modulesprop, screensprop }) => {
       valueFormatter: (params) => {
         if (!params.value) return "";
         const option = vendorOptions.find((item) => item.vendorId === params.value);
-        return option ? `${option.vendorCode}-${option.vendorName}` : params.data.vendorDesc || params.value;
+        return option ? `${option.vendorCode}-${option.vendorName}` : params.value;
       },
       filterValueGetter: (params) => {
         const option = vendorOptions.find((item) => item.vendorId === params.data.vendorId);
-        return option ? `${option.vendorCode}-${option.vendorName}` : params.data.vendorDesc || "";
+        return option ? `${option.vendorCode}-${option.vendorName}` : "";
       },
     },
     {

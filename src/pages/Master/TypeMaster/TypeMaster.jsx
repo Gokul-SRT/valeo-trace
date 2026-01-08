@@ -331,7 +331,9 @@ if (invalidTypeDesc) {
         return;
       }
 
-      const updatedList = masterList.map((item) => ({
+        const combinedList = [...rowsToInsert,...rowsToUpdate];
+      
+      const updatedList = combinedList.map((item) => ({
         isUpdate: item.isUpdate,
         typeCode: item.typeCode,
         typeDesc: item.typeDescription,

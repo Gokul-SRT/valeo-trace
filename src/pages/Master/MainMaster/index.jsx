@@ -15,6 +15,7 @@ import VendorMaster from "../../Master/VendorMaster";
 import ChildPartToVendorMapping from "../ChildPartToVendorMapping";
 import SubAssyMaster from "../SubAssyMaster";
 import { Select } from "antd";
+import { toast } from "react-toastify";
 
 const Traceability = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
@@ -75,13 +76,13 @@ const Traceability = () => {
     e.preventDefault();
 
     if (!selectedScreen) {
-      alert("Please select a screen first!");
+      toast.info("Please select a screen first!");
       return;
     }
 
     const component = getComponentByScreenName(selectedScreen);
     if (!component) {
-      alert("This screen component is not available yet!");
+      toast.info("This screen component is not available yet!");
       return;
     }
 
@@ -116,6 +117,7 @@ const Traceability = () => {
                   onChange={setSelectedScreen}
                   style={{ width: "100%" }}
                   size="large"
+                  
                 >
                   {Object.values(moduleScreens)
                     .flat()

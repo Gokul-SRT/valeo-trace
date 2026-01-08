@@ -365,7 +365,7 @@ const SubAssyMaster = ({ modulesprop, screensprop }) => {
 
       // Check if there are any changes
       if (!hasChanges()) {
-        toast.error("Change any one field before saving.");
+        toast.error("No new or modified records found!");
         setLoading(false);
         return;
       }
@@ -497,7 +497,7 @@ const SubAssyMaster = ({ modulesprop, screensprop }) => {
       // Handle response
       if (response.data && response.data.responseCode === "200") {
         toast.success(
-          response.data.responseDataMessage || "Add/Update successful"
+           "Add/Update successful"
         );
         await loadOptionsAndData();
       } else if (response.data && response.data.responseMessage) {

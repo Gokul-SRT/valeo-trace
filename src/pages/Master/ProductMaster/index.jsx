@@ -12,6 +12,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import Loader from "../../../Utills/Loader";
+import store from "store";
 
 // ModuleRegistry.registerModules([
 //   SetFilterModule,
@@ -33,9 +34,10 @@ const ProductMaster = ({ modulesprop, screensprop, onCancel }) => {
   const [currentFilter, setCurrentFilter] = useState("GetAll");
   const [loading, setLoading] = useState(false);
 
-  const tenantId = JSON.parse(localStorage.getItem("tenantId"));
-  const branchCode = JSON.parse(localStorage.getItem("branchCode"));
-  const employeeId = JSON.parse(localStorage.getItem("empID"));
+
+  const tenantId = store.get("tenantId");
+  const branchCode = store.get('branchCode');
+  const employeeId = store.get("employeeId");
 
   // ✅ Fetch Group Dropdown
   useEffect(() => {
@@ -296,6 +298,7 @@ const ProductMaster = ({ modulesprop, screensprop, onCancel }) => {
                 })
                 .join(", "),
               isUpdate: 1,
+              changed: true,
             }
           : item
       );
@@ -608,7 +611,10 @@ const hasChanges = () => {
         return;
       }
 
-      const updatedList = masterList.map((item) => {
+      const combinedList = [...rowsToInsert,...rowsToUpdate];
+
+
+      const updatedList = combinedList.map((item) => {
         const matchedGroup = groupDropdown.find(
           (grp) => grp.grpCode === item.groupCode
         );

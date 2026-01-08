@@ -42,6 +42,7 @@ const MultiSelectEditor = forwardRef((props, ref) => {
 
   const handleChange = (values) => {
     setSelectedValues(values);
+    props.data.changed = true;
     props.data[props.colDef.field] = values; // ✅ store as array
   };
 
@@ -67,7 +68,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
   const [productData, setProductData] = useState([]);
   const [childPartData, setChildPartData] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
-  const mappingGridRef = useRef(null);
+  const gridRef = useRef(null);
   const [currentFilter, setCurrentFilter] = useState("GetAll");
   const [loading, setLoading] = useState(false);
 
@@ -254,7 +255,9 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       cellEditor: MultiSelectEditor,
       cellEditorParams: { values: childPartData },
       valueFormatter: (params) => {
+        // params.data.changed = true;
         if (!params.value) return "";
+        console.log(params, "params in valueFormatter");
         const keys = Array.isArray(params.value)
           ? params.value
           : typeof params.value === "string"
@@ -268,10 +271,33 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
           .join(", ");
       },
       valueSetter: (params) => {
-        params.data.childPartId = params.newValue;
+        const newValue = params.newValue?.trim();
+
+        // Mandatory check
+        if (!newValue) {
+          toast.error("Product Code is required!");
+          return false;
+        }
+
+        // Duplicate check (exclude same row)
+        const isDuplicate = mappingList.some(
+          (item, index) =>
+            index !== params.node.rowIndex &&
+            item.productCode &&
+            item.productCode.toString().toLowerCase() === newValue.toLowerCase()
+        );
+
+        if (isDuplicate) {
+          toast.error(`"${newValue}" already exists!`);
+          return false; // ❌ no change
+        }
+
+        // Set value
+        params.data.productCode = newValue;
         params.data.changed = true;
         return true;
       },
+
       headerComponent: RequiredHeader,
     },
     {
@@ -303,19 +329,21 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
 
     // Check for empty rows before adding new one
     const emptyRows = mappingList.filter(
-      (item) => !item.productCode && (!item.childPartId || item.childPartId.length === 0)
+      (item) =>
+        !item.productCode &&
+        (!item.childPartId || item.childPartId.length === 0)
     );
 
     if (emptyRows && emptyRows?.length === 0) {
       const updated = [...mappingList, emptyRow];
       setMappingList(updated);
-      
+
       setTimeout(() => {
-        const api = mappingGridRef.current?.api;
+        const api = gridRef.current?.api;
         if (api && api.paginationGetTotalPages) {
           const totalPages = api.paginationGetTotalPages();
           api.paginationGoToPage(Math.max(0, totalPages - 1));
-          
+
           setTimeout(() => {
             const lastRowIndex = updated.length - 1;
             // Start editing first cell (productCode)
@@ -359,7 +387,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       const worksheet = workbook.addWorksheet("Product Child Part Mapping");
 
       // ===== Column Widths =====
-      const columnWidths = [30, 50,20];
+      const columnWidths = [30, 50, 20];
       columnWidths.forEach((w, i) => {
         worksheet.getColumn(i + 1).width = w;
       });
@@ -388,7 +416,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       // ===== Title Cell =====
       worksheet.mergeCells("B1");
       const titleCell = worksheet.getCell("B1");
-      titleCell.value = `Product to Child Part Mapping Report\nGenerated On: ${moment().format(
+      titleCell.value = `Product to Child Part Mapping \nGenerated On: ${moment().format(
         "DD/MM/YYYY HH:mm:ss"
       )}`;
       titleCell.font = { bold: true, size: 14, color: { argb: "FF00264D" } };
@@ -424,11 +452,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
 
       // ===== Header Row =====
       const startRow = 2;
-      const headers = [
-        "Product Code",
-        "Child Part Codes",
-        "Status",
-      ];
+      const headers = ["Product Code", "Child Part Codes", "Status"];
 
       const headerRow = worksheet.getRow(startRow);
       headers.forEach((header, idx) => {
@@ -510,16 +534,17 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
 
     try {
       // Stop any ongoing editing
-      mappingGridRef.current?.api?.stopEditing();
+      gridRef.current?.api?.stopEditing();
 
       // Find new rows (isUpdate === "0" or 0)
       const rowsToInsert = mappingList.filter(
         (row) => row.isUpdate === "0" || row.isUpdate === 0
       );
-      
+
       // Find modified rows (changed === true and not new rows)
       const rowsToUpdate = mappingList.filter(
-        (row) => row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0
+        (row) =>
+          row.changed === true && row.isUpdate !== "0" && row.isUpdate !== 0
       );
 
       console.log("masterList:", mappingList);
@@ -556,7 +581,9 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
       }
 
       // ✅ Prepare payload - send all rows with proper structure
-      const dataToSend = mappingList.map((item) => ({
+
+      const combinedList = [...rowsToInsert,...rowsToUpdate];
+      const dataToSend = combinedList.map((item) => ({
         isUpdate: item.isUpdate,
         productCode: item.productCode,
         childPartCode: Array.isArray(item.childPartId)
@@ -577,12 +604,11 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
 
       if (response?.data?.responseCode === "200") {
         toast.success(
-          response.data.responseDataMessage ||
-            "Add/Update successful"
+           "Add/Update successful"
         );
         fetchMappingData();
       } else {
-        toast.error(response.data.responseMessage || "Failed to save records.");
+        toast.error("Failed to save records.");
       }
     } catch (error) {
       console.error("Error saving mapping data:", error);
@@ -617,7 +643,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
         </div>
 
         {/* 🔹 Filter Section */}
-         <div className="p-3">
+        <div className="p-3">
           <div className="row">
             <div className="col-md-3">
               <label className="form-label fw-bold">Status</label>
@@ -631,12 +657,12 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               </select>
             </div>
           </div>
-        </div> 
+        </div>
 
         {/* 🔹 AG Grid */}
         <div className="card-body p-3 ag-theme-alpine">
           <AgGridReact
-            ref={mappingGridRef}
+            ref={gridRef}
             rowData={mappingList}
             columnDefs={mappingColumnDefs}
             defaultColDef={defaultColDef}
@@ -651,6 +677,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               updatedList[params.rowIndex] = params.data;
               setMappingList(updatedList);
             }}
+            overlayNoRowsTemplate="<span style='padding:10px; font-weight:600; color:#666;'>No data available</span>"
           />
           {loading && (
             <div
@@ -688,7 +715,7 @@ const ProductChildPartMapping = ({ modulesprop, screensprop, onCancel }) => {
               style={{ backgroundColor: "#00264d", minWidth: "90px" }}
               disabled={isSaving}
             >
-              {isSaving ? "Saving..." : "Update"}
+              Update
             </button>
             <button
               type="button"
