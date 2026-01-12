@@ -10,11 +10,11 @@ const PDF417Barcode = ({ value, width = 3, height = 10 }) => {
         bwipjs.toCanvas(canvasRef.current, {
           bcid: "pdf417",      // Barcode type
           text: value,         // Value to encode
-          scale: 2,            // 2x scaling factor
+          scale: 4,            // 2x scaling factor
           width,
           height,
           includetext: false,  // Hide human-readable text
-          eclevel: 4           // Error correction level 4
+          eclevel: 7           // Error correction level 4
         });
       } catch (e) {
         // Handle rendering errors if any

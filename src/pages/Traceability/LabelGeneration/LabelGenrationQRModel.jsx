@@ -213,7 +213,7 @@ footer={[
       </div>
 
       {/* Right section (Traceability spanning 3 rows) */}
-      <div
+      {/* <div
         style={{
           width: "160px",
           display: "flex",
@@ -226,7 +226,21 @@ footer={[
       >
         <div style={{ fontSize: "12px", marginBottom: "6px", textAlign: "center" }}>
           (17) Traceability (H)
-        </div>
+        </div> */}
+        <div
+  style={{
+    width: "30%",               
+    borderLeft: "2px solid #000",
+    padding: "6px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center"
+  }}
+>
+  <div style={{ fontSize: "12px", marginBottom: "6px" }}>
+    (17) Traceability (H)
+  </div>
         <PDF417Barcode value={data.traceability} width={30} height={10} />
       </div>
     </div>
