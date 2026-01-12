@@ -382,6 +382,7 @@ const LabelGeneration = () => {
                 ]}
               >
                 <Select
+                showSearch
                   placeholder="Select a ChildPartcode"
                   onChange={(value) => {
                     // Find the selected item and set the description
@@ -516,7 +517,11 @@ const LabelGeneration = () => {
                   { required: true, message: "Please select Supplier Number" },
                 ]}
               >
-                <Select placeholder="Select a Supplier Number">
+                <Select 
+                showSearch 
+                placeholder="Select a Supplier Number"
+                optionFilterProp="children">
+                  
                   {supplierList.map((statuslis) => (
                     <Option
                       key={statuslis.vendorCode}
