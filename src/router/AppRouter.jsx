@@ -23,6 +23,7 @@ import LabelPrint from "../pages/Traceability/LabelPrint";
 import ExternalRedirect from "./ExternalRedirect";
 import NotFound from "../Errors/404";
 import PicklistVerification from "../pages/Traceability/Reports/PicklistVerification";
+import LabelGeneration from "../pages/Traceability/LabelGeneration";
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -66,6 +67,8 @@ export default function AppRouter() {
           <Route path="/externalapp" element={<ExternalRedirect />} />
            <Route path="/notfound404" element={<NotFound />} />
            <Route path="/picklist-verification" element={<PicklistVerification />} />
+           <Route path="/labelGeneration" element={<LabelGeneration />} />
+           
         </Route>
             ):(
               <Route path="*" element={<NotFound />} />
